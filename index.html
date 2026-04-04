@@ -4,40 +4,44 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>BCyberAware – Live Threat Intelligence | Vikas Pandita</title>
-  <meta name="description" content="Live cybersecurity threat intelligence dashboard. Real advisories from CISA KEV, NVD, and CERT-In India. Built by Vikas Pandita." />
+  <meta name="description" content="Live cybersecurity threat intelligence. Real advisories from CISA, NVD, NCSC UK, CERT-In, Exploit-DB, The Hacker News and more. Built by Vikas Pandita." />
   <meta name="author" content="Vikas Pandita" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%237b2ff7'/%3E%3Cstop offset='100%25' stop-color='%2300c8ff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='12' fill='url(%23g)'/%3E%3Ctext x='50%25' y='72%25' text-anchor='middle' font-family='Arial Black,sans-serif' font-weight='900' font-size='36' fill='white'%3EB%3C/text%3E%3C/svg%3E" />
+  <meta property="og:title"       content="BCyberAware – Live Threat Intelligence by Vikas Pandita" />
+  <meta property="og:description" content="Real-time cybersecurity advisories from CISA, NVD, NCSC UK, CERT-In, Exploit-DB, The Hacker News and more." />
+  <meta property="og:type"        content="website" />
+  <meta property="og:url"         content="https://bcyberawarebyvikaspandita.netlify.app/" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
   <style>
-    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
-    body { background:#05080f; color:#c8d8e8; font-family:'Courier New',monospace; }
-    ::-webkit-scrollbar { width:3px } ::-webkit-scrollbar-thumb { background:rgba(0,200,255,0.15) }
-    a { color:inherit; text-decoration:none; }
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+    body{background:#05080f;color:#c8d8e8;font-family:'Segoe UI',Arial,sans-serif}
+    ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:rgba(0,200,255,0.2)}
+    a{color:inherit;text-decoration:none}
   </style>
 </head>
 <body>
 <div id="root">
-  <div style="height:100vh;display:flex;align-items:center;justify-content:center;color:#00c8ff;font-family:monospace;font-size:12px;letter-spacing:3px;">
+  <div style="height:100vh;display:flex;align-items:center;justify-content:center;color:#00c8ff;font-family:monospace;font-size:13px;letter-spacing:3px">
     LOADING BCYBERAWARE…
   </div>
 </div>
-
 <script type="text/babel">
 // ─────────────────────────────────────────────────────────────────────────────
 // BCyberAware | Live Threat Intelligence Dashboard
-// Author  : Vikas Pandita
-// Role    : Assistant CISO & Global Head of Security Architecture
+// Author  : Vikas Pandita | Global Head of Security Architecture
 // Brand   : BCyberAware – Security Intelligence for the Modern Enterprise
-// Sources : CISA KEV (live) · NVD/CVE.org (live) · CERT-In India (live)
-// Version : 2.0 Free | 2025 | MIT Licence
+// Sources : CISA KEV · CISA Alerts · NVD · CERT-In · NCSC UK ·
+//           Exploit-DB · The Hacker News · Bleeping Computer · SANS ISC
+// Version : 3.0 | 2025 | MIT Licence
 // ─────────────────────────────────────────────────────────────────────────────
 
 const { useState, useEffect, useCallback } = React;
 
-const PROXY  = "/.netlify/functions/proxy";
-const ACCENT = "#00c8ff";
-const ACCENT2= "#7b2ff7";
+const PROXY   = "/.netlify/functions/proxy";
+const ACCENT  = "#00c8ff";
+const ACCENT2 = "#7b2ff7";
 
 const SEV_S = {
   CRITICAL:{ bg:"rgba(200,0,0,0.15)",   border:"#c00000", text:"#ff4444" },
@@ -47,73 +51,86 @@ const SEV_S = {
 };
 const SEV_ORDER = ["CRITICAL","HIGH","MEDIUM","LOW"];
 
-// ── Load live feed from proxy ─────────────────────────────────────────────────
 async function loadFeed() {
   const r = await fetch(`${PROXY}?action=feed`);
   if (!r.ok) throw new Error(`Feed error ${r.status}`);
   return r.json();
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
+// ── Components ────────────────────────────────────────────────────────────────
 function SevBadge({ sev, small }) {
   const s = SEV_S[sev] || SEV_S.LOW;
-  return (
-    <span style={{ fontSize:small?8:9, fontWeight:800, letterSpacing:1.5,
-      padding:small?"2px 6px":"3px 9px", background:s.bg,
-      border:`1px solid ${s.border}`, color:s.text, borderRadius:2,
-      whiteSpace:"nowrap", fontFamily:"monospace" }}>
-      {sev}
-    </span>
-  );
+  return <span style={{ fontSize:small?8:9, fontWeight:800, letterSpacing:1.5,
+    padding:small?"2px 6px":"3px 9px", background:s.bg,
+    border:`1px solid ${s.border}`, color:s.text, borderRadius:2,
+    whiteSpace:"nowrap", fontFamily:"monospace" }}>{sev}</span>;
 }
 
 function StatCard({ label, value, color, sub }) {
   return (
-    <div style={{ flex:1, minWidth:85, background:"rgba(255,255,255,0.02)",
+    <div style={{ flex:1, minWidth:80, background:"rgba(255,255,255,0.02)",
       border:"1px solid rgba(255,255,255,0.06)", borderRadius:4,
       padding:"11px 12px", textAlign:"center" }}>
-      <div style={{ fontSize:26, fontWeight:900, color:color||ACCENT,
+      <div style={{ fontSize:24, fontWeight:900, color:color||ACCENT,
         fontFamily:"monospace", lineHeight:1 }}>{value}</div>
-      <div style={{ fontSize:7.5, letterSpacing:2, color:"rgba(200,220,240,0.35)",
+      <div style={{ fontSize:7.5, letterSpacing:1.5, color:"rgba(200,220,240,0.35)",
         textTransform:"uppercase", marginTop:5 }}>{label}</div>
-      {sub && <div style={{ fontSize:8, color:"rgba(200,220,240,0.2)", marginTop:2 }}>{sub}</div>}
+      {sub&&<div style={{ fontSize:7.5, color:"rgba(200,220,240,0.2)", marginTop:2 }}>{sub}</div>}
     </div>
   );
 }
 
 function AdvisoryCard({ adv }) {
   const s = SEV_S[adv.severity] || SEV_S.LOW;
+  const isNews    = adv.category === "news";
+  const isExploit = adv.category === "exploit";
+  const borderCol = isNews ? "#1976d2" : isExploit ? "#c00000" : s.border;
+
   return (
-    <div style={{ background:"rgba(5,8,15,0.9)", border:`1px solid ${s.border}22`,
-      borderLeft:`3px solid ${s.border}`, borderRadius:4, padding:"13px 15px",
-      marginBottom:7, boxShadow:adv.exploit_in_wild?`0 0 10px ${s.border}10`:"none" }}>
-      {/* Badges */}
+    <div style={{ background:"rgba(5,8,15,0.9)",
+      border:`1px solid ${borderCol}22`,
+      borderLeft:`3px solid ${borderCol}`,
+      borderRadius:4, padding:"13px 15px", marginBottom:7,
+      boxShadow:adv.exploit_in_wild?`0 0 10px ${borderCol}10`:"none" }}>
+
+      {/* Badges row */}
       <div style={{ display:"flex", gap:5, flexWrap:"wrap", alignItems:"center", marginBottom:6 }}>
-        <SevBadge sev={adv.severity} small />
-        {adv.exploit_in_wild && (
-          <span style={{ fontSize:7.5, padding:"2px 6px", background:"rgba(200,0,0,0.15)",
-            border:"1px solid #c0000055", color:"#ff4444", letterSpacing:1, fontFamily:"monospace" }}>
-            ⚡ EXPLOIT IN WILD
-          </span>
+        {!isNews && <SevBadge sev={adv.severity} small />}
+        {isNews && (
+          <span style={{ fontSize:8, padding:"2px 7px", background:"rgba(25,118,210,0.15)",
+            border:"1px solid #1976d255", color:"#64b5f6", letterSpacing:1,
+            fontFamily:"monospace" }}>📰 NEWS</span>
         )}
-        {adv.middle_east_relevance === "HIGH" && (
-          <span style={{ fontSize:7.5, padding:"2px 6px", background:"rgba(0,166,81,0.1)",
-            border:"1px solid #00a65155", color:"#00e676", letterSpacing:1, fontFamily:"monospace" }}>
-            🌍 GCC RISK
-          </span>
+        {isExploit && (
+          <span style={{ fontSize:8, padding:"2px 7px", background:"rgba(200,0,0,0.15)",
+            border:"1px solid #c0000055", color:"#ff4444", letterSpacing:1,
+            fontFamily:"monospace" }}>⚡ PUBLIC EXPLOIT</span>
+        )}
+        {adv.exploit_in_wild && !isExploit && (
+          <span style={{ fontSize:8, padding:"2px 6px", background:"rgba(200,0,0,0.15)",
+            border:"1px solid #c0000055", color:"#ff4444", letterSpacing:1,
+            fontFamily:"monospace" }}>⚡ EXPLOIT IN WILD</span>
+        )}
+        {adv.middle_east_relevance==="HIGH" && (
+          <span style={{ fontSize:8, padding:"2px 6px", background:"rgba(0,166,81,0.1)",
+            border:"1px solid #00a65155", color:"#00e676", letterSpacing:1,
+            fontFamily:"monospace" }}>🌍 GCC RISK</span>
         )}
         <a href={adv.source_url||"#"} target="_blank" rel="noopener noreferrer"
           style={{ fontSize:8, color:"rgba(200,220,240,0.3)", fontFamily:"monospace" }}>
-          {adv.source} · {adv.date} ↗
+          {adv.source_flag} {adv.source} · {adv.date} ↗
         </a>
       </div>
+
       {/* Title */}
       <div style={{ fontSize:12.5, fontWeight:700, color:"#ddeeff",
         marginBottom:5, lineHeight:1.4 }}>{adv.title}</div>
+
       {/* Summary */}
       <div style={{ fontSize:11, color:"rgba(200,220,240,0.48)",
         lineHeight:1.65, marginBottom:6 }}>{adv.summary}</div>
-      {/* CVE + Actor tags */}
+
+      {/* Tags */}
       <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
         {adv.cve_ids?.map(c => (
           <a key={c} href={`https://nvd.nist.gov/vuln/detail/${c}`}
@@ -131,7 +148,7 @@ function AdvisoryCard({ adv }) {
             🎯 {adv.threat_actor}
           </span>
         )}
-        {adv.patch_available && (
+        {adv.patch_available && !isNews && (
           <span style={{ fontSize:8.5, color:"#00e676", fontFamily:"monospace",
             background:"rgba(0,200,100,0.06)", padding:"2px 8px",
             border:"1px solid rgba(0,200,100,0.18)", borderRadius:2 }}>
@@ -146,6 +163,8 @@ function AdvisoryCard({ adv }) {
 // ── Main App ──────────────────────────────────────────────────────────────────
 function BCyberAwareDashboard() {
   const [advisories, setAdvisories] = useState([]);
+  const [exploits,   setExploits]   = useState([]);
+  const [news,       setNews]       = useState([]);
   const [feedMeta,   setFeedMeta]   = useState(null);
   const [loading,    setLoading]    = useState(true);
   const [feedError,  setFeedError]  = useState(null);
@@ -153,23 +172,23 @@ function BCyberAwareDashboard() {
   const [filterME,   setFilterME]   = useState(false);
   const [filterExp,  setFilterExp]  = useState(false);
   const [view,       setView]       = useState("feed");
+  const [feedTab,    setFeedTab]    = useState("advisories");
 
   const refreshFeed = useCallback(async () => {
     setLoading(true); setFeedError(null);
     try {
       const data = await loadFeed();
       setAdvisories(data.advisories || []);
+      setExploits(data.exploits     || []);
+      setNews(data.news             || []);
       setFeedMeta(data);
-    } catch(e) {
-      setFeedError("Could not reach live feed: " + e.message);
-    }
+    } catch(e) { setFeedError("Could not reach live feed: " + e.message); }
     setLoading(false);
   }, []);
 
   useEffect(() => { refreshFeed(); }, []);
 
-  // Filtered + sorted
-  const filtered = advisories
+  const applyFilters = arr => arr
     .filter(a => {
       if (filterSev !== "All" && a.severity !== filterSev) return false;
       if (filterME  && a.middle_east_relevance !== "HIGH") return false;
@@ -178,92 +197,114 @@ function BCyberAwareDashboard() {
     })
     .sort((a,b) => SEV_ORDER.indexOf(a.severity) - SEV_ORDER.indexOf(b.severity));
 
-  const counts = { CRITICAL:0, HIGH:0, MEDIUM:0, LOW:0 };
-  advisories.forEach(a => { if (counts[a.severity] !== undefined) counts[a.severity]++; });
+  const fAdvisories = applyFilters(advisories);
+  const fExploits   = applyFilters(exploits);
+  const fNews       = news; // news doesn't need sev filter
+
+  const allItems = [...advisories, ...exploits, ...news];
+  const counts   = { CRITICAL:0, HIGH:0, MEDIUM:0, LOW:0 };
+  advisories.forEach(a => { if (counts[a.severity]!==undefined) counts[a.severity]++; });
+
+  const FEED_TABS = [
+    { id:"advisories", label:`🏛️ ADVISORIES (${advisories.length})` },
+    { id:"exploits",   label:`⚡ EXPLOITS (${exploits.length})` },
+    { id:"news",       label:`📰 NEWS (${news.length})` },
+  ];
+
+  const SOURCES_DATA = [
+    { name:"CISA KEV",          cat:"Advisory", flag:"🇺🇸", status:"live",   color:"#e05000", url:"https://www.cisa.gov/known-exploited-vulnerabilities-catalog", desc:"Actively exploited vulnerabilities — updated continuously by US CISA." },
+    { name:"CISA Alerts",       cat:"Advisory", flag:"🇺🇸", status:"live",   color:"#e05000", url:"https://www.cisa.gov/news-events/cybersecurity-advisories",    desc:"Full US-CERT security alerts and advisories." },
+    { name:"NVD / CVE.org",     cat:"Advisory", flag:"🌐", status:"live",   color:"#8b0000", url:"https://nvd.nist.gov",                                          desc:"NIST National Vulnerability Database — all published CVEs with CVSS scoring." },
+    { name:"CERT-In India",     cat:"Advisory", flag:"🇮🇳", status:"live",   color:"#ff6b00", url:"https://www.cert-in.org.in",                                   desc:"India's national CERT — enterprise software advisories." },
+    { name:"NCSC UK",           cat:"Advisory", flag:"🇬🇧", status:"live",   color:"#003078", url:"https://www.ncsc.gov.uk",                                      desc:"UK National Cyber Security Centre — official threat reports and guidance." },
+    { name:"Exploit-DB",        cat:"Exploit",  flag:"⚡", status:"live",   color:"#cc0000", url:"https://www.exploit-db.com",                                   desc:"Public exploit database — proof-of-concept exploits for known vulnerabilities." },
+    { name:"The Hacker News",   cat:"News",     flag:"📰", status:"live",   color:"#e91e63", url:"https://thehackernews.com",                                    desc:"Leading cybersecurity news — breaking stories, APTs, data breaches, and vulnerabilities." },
+    { name:"Bleeping Computer", cat:"News",     flag:"📰", status:"live",   color:"#2196f3", url:"https://www.bleepingcomputer.com",                             desc:"Breaking security and technology news — ransomware, malware, and incident reports." },
+    { name:"SANS ISC",          cat:"News",     flag:"🔍", status:"live",   color:"#ff9800", url:"https://isc.sans.edu",                                         desc:"SANS Internet Storm Center — daily threat intelligence and handler diaries." },
+    { name:"UAE CERT",          cat:"Advisory", flag:"🇦🇪", status:"no_api", color:"#00a651", url:"https://www.tra.gov.ae",                                      desc:"UAE CERT advisories are published on their portal — no public machine-readable API." },
+    { name:"Saudi CERT",        cat:"Advisory", flag:"🇸🇦", status:"no_api", color:"#006c35", url:"https://www.ncsc.gov.sa",                                     desc:"Saudi CERT — no public API. GCC threats covered via CISA KEV and NVD." },
+    { name:"Twitter/X Security",cat:"News",     flag:"🐦", status:"no_api", color:"#555",    url:"https://twitter.com",                                          desc:"Twitter API now requires $100/month paid plan. Security community content is covered via The Hacker News and Bleeping Computer RSS feeds." },
+  ];
 
   return (
     <div style={{ minHeight:"100vh", background:"#05080f" }}>
       <style>{`
-        @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
         @keyframes fadeIn{from{opacity:0}to{opacity:1}}
         @keyframes shimmer{0%{left:-60%}100%{left:120%}}
-        @keyframes glow{0%,100%{opacity:0.7}50%{opacity:1}}
-        .nbtn:hover{border-color:rgba(0,200,255,0.4)!important;color:#00c8ff!important}
+        @keyframes glow{0%,100%{opacity:.7}50%{opacity:1}}
+        .nb:hover{border-color:rgba(0,200,255,.4)!important;color:#00c8ff!important}
+        .ftab:hover{background:rgba(0,200,255,.05)!important}
       `}</style>
 
       {/* ── Top Bar ── */}
-      <div style={{ background:"rgba(0,0,0,0.65)",
-        borderBottom:"1px solid rgba(0,200,255,0.08)",
+      <div style={{ background:"rgba(0,0,0,.65)", borderBottom:"1px solid rgba(0,200,255,.08)",
         position:"sticky", top:0, zIndex:50 }}>
-        <div style={{ maxWidth:1060, margin:"0 auto", padding:"0 18px",
-          display:"flex", alignItems:"center", justifyContent:"space-between", height:52 }}>
-          {/* Logo */}
-          <div style={{ display:"flex", alignItems:"center", gap:14 }}>
-            <div style={{ display:"flex", alignItems:"center", gap:9 }}>
-              <div style={{ width:28, height:28, borderRadius:5,
+        <div style={{ maxWidth:1100, margin:"0 auto", padding:"0 18px",
+          display:"flex", alignItems:"center", justifyContent:"space-between", height:62 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:16 }}>
+            {/* Logo */}
+            <div style={{ display:"flex", alignItems:"center", gap:11 }}>
+              <div style={{ width:40, height:40, borderRadius:8,
                 background:`linear-gradient(135deg,${ACCENT2},${ACCENT})`,
                 display:"flex", alignItems:"center", justifyContent:"center",
-                fontWeight:900, color:"#fff", fontSize:14, animation:"glow 3s infinite" }}>B</div>
+                fontWeight:900, color:"#fff", fontSize:22,
+                fontFamily:"Arial Black,sans-serif",
+                boxShadow:`0 0 18px ${ACCENT}44`, animation:"glow 3s infinite" }}>B</div>
               <div>
-                <div style={{ fontSize:12, fontWeight:900, color:ACCENT,
-                  letterSpacing:1.5, lineHeight:1 }}>BCyberAware</div>
-                <div style={{ fontSize:7, color:"rgba(200,220,240,0.3)",
-                  letterSpacing:1 }}>by Vikas Pandita</div>
+                <div style={{ fontSize:17, fontWeight:900, color:ACCENT,
+                  letterSpacing:2, lineHeight:1.1,
+                  fontFamily:"Arial Black,sans-serif" }}>BCyberAware</div>
+                <div style={{ fontSize:8.5, color:"rgba(200,220,240,.4)",
+                  letterSpacing:1.5, marginTop:2 }}>by Vikas Pandita</div>
               </div>
             </div>
-            <div style={{ width:1, height:20, background:"rgba(255,255,255,0.07)" }}/>
+            <div style={{ width:1, height:22, background:"rgba(255,255,255,.07)" }}/>
             {/* Nav */}
             {[["feed","▦ LIVE FEED"],["sources","◎ SOURCES"],["about","◉ ABOUT"]].map(([v,l]) => (
-              <button key={v} className="nbtn" onClick={() => setView(v)} style={{
-                padding:"4px 10px",
-                background:view===v?"rgba(0,200,255,0.08)":"transparent",
-                border:`1px solid ${view===v?"rgba(0,200,255,0.3)":"rgba(255,255,255,0.06)"}`,
-                color:view===v?ACCENT:"rgba(200,220,240,0.35)",
-                fontSize:7.5, letterSpacing:2, cursor:"pointer",
-                fontFamily:"monospace", borderRadius:2, transition:"all 0.2s" }}>{l}</button>
+              <button key={v} className="nb" onClick={() => setView(v)} style={{
+                padding:"5px 12px",
+                background:view===v?"rgba(0,200,255,.08)":"transparent",
+                border:`1px solid ${view===v?"rgba(0,200,255,.3)":"rgba(255,255,255,.06)"}`,
+                color:view===v?ACCENT:"rgba(200,220,240,.35)",
+                fontSize:8, letterSpacing:2, cursor:"pointer",
+                fontFamily:"monospace", borderRadius:2, transition:"all .2s" }}>{l}</button>
             ))}
           </div>
-          {/* Right side */}
-          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-            {loading && (
-              <span style={{ fontSize:7.5, color:ACCENT, letterSpacing:2,
-                animation:"pulse 1.5s infinite" }}>⟳ FETCHING LIVE DATA…</span>
-            )}
-            {!loading && feedMeta && (
-              <span style={{ fontSize:7.5, color:"rgba(200,220,240,0.22)" }}>
-                Updated {feedMeta.fetched_at_human}
-              </span>
-            )}
-            <button onClick={refreshFeed} disabled={loading} style={{
-              padding:"4px 10px", background:"transparent",
-              border:`1px solid rgba(0,200,255,0.22)`, color:ACCENT,
-              fontSize:7.5, letterSpacing:2,
-              cursor:loading?"not-allowed":"pointer",
-              fontFamily:"monospace", opacity:loading?0.4:1, borderRadius:2 }}>
-              ⟳ REFRESH
-            </button>
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            {loading && <span style={{ fontSize:8, color:ACCENT, letterSpacing:2,
+              animation:"pulse 1.5s infinite" }}>⟳ FETCHING 9 SOURCES…</span>}
+            {!loading && feedMeta && <span style={{ fontSize:8,
+              color:"rgba(200,220,240,.22)" }}>Updated {feedMeta.fetched_at_human}</span>}
+            <button onClick={refreshFeed} disabled={loading} className="nb" style={{
+              padding:"5px 12px", background:"transparent",
+              border:`1px solid rgba(0,200,255,.22)`, color:ACCENT,
+              fontSize:8, letterSpacing:2, cursor:loading?"not-allowed":"pointer",
+              fontFamily:"monospace", opacity:loading?.4:1, borderRadius:2 }}>⟳ REFRESH</button>
           </div>
         </div>
       </div>
 
-      <div style={{ maxWidth:1060, margin:"0 auto", padding:"18px 18px" }}>
+      <div style={{ maxWidth:1100, margin:"0 auto", padding:"18px" }}>
 
-        {/* ══════════════ LIVE FEED ══════════════ */}
+        {/* ══════════ LIVE FEED ══════════ */}
         {view==="feed" && (
-          <div style={{ animation:"fadeIn 0.3s ease" }}>
+          <div style={{ animation:"fadeIn .3s ease" }}>
+
             {/* Stats */}
-            <div style={{ display:"flex", gap:7, marginBottom:14, flexWrap:"wrap" }}>
-              <StatCard label="Total Advisories" value={advisories.length} color={ACCENT}/>
-              <StatCard label="Critical"          value={counts.CRITICAL}  color="#ff4444"/>
-              <StatCard label="High"              value={counts.HIGH}      color="#ff9944"/>
-              <StatCard label="GCC High Risk"     value={advisories.filter(a=>a.middle_east_relevance==="HIGH").length} color="#00e676" sub="Middle East"/>
-              <StatCard label="Exploit in Wild"   value={advisories.filter(a=>a.exploit_in_wild).length} color="#ff4444" sub="Active"/>
+            <div style={{ display:"flex", gap:7, marginBottom:16, flexWrap:"wrap" }}>
+              <StatCard label="Total Items"     value={allItems.length}   color={ACCENT}/>
+              <StatCard label="Advisories"      value={advisories.length} color="#00c8ff"/>
+              <StatCard label="Critical"        value={counts.CRITICAL}   color="#ff4444"/>
+              <StatCard label="Exploits"        value={exploits.length}   color="#ff4444"  sub="Public"/>
+              <StatCard label="Security News"   value={news.length}       color="#e91e63"/>
+              <StatCard label="GCC High Risk"   value={[...advisories,...exploits].filter(a=>a.middle_east_relevance==="HIGH").length} color="#00e676" sub="Middle East"/>
             </div>
 
-            {/* Shimmer loader */}
+            {/* Shimmer */}
             {loading && (
-              <div style={{ height:2, background:"rgba(0,200,255,0.06)",
-                overflow:"hidden", position:"relative", borderRadius:1, marginBottom:12 }}>
+              <div style={{ height:2, background:"rgba(0,200,255,.06)", overflow:"hidden",
+                position:"relative", borderRadius:1, marginBottom:14 }}>
                 <div style={{ position:"absolute", height:"100%", width:"55%",
                   background:`linear-gradient(90deg,transparent,${ACCENT},transparent)`,
                   animation:"shimmer 1.4s infinite" }}/>
@@ -272,185 +313,212 @@ function BCyberAwareDashboard() {
 
             {/* Error */}
             {feedError && (
-              <div style={{ padding:"10px 14px", background:"rgba(200,0,0,0.1)",
-                border:"1px solid rgba(200,0,0,0.3)", borderRadius:3,
-                marginBottom:12, fontSize:11, color:"#ff6666" }}>
-                ⚠ {feedError}
-              </div>
+              <div style={{ padding:"10px 14px", background:"rgba(200,0,0,.1)",
+                border:"1px solid rgba(200,0,0,.3)", borderRadius:3,
+                marginBottom:12, fontSize:11, color:"#ff6666" }}>⚠ {feedError}</div>
             )}
 
-            {/* Filters */}
-            <div style={{ display:"flex", gap:5, flexWrap:"wrap",
-              marginBottom:12, alignItems:"center" }}>
-              <span style={{ fontSize:7.5, color:"rgba(200,220,240,0.22)",
-                letterSpacing:2 }}>FILTER:</span>
-              {["All","CRITICAL","HIGH","MEDIUM","LOW"].map(s => {
-                const ss = SEV_S[s];
-                return (
-                  <button key={s} onClick={() => setFilterSev(s)} style={{
-                    padding:"3px 9px", fontSize:7.5, letterSpacing:1,
-                    cursor:"pointer", fontFamily:"monospace",
-                    background:filterSev===s?(ss?.bg||"rgba(0,200,255,0.08)"):"transparent",
-                    border:`1px solid ${filterSev===s?(ss?.border||ACCENT):"rgba(255,255,255,0.08)"}`,
-                    color:filterSev===s?(ss?.text||ACCENT):"rgba(200,220,240,0.3)",
-                    borderRadius:2 }}>{s}</button>
-                );
-              })}
-              <div style={{ width:1, height:12, background:"rgba(255,255,255,0.07)" }}/>
-              <button onClick={() => setFilterME(!filterME)} style={{
-                padding:"3px 9px", fontSize:7.5, letterSpacing:1,
-                cursor:"pointer", fontFamily:"monospace",
-                background:filterME?"rgba(0,166,81,0.1)":"transparent",
-                border:`1px solid ${filterME?"#00a651":"rgba(255,255,255,0.08)"}`,
-                color:filterME?"#00e676":"rgba(200,220,240,0.3)", borderRadius:2 }}>
-                🌍 GCC / Middle East
-              </button>
-              <button onClick={() => setFilterExp(!filterExp)} style={{
-                padding:"3px 9px", fontSize:7.5, letterSpacing:1,
-                cursor:"pointer", fontFamily:"monospace",
-                background:filterExp?"rgba(200,0,0,0.12)":"transparent",
-                border:`1px solid ${filterExp?"#c00000":"rgba(255,255,255,0.08)"}`,
-                color:filterExp?"#ff4444":"rgba(200,220,240,0.3)", borderRadius:2 }}>
-                ⚡ Exploit in Wild
-              </button>
-              <span style={{ fontSize:7.5, color:"rgba(200,220,240,0.2)" }}>
-                {filtered.length} advisories
-              </span>
+            {/* Feed Tabs */}
+            <div style={{ display:"flex", gap:4, marginBottom:14,
+              borderBottom:"1px solid rgba(255,255,255,.06)", paddingBottom:0 }}>
+              {FEED_TABS.map(t => (
+                <button key={t.id} className="ftab" onClick={() => setFeedTab(t.id)} style={{
+                  padding:"8px 14px", background:"transparent", border:"none",
+                  borderBottom:feedTab===t.id?`2px solid ${ACCENT}`:"2px solid transparent",
+                  color:feedTab===t.id?ACCENT:"rgba(200,220,240,.4)",
+                  fontSize:9, letterSpacing:1.5, cursor:"pointer",
+                  fontFamily:"monospace", transition:"all .2s" }}>{t.label}</button>
+              ))}
             </div>
 
-            {/* Advisory cards */}
-            {!loading && filtered.length === 0 && (
-              <div style={{ textAlign:"center", padding:"40px 0",
-                color:"rgba(200,220,240,0.25)", fontSize:11 }}>
-                No advisories match the current filters.
+            {/* Filters — only for advisories/exploits */}
+            {feedTab !== "news" && (
+              <div style={{ display:"flex", gap:5, flexWrap:"wrap",
+                marginBottom:12, alignItems:"center" }}>
+                <span style={{ fontSize:7.5, color:"rgba(200,220,240,.22)",
+                  letterSpacing:2, fontFamily:"monospace" }}>FILTER:</span>
+                {["All","CRITICAL","HIGH","MEDIUM","LOW"].map(s => {
+                  const ss = SEV_S[s];
+                  return (
+                    <button key={s} onClick={() => setFilterSev(s)} style={{
+                      padding:"3px 9px", fontSize:7.5, letterSpacing:1,
+                      cursor:"pointer", fontFamily:"monospace",
+                      background:filterSev===s?(ss?.bg||"rgba(0,200,255,.08)"):"transparent",
+                      border:`1px solid ${filterSev===s?(ss?.border||ACCENT):"rgba(255,255,255,.08)"}`,
+                      color:filterSev===s?(ss?.text||ACCENT):"rgba(200,220,240,.3)",
+                      borderRadius:2 }}>{s}</button>
+                  );
+                })}
+                <div style={{ width:1, height:12, background:"rgba(255,255,255,.07)" }}/>
+                <button onClick={() => setFilterME(!filterME)} style={{
+                  padding:"3px 9px", fontSize:7.5, letterSpacing:1, cursor:"pointer",
+                  fontFamily:"monospace",
+                  background:filterME?"rgba(0,166,81,.1)":"transparent",
+                  border:`1px solid ${filterME?"#00a651":"rgba(255,255,255,.08)"}`,
+                  color:filterME?"#00e676":"rgba(200,220,240,.3)", borderRadius:2 }}>
+                  🌍 GCC / Middle East
+                </button>
+                <button onClick={() => setFilterExp(!filterExp)} style={{
+                  padding:"3px 9px", fontSize:7.5, letterSpacing:1, cursor:"pointer",
+                  fontFamily:"monospace",
+                  background:filterExp?"rgba(200,0,0,.12)":"transparent",
+                  border:`1px solid ${filterExp?"#c00000":"rgba(255,255,255,.08)"}`,
+                  color:filterExp?"#ff4444":"rgba(200,220,240,.3)", borderRadius:2 }}>
+                  ⚡ Exploit in Wild
+                </button>
               </div>
             )}
-            {filtered.map(adv => <AdvisoryCard key={adv.id} adv={adv}/>)}
+
+            {/* Cards */}
+            {feedTab === "advisories" && (
+              <>
+                {!loading && fAdvisories.length === 0 && (
+                  <div style={{ textAlign:"center", padding:"40px 0",
+                    color:"rgba(200,220,240,.25)", fontSize:11 }}>No advisories match filters.</div>
+                )}
+                {fAdvisories.map(a => <AdvisoryCard key={a.id} adv={a}/>)}
+              </>
+            )}
+            {feedTab === "exploits" && (
+              <>
+                {!loading && fExploits.length === 0 && (
+                  <div style={{ textAlign:"center", padding:"40px 0",
+                    color:"rgba(200,220,240,.25)", fontSize:11 }}>No exploits match filters.</div>
+                )}
+                {fExploits.map(a => <AdvisoryCard key={a.id} adv={a}/>)}
+              </>
+            )}
+            {feedTab === "news" && (
+              <>
+                {!loading && fNews.length === 0 && (
+                  <div style={{ textAlign:"center", padding:"40px 0",
+                    color:"rgba(200,220,240,.25)", fontSize:11 }}>No news items yet.</div>
+                )}
+                {fNews.map(a => <AdvisoryCard key={a.id} adv={a}/>)}
+              </>
+            )}
           </div>
         )}
 
-        {/* ══════════════ SOURCES ══════════════ */}
+        {/* ══════════ SOURCES ══════════ */}
         {view==="sources" && (
-          <div style={{ maxWidth:660, margin:"0 auto", animation:"fadeIn 0.3s ease" }}>
-            <div style={{ fontSize:7.5, letterSpacing:4, color:ACCENT,
-              marginBottom:16, textAlign:"center" }}>INTELLIGENCE SOURCES</div>
-            {[
-              { name:"CISA Known Exploited Vulnerabilities", flag:"🇺🇸", status:"live",
-                url:"https://www.cisa.gov/known-exploited-vulnerabilities-catalog",
-                desc:"US Cybersecurity & Infrastructure Security Agency. The authoritative catalog of vulnerabilities actively exploited in the wild. Updated continuously.", color:"#e05000" },
-              { name:"NVD / CVE.org", flag:"🌐", status:"live",
-                url:"https://nvd.nist.gov",
-                desc:"NIST National Vulnerability Database. Comprehensive CVE scoring, CVSS ratings, and affected product data for all published vulnerabilities.", color:"#8b0000" },
-              { name:"CERT-In (India)", flag:"🇮🇳", status:"live",
-                url:"https://www.cert-in.org.in",
-                desc:"Indian Computer Emergency Response Team. Official security advisories from India's national CERT, covering enterprise software widely used across South Asia and the Middle East.", color:"#ff6b00" },
-              { name:"UAE CERT", flag:"🇦🇪", status:"no_api",
-                url:"https://www.tra.gov.ae",
-                desc:"UAE Telecommunications & Digital Government Regulatory Authority. Advisories are published on their portal but no public machine-readable API is available.", color:"#00a651" },
-              { name:"Saudi CERT (NCSC-SA)", flag:"🇸🇦", status:"no_api",
-                url:"https://www.ncsc.gov.sa",
-                desc:"Saudi Arabia's National Cybersecurity Authority. No public feed API. Saudi-relevant advisories are surfaced through CISA KEV and NVD coverage.", color:"#006c35" },
-            ].map(src => (
-              <div key={src.name} style={{ background:"rgba(255,255,255,0.02)",
-                border:"1px solid rgba(255,255,255,0.06)", borderRadius:4,
-                padding:"14px 16px", marginBottom:8 }}>
-                <div style={{ display:"flex", justifyContent:"space-between",
-                  alignItems:"flex-start", gap:10 }}>
-                  <div style={{ flex:1 }}>
-                    <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:6 }}>
-                      <span style={{ fontSize:14 }}>{src.flag}</span>
-                      <span style={{ fontSize:12.5, fontWeight:700, color:"#ddeeff" }}>{src.name}</span>
-                      <span style={{ fontSize:8, padding:"2px 7px",
-                        background:src.status==="live"?"rgba(0,150,70,0.12)":"rgba(200,170,0,0.1)",
-                        border:`1px solid ${src.status==="live"?"#008c46":"#c8a000"}`,
-                        color:src.status==="live"?"#00e676":"#ffd700",
-                        fontFamily:"monospace", letterSpacing:1 }}>
-                        {src.status==="live"?"● LIVE FEED":"◌ NO PUBLIC API"}
-                      </span>
-                    </div>
-                    <div style={{ fontSize:11, color:"rgba(200,220,240,0.45)",
-                      lineHeight:1.7 }}>{src.desc}</div>
-                  </div>
-                  <a href={src.url} target="_blank" rel="noopener noreferrer"
-                    style={{ fontSize:8, color:ACCENT, fontFamily:"monospace",
-                      border:`1px solid rgba(0,200,255,0.2)`, padding:"4px 10px",
-                      borderRadius:2, whiteSpace:"nowrap", flexShrink:0 }}>VISIT ↗</a>
+          <div style={{ maxWidth:720, margin:"0 auto", animation:"fadeIn .3s ease" }}>
+            <div style={{ textAlign:"center", marginBottom:20 }}>
+              <div style={{ fontSize:8, letterSpacing:4, color:ACCENT,
+                marginBottom:6, fontFamily:"monospace" }}>INTELLIGENCE SOURCES</div>
+              <div style={{ fontSize:11, color:"rgba(200,220,240,.35)" }}>
+                9 live sources · auto-refreshed every 6 hours · no API key required
+              </div>
+            </div>
+
+            {["Advisory","Exploit","News"].map(cat => (
+              <div key={cat} style={{ marginBottom:20 }}>
+                <div style={{ fontSize:8, letterSpacing:3, color:"rgba(0,200,255,.5)",
+                  marginBottom:10, fontFamily:"monospace", borderBottom:"1px solid rgba(255,255,255,.05)",
+                  paddingBottom:6 }}>
+                  {cat === "Advisory" ? "🏛️" : cat === "Exploit" ? "⚡" : "📰"} {cat.toUpperCase()} SOURCES
                 </div>
+                {SOURCES_DATA.filter(s => s.cat === cat).map(src => (
+                  <div key={src.name} style={{ background:"rgba(255,255,255,.02)",
+                    border:"1px solid rgba(255,255,255,.06)", borderRadius:4,
+                    padding:"13px 15px", marginBottom:7 }}>
+                    <div style={{ display:"flex", justifyContent:"space-between",
+                      alignItems:"flex-start", gap:10 }}>
+                      <div style={{ flex:1 }}>
+                        <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:5 }}>
+                          <span style={{ fontSize:16 }}>{src.flag}</span>
+                          <span style={{ fontSize:13, fontWeight:700, color:"#ddeeff" }}>{src.name}</span>
+                          <span style={{ fontSize:7.5, padding:"2px 7px", letterSpacing:1,
+                            fontFamily:"monospace",
+                            background:src.status==="live"?"rgba(0,150,70,.12)":"rgba(200,170,0,.1)",
+                            border:`1px solid ${src.status==="live"?"#008c46":"#c8a000"}`,
+                            color:src.status==="live"?"#00e676":"#ffd700" }}>
+                            {src.status==="live"?"● LIVE":"◌ NO API"}
+                          </span>
+                        </div>
+                        <div style={{ fontSize:11, color:"rgba(200,220,240,.42)",
+                          lineHeight:1.7 }}>{src.desc}</div>
+                      </div>
+                      <a href={src.url} target="_blank" rel="noopener noreferrer"
+                        style={{ fontSize:8, color:ACCENT, fontFamily:"monospace",
+                          border:`1px solid rgba(0,200,255,.2)`, padding:"4px 10px",
+                          borderRadius:2, whiteSpace:"nowrap", flexShrink:0 }}>VISIT ↗</a>
+                    </div>
+                  </div>
+                ))}
               </div>
             ))}
-            <div style={{ marginTop:14, padding:"11px 14px",
-              background:"rgba(0,200,255,0.04)",
-              border:"1px solid rgba(0,200,255,0.12)", borderRadius:3,
-              fontSize:10.5, color:"rgba(200,220,240,0.4)", lineHeight:1.7 }}>
-              ℹ The feed auto-refreshes every 6 hours. All CVE IDs link directly to NVD source records. No API key or login required.
-            </div>
           </div>
         )}
 
-        {/* ══════════════ ABOUT ══════════════ */}
+        {/* ══════════ ABOUT ══════════ */}
         {view==="about" && (
-          <div style={{ maxWidth:640, margin:"0 auto", animation:"fadeIn 0.3s ease" }}>
+          <div style={{ maxWidth:640, margin:"0 auto", animation:"fadeIn .3s ease" }}>
             <div style={{ textAlign:"center", marginBottom:26 }}>
-              <div style={{ width:56, height:56, borderRadius:10,
+              <div style={{ width:60, height:60, borderRadius:12,
                 background:`linear-gradient(135deg,${ACCENT2},${ACCENT})`,
                 display:"flex", alignItems:"center", justifyContent:"center",
-                fontSize:26, fontWeight:900, color:"#fff",
-                margin:"0 auto 14px" }}>B</div>
-              <div style={{ fontSize:20, fontWeight:900, color:"#ddeeff",
-                letterSpacing:2, marginBottom:5 }}>BCyberAware</div>
-              <div style={{ fontSize:9.5, color:"rgba(200,220,240,0.3)",
+                fontSize:28, fontWeight:900, color:"#fff",
+                fontFamily:"Arial Black,sans-serif",
+                margin:"0 auto 14px",
+                boxShadow:`0 0 30px ${ACCENT}33` }}>B</div>
+              <div style={{ fontSize:22, fontWeight:900, color:"#ddeeff",
+                letterSpacing:2, marginBottom:5,
+                fontFamily:"Arial Black,sans-serif" }}>BCyberAware</div>
+              <div style={{ fontSize:9.5, color:"rgba(200,220,240,.3)",
                 letterSpacing:2 }}>SECURITY INTELLIGENCE FOR THE MODERN ENTERPRISE</div>
             </div>
-            {/* Author */}
-            <div style={{ background:"rgba(255,255,255,0.02)",
-              border:"1px solid rgba(0,200,255,0.1)", borderRadius:4,
+
+            <div style={{ background:"rgba(255,255,255,.02)",
+              border:"1px solid rgba(0,200,255,.1)", borderRadius:4,
               padding:"18px 20px", marginBottom:10 }}>
-              <div style={{ fontSize:7.5, letterSpacing:3,
-                color:"rgba(0,200,255,0.5)", marginBottom:10,
-                fontFamily:"monospace" }}>AUTHOR</div>
-              <div style={{ fontSize:14, fontWeight:800, color:"#ddeeff",
+              <div style={{ fontSize:7.5, letterSpacing:3, color:"rgba(0,200,255,.5)",
+                marginBottom:10, fontFamily:"monospace" }}>AUTHOR</div>
+              <div style={{ fontSize:15, fontWeight:800, color:"#ddeeff",
                 marginBottom:4 }}>Vikas Pandita</div>
-              <div style={{ fontSize:11, color:"rgba(200,220,240,0.4)",
-                marginBottom:12 }}>
+              <div style={{ fontSize:11.5, color:"rgba(200,220,240,.45)", marginBottom:14 }}>
                 Global Head of Security Architecture · AI Researcher · Blogger
               </div>
               <div style={{ display:"flex", gap:7, flexWrap:"wrap" }}>
                 {["TOGAF 9.2","IIM Kozhikode EPGP","14+ Years Experience",
-                  "Big 4 Consulting","IOC Security Architect","Security Architecture"].map(b => (
+                  "Big 4 Consulting","IOC Security Architect","GenAI Security"].map(b => (
                   <span key={b} style={{ fontSize:8.5, color:ACCENT,
-                    fontFamily:"monospace", background:"rgba(0,200,255,0.06)",
-                    padding:"3px 9px", border:`1px solid rgba(0,200,255,0.18)`,
+                    fontFamily:"monospace", background:"rgba(0,200,255,.06)",
+                    padding:"3px 9px", border:`1px solid rgba(0,200,255,.18)`,
                     borderRadius:2 }}>{b}</span>
                 ))}
               </div>
             </div>
-            {/* Features */}
-            <div style={{ background:"rgba(255,255,255,0.02)",
-              border:"1px solid rgba(0,200,255,0.1)", borderRadius:4,
+
+            <div style={{ background:"rgba(255,255,255,.02)",
+              border:"1px solid rgba(0,200,255,.1)", borderRadius:4,
               padding:"18px 20px" }}>
-              <div style={{ fontSize:7.5, letterSpacing:3,
-                color:"rgba(0,200,255,0.5)", marginBottom:10,
-                fontFamily:"monospace" }}>WHAT BCYBERAWARE DOES</div>
+              <div style={{ fontSize:7.5, letterSpacing:3, color:"rgba(0,200,255,.5)",
+                marginBottom:10, fontFamily:"monospace" }}>PLATFORM CAPABILITIES</div>
               {[
-                "Live advisory feed from CISA KEV — actively exploited vulnerabilities updated daily",
-                "Live critical CVEs from NVD / CVE.org — last 30 days of critical severity",
-                "Live security alerts from CERT-In India — national CERT advisories",
+                "9 live intelligence sources — advisories, exploits, and security news",
+                "CISA KEV — actively exploited vulnerabilities updated daily by US CISA",
+                "CISA Alerts — full US-CERT security advisories",
+                "NVD / CVE.org — all critical CVEs from the last 30 days",
+                "CERT-In India — India's national CERT security advisories",
+                "NCSC UK — UK National Cyber Security Centre threat reports",
+                "Exploit-DB — public proof-of-concept exploits",
+                "The Hacker News — breaking cybersecurity news",
+                "Bleeping Computer — ransomware, malware and incident news",
+                "SANS ISC — daily threat intelligence from SANS handlers",
                 "GCC / Middle East relevance scoring per advisory",
-                "Severity filtering — Critical, High, Medium, Low",
-                "Exploit-in-Wild flag — know what is being actively attacked right now",
+                "Auto-refresh every 6 hours — always current",
                 "Direct CVE links to NVD source records",
-                "Threat actor attribution where available",
-                "Auto-refresh every 6 hours — no manual update needed",
               ].map((f,i) => (
-                <div key={i} style={{ fontSize:11, color:"rgba(200,220,240,0.48)",
-                  padding:"5px 0", borderBottom:"1px solid rgba(255,255,255,0.04)",
+                <div key={i} style={{ fontSize:11, color:"rgba(200,220,240,.48)",
+                  padding:"5px 0", borderBottom:"1px solid rgba(255,255,255,.04)",
                   display:"flex", gap:8 }}>
-                  <span style={{ color:ACCENT }}>▸</span>{f}
+                  <span style={{ color:ACCENT, flexShrink:0 }}>▸</span>{f}
                 </div>
               ))}
               <div style={{ marginTop:14, fontSize:8.5,
-                color:"rgba(200,220,240,0.2)", fontFamily:"monospace" }}>
-                Open source · MIT Licence · Contributions welcome
+                color:"rgba(200,220,240,.2)", fontFamily:"monospace" }}>
+                Open source · MIT Licence · Contributions welcome on GitHub
               </div>
             </div>
           </div>
@@ -458,10 +526,11 @@ function BCyberAwareDashboard() {
       </div>
 
       {/* Footer */}
-      <div style={{ borderTop:"1px solid rgba(255,255,255,0.04)",
-        marginTop:28, padding:"13px 18px", textAlign:"center" }}>
-        <div style={{ fontSize:8, color:"rgba(200,220,240,0.18)", letterSpacing:1.5 }}>
-          BCyberAware · Vikas Pandita · {new Date().getFullYear()} · MIT Licence · Data: CISA KEV · NVD · CERT-In India
+      <div style={{ borderTop:"1px solid rgba(255,255,255,.04)",
+        marginTop:28, padding:"14px 18px", textAlign:"center" }}>
+        <div style={{ fontSize:8, color:"rgba(200,220,240,.18)", letterSpacing:1.5 }}>
+          BCyberAware · Vikas Pandita · {new Date().getFullYear()} · MIT Licence ·
+          Sources: CISA KEV · CISA Alerts · NVD · CERT-In · NCSC UK · Exploit-DB · THN · Bleeping Computer · SANS ISC
         </div>
       </div>
     </div>
