@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BCyberAware – Live Threat Intelligence | Vikas Pandita</title>
+  <meta name="description" content="Live cybersecurity threat intelligence dashboard. Real advisories from CISA KEV, NVD, and CERT-In India. Built by Vikas Pandita." />
+  <meta name="author" content="Vikas Pandita" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    body { background:#05080f; color:#c8d8e8; font-family:'Courier New',monospace; }
+    ::-webkit-scrollbar { width:3px } ::-webkit-scrollbar-thumb { background:rgba(0,200,255,0.15) }
+    a { color:inherit; text-decoration:none; }
+  </style>
+</head>
+<body>
+<div id="root"><div style="height:100vh;display:flex;align-items:center;justify-content:center;color:#00c8ff;font-family:monospace;font-size:12px;letter-spacing:3px;">LOADING BCYBERAWARE…</div></div>
+
+<script type="text/babel">
+// ─────────────────────────────────────────────────────────────────────────────
+// BCyberAware | Live Threat Intelligence Dashboard
+// Author  : Vikas Pandita
+// Role    : Assistant CISO & Global Head of Security Architecture
+// Brand   : BCyberAware – Security Intelligence for the Modern Enterprise
+// Sources : CISA KEV (live) · NVD/CVE.org (live) · CERT-In India (live)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const { useState, useEffect, useCallback } = React;
+
+const PROXY   = "/.netlify/functions/proxy";
+const ACCENT  = "#00c8ff";
+const ACCENT2 = "#7b2ff7";
+
+const SEV_S = {
+  CRITICAL:{ bg:"rgba(200,0,0,0.15)",   border:"#c00000", text:"#ff4444" },
+  HIGH:    { bg:"rgba(220,100,0,0.13)", border:"#dd6600", text:"#ff9944" },
+  MEDIUM:  { bg:"rgba(200,170,0,0.11)", border:"#c8a000", text:"#ffd700" },
+  LOW:     { bg:"rgba(0,140,70,0.11)",  border:"#008c46", text:"#00e676" },
+};
+const SEV_ORDER = ["CRITICAL","HIGH","MEDIUM","LOW"];
+
+// ── API helpers ───────────────────────────────────────────────────────────────
+async function loadFeed() {
+  const r = await fetch(`${PROXY}?action=feed`);
+  if (!r.ok) throw new Error(`Feed error ${r.status}`);
+  return r.json();
+}
+
+async function callClaude(prompt) {
+  const r = await fetch(PROXY, {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:1000, messages:[{role:"user",content:prompt}] }),
+  });
+  if (!r.ok) throw new Error(`Proxy error ${r.status}`);
+  const d = await r.json();
+  if (d.error) throw new Error(d.error.message || "Claude API error");
+  const text = d.content.filter(b=>b.type==="text").map(b=>b.text).join("");
+  return JSON.parse(text.replace(/```json[\s\S]*?```|```/g,"").trim());
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+function SevBadge({ sev, small }) {
+  const s = SEV_S[sev] || SEV_S.LOW;
+  return <span style={{ fontSize:small?8:9, fontWeight:800, letterSpacing:1.5, padding:small?"2px 6px":"3px 9px", background:s.bg, border:`1px solid ${s.border}`, color:s.text, borderRadius:2, whiteSpace:"nowrap", fontFamily:"monospace" }}>{sev}</span>;
+}
+
+function StatCard({ label, value, color, sub }) {
+  return (
+    <div style={{ flex:1, minWidth:85, background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.06)", borderRadius:4, padding:"11px 12px", textAlign:"center" }}>
+      <div style={{ fontSize:26, fontWeight:900, color:color||ACCENT, fontFamily:"monospace", lineHeight:1 }}>{value}</div>
+      <div style={{ fontSize:7.5, letterSpacing:2, color:"rgba(200,220,240,0.35)", textTransform:"uppercase", marginTop:5 }}>{label}</div>
+      {sub&&<div style={{ fontSize:8, color:"rgba(200,220,240,0.2)", marginTop:2 }}>{sub}</div>}
+    </div>
+  );
+}
+
+function Lbl({ children, mt }) {
+  return <div style={{ fontSize:7.5, letterSpacing:3, color:"rgba(0,200,255,0.5)", marginBottom:7, marginTop:mt||14, fontFamily:"monospace" }}>{children}</div>;
+}
+
+function InfoBox({ children, color, bg, border }) {
+  return <div style={{ fontSize:11.5, color:color||"#c8d8e8", lineHeight:1.8, padding:"11px 13px", background:bg||"rgba(255,255,255,0.02)", border:`1px solid ${border||"rgba(255,255,255,0.06)"}`, borderRadius:3, marginBottom:10 }}>{children}</div>;
+}
+
+function AdvisoryCard({ adv, onAnalyse, analysing }) {
+  const s = SEV_S[adv.severity] || SEV_S.LOW;
+  return (
+    <div style={{ background:"rgba(5,8,15,0.9)", border:`1px solid ${s.border}22`, borderLeft:`3px solid ${s.border}`, borderRadius:4, padding:"13px 15px", marginBottom:7, boxShadow:adv.exploit_in_wild?`0 0 10px ${s.border}10`:"none" }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:10 }}>
+        <div style={{ flex:1 }}>
+          {/* Badges row */}
+          <div style={{ display:"flex", gap:5, flexWrap:"wrap", alignItems:"center", marginBottom:6 }}>
+            <SevBadge sev={adv.severity} small />
+            {adv.exploit_in_wild&&<span style={{ fontSize:7.5, padding:"2px 6px", background:"rgba(200,0,0,0.15)", border:"1px solid #c0000055", color:"#ff4444", letterSpacing:1, fontFamily:"monospace" }}>⚡ EXPLOIT IN WILD</span>}
+            {adv.middle_east_relevance==="HIGH"&&<span style={{ fontSize:7.5, padding:"2px 6px", background:"rgba(0,166,81,0.1)", border:"1px solid #00a65155", color:"#00e676", letterSpacing:1, fontFamily:"monospace" }}>🌍 GCC RISK</span>}
+            <a href={adv.source_url||"#"} target="_blank" rel="noopener noreferrer" style={{ fontSize:8, color:"rgba(200,220,240,0.3)", fontFamily:"monospace" }}>
+              {adv.source} · {adv.date} ↗
+            </a>
+          </div>
+          {/* Title */}
+          <div style={{ fontSize:12.5, fontWeight:700, color:"#ddeeff", marginBottom:5, lineHeight:1.4 }}>{adv.title}</div>
+          {/* Summary */}
+          <div style={{ fontSize:11, color:"rgba(200,220,240,0.48)", lineHeight:1.65, marginBottom:6 }}>{adv.summary}</div>
+          {/* CVE + Actor tags */}
+          <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+            {adv.cve_ids?.map(c=>(
+              <a key={c} href={`https://nvd.nist.gov/vuln/detail/${c}`} target="_blank" rel="noopener noreferrer" style={{ fontSize:8.5, color:ACCENT, fontFamily:"monospace", background:"rgba(0,200,255,0.06)", padding:"2px 8px", border:`1px solid rgba(0,200,255,0.18)`, borderRadius:2 }}>{c} ↗</a>
+            ))}
+            {adv.threat_actor&&<span style={{ fontSize:8.5, color:"#c084fc", fontFamily:"monospace", background:"rgba(123,47,247,0.08)", padding:"2px 8px", border:"1px solid rgba(123,47,247,0.2)", borderRadius:2 }}>🎯 {adv.threat_actor}</span>}
+          </div>
+        </div>
+        <button onClick={()=>onAnalyse(adv)} disabled={analysing} style={{ padding:"8px 12px", background:"transparent", border:`1px solid rgba(0,200,255,0.28)`, color:ACCENT, fontSize:8, letterSpacing:2, cursor:analysing?"not-allowed":"pointer", fontFamily:"monospace", whiteSpace:"nowrap", opacity:analysing?0.45:1, flexShrink:0, borderRadius:2 }}>
+          {analysing?"ANALYSING…":"▶ ANALYSE"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function BriefModal({ brief, adv, onClose }) {
+  const [tab, setTab]       = useState("exec");
+  const [copied, setCopied] = useState(false);
+  if (!brief) return null;
+  const rl = SEV_S[brief.relevance] || SEV_S.LOW;
+  const copy = () => { navigator.clipboard?.writeText(brief.share_message); setCopied(true); setTimeout(()=>setCopied(false),2000); };
+
+  return (
+    <div onClick={onClose} style={{ position:"fixed", inset:0, background:"rgba(0,3,10,0.92)", zIndex:200, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
+      <div onClick={e=>e.stopPropagation()} style={{ background:"#0a0f1e", border:`1px solid ${rl.border}`, borderRadius:6, maxWidth:700, width:"100%", maxHeight:"88vh", overflow:"auto", boxShadow:`0 0 60px ${rl.border}25` }}>
+        {/* Header */}
+        <div style={{ background:rl.bg, padding:"16px 20px", borderBottom:`1px solid ${rl.border}33` }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+            <div>
+              <div style={{ fontSize:7.5, letterSpacing:4, color:ACCENT, marginBottom:6, fontFamily:"monospace" }}>BCYBERAWARE · AI INTELLIGENCE BRIEF</div>
+              <div style={{ fontSize:14, fontWeight:800, color:"#ddeeff", marginBottom:7, lineHeight:1.4 }}>{adv?.title}</div>
+              <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                <SevBadge sev={brief.relevance} />
+                <span style={{ fontSize:8.5, color:"rgba(200,220,240,0.35)", fontFamily:"monospace" }}>Relevance: {brief.relevance_score}/100</span>
+              </div>
+            </div>
+            <button onClick={onClose} style={{ background:"none", border:"none", color:"rgba(200,220,240,0.3)", fontSize:18, cursor:"pointer" }}>✕</button>
+          </div>
+        </div>
+        {/* Tabs */}
+        <div style={{ display:"flex", borderBottom:"1px solid rgba(255,255,255,0.05)", padding:"0 20px" }}>
+          {[["exec","EXECUTIVE"],["tech","TECHNICAL"],["actions","ACTIONS"],["share","📤 SHARE"]].map(([id,lbl])=>(
+            <button key={id} onClick={()=>setTab(id)} style={{ padding:"8px 13px", background:"none", border:"none", borderBottom:tab===id?`2px solid ${ACCENT}`:"2px solid transparent", color:tab===id?ACCENT:"rgba(200,220,240,0.3)", fontSize:8, letterSpacing:2, cursor:"pointer", fontFamily:"monospace" }}>{lbl}</button>
+          ))}
+        </div>
+        {/* Body */}
+        <div style={{ padding:"18px 20px" }}>
+          {tab==="exec"&&<>
+            <Lbl mt={0}>CISO EXECUTIVE SUMMARY</Lbl>
+            <InfoBox>{brief.executive_summary}</InfoBox>
+            <Lbl>BUSINESS RISK IF UNPATCHED</Lbl>
+            <InfoBox color="#ff9944" bg="rgba(220,100,0,0.07)" border="rgba(220,100,0,0.22)">⚠ {brief.risk_if_unpatched}</InfoBox>
+            <div style={{ display:"flex", gap:14, flexWrap:"wrap" }}>
+              <div style={{ flex:1, minWidth:140 }}>
+                <Lbl>AFFECTED SYSTEMS</Lbl>
+                {brief.affected_systems?.map((s,i)=><div key={i} style={{ fontSize:11, color:"#c8d8e8", padding:"4px 0", borderBottom:"1px solid rgba(255,255,255,0.04)" }}>· {s}</div>)}
+              </div>
+              <div style={{ flex:1, minWidth:140 }}>
+                <Lbl>REGIONS AT RISK</Lbl>
+                {brief.affected_regions?.map((r,i)=><div key={i} style={{ fontSize:11, color:"#c8d8e8", padding:"4px 0", borderBottom:"1px solid rgba(255,255,255,0.04)" }}>🌍 {r}</div>)}
+              </div>
+            </div>
+          </>}
+          {tab==="tech"&&<>
+            <Lbl mt={0}>TECHNICAL ANALYSIS</Lbl>
+            <InfoBox>{brief.technical_summary}</InfoBox>
+            <Lbl>PATCH / MITIGATION GUIDANCE</Lbl>
+            <InfoBox color="#00e676" bg="rgba(0,150,70,0.07)" border="rgba(0,150,70,0.22)">✔ {brief.patch_recommendation}</InfoBox>
+            {brief.detection_queries?.length>0&&<>
+              <Lbl>SIEM / EDR HUNT QUERIES</Lbl>
+              {brief.detection_queries.map((q,i)=><div key={i} style={{ fontSize:10, color:ACCENT, fontFamily:"monospace", padding:"8px 12px", background:"rgba(0,0,0,0.4)", border:`1px solid rgba(0,200,255,0.12)`, borderRadius:2, marginBottom:6, overflowX:"auto" }}>{q}</div>)}
+            </>}
+          </>}
+          {tab==="actions"&&<>
+            <Lbl mt={0}>PRIORITISED RESPONSE PLAN</Lbl>
+            {brief.actions?.map((a,i)=>(
+              <div key={i} style={{ display:"flex", gap:12, padding:"11px", marginBottom:7, background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.05)", borderRadius:3 }}>
+                <div style={{ fontSize:18, fontWeight:900, color:i===0?"#ff4444":i===1?"#ff9944":"#ffd700", fontFamily:"monospace", minWidth:26, textAlign:"center" }}>{String(a.priority).padStart(2,"0")}</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:11.5, color:"#ddeeff", lineHeight:1.5, marginBottom:6 }}>{a.action}</div>
+                  <div style={{ display:"flex", gap:7, flexWrap:"wrap" }}>
+                    <span style={{ fontSize:8, color:ACCENT, fontFamily:"monospace", background:"rgba(0,200,255,0.06)", padding:"2px 8px" }}>👤 {a.owner}</span>
+                    <span style={{ fontSize:8, color:"#ffd700", fontFamily:"monospace", background:"rgba(200,170,0,0.06)", padding:"2px 8px" }}>⏱ {a.timeframe}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </>}
+          {tab==="share"&&<>
+            <Lbl mt={0}>READY-TO-SEND TEAM ALERT</Lbl>
+            <div style={{ fontSize:11.5, color:"#c8d8e8", lineHeight:1.9, padding:"14px", background:"rgba(0,0,0,0.35)", border:`1px solid rgba(0,200,255,0.15)`, borderRadius:3, marginBottom:12, whiteSpace:"pre-wrap", fontFamily:"monospace" }}>{brief.share_message}</div>
+            <button onClick={copy} style={{ padding:"9px 18px", background:copied?"rgba(0,230,118,0.1)":"transparent", border:`1px solid ${copied?"#00e676":"rgba(0,200,255,0.3)"}`, color:copied?"#00e676":ACCENT, fontSize:8.5, letterSpacing:2, cursor:"pointer", fontFamily:"monospace", borderRadius:2 }}>
+              {copied?"✔ COPIED":"⎘ COPY MESSAGE"}
+            </button>
+            <div style={{ marginTop:14, fontSize:8, color:"rgba(200,220,240,0.2)", fontFamily:"monospace" }}>— BCyberAware · Vikas Pandita · AI-assisted analysis of real advisory data</div>
+          </>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main App ──────────────────────────────────────────────────────────────────
+function BCyberAwareDashboard() {
+  const [advisories, setAdvisories] = useState([]);
+  const [feedMeta,   setFeedMeta]   = useState(null);
+  const [loading,    setLoading]    = useState(true);
+  const [feedError,  setFeedError]  = useState(null);
+  const [analysing,  setAnalysing]  = useState(null);
+  const [brief,      setBrief]      = useState(null);
+  const [activeAdv,  setActiveAdv]  = useState(null);
+  const [filterSev,  setFilterSev]  = useState("All");
+  const [filterME,   setFilterME]   = useState(false);
+  const [filterExp,  setFilterExp]  = useState(false);
+  const [view,       setView]       = useState("feed");
+  const [pasteText,  setPasteText]  = useState("");
+  const [pasteLoad,  setPasteLoad]  = useState(false);
+  const [pasteErr,   setPasteErr]   = useState(null);
+
+  const refreshFeed = useCallback(async () => {
+    setLoading(true); setFeedError(null);
+    try {
+      const data = await loadFeed();
+      setAdvisories(data.advisories || []);
+      setFeedMeta(data);
+    } catch (e) {
+      setFeedError("Could not reach live feed: " + e.message);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { refreshFeed(); }, []);
+
+  const handleAnalyse = async (adv) => {
+    setAnalysing(adv.id); setActiveAdv(adv); setBrief(null);
+    try {
+      const r = await callClaude(
+        `You are a senior cybersecurity analyst producing an intelligence brief for BCyberAware by Vikas Pandita (Assistant CISO, 14+ years Big 4 experience). Analyse this real advisory for enterprise security teams, with emphasis on Middle East / GCC organisations, logistics, transport, and enterprise IT/OT.
+ADVISORY (real data from ${adv.source}): ${JSON.stringify(adv)}
+Return ONLY valid JSON — no markdown:
+{"relevance":"CRITICAL"|"HIGH"|"MEDIUM"|"LOW","relevance_score":<0-100>,"executive_summary":"<2-3 sentences, business-impact first, CISO level>","technical_summary":"<3-4 sentences for security engineers>","affected_systems":["<system>"],"affected_regions":["<region>"],"actions":[{"priority":1,"action":"<specific action>","owner":"<team>","timeframe":"<24h|72h|1 week>"}],"patch_recommendation":"<clear instruction>","detection_queries":["<KQL or Splunk SPL hunt query>"],"share_message":"<WhatsApp/Teams alert, max 6 lines, include CVE/ID, signed BCyberAware by Vikas Pandita>","risk_if_unpatched":"<concrete business impact>","false_positive_note":"<caveats if any>"}`
+      );
+      setBrief(r);
+    } catch(e) { alert("Analysis failed: " + e.message); }
+    setAnalysing(null);
+  };
+
+  const handlePasteAnalyse = async () => {
+    if (!pasteText.trim()) return;
+    setPasteLoad(true); setPasteErr(null);
+    try {
+      const r = await callClaude(
+        `You are a senior cybersecurity analyst at BCyberAware by Vikas Pandita. Analyse this pasted advisory for enterprise relevance, focusing on Middle East / GCC, logistics, and enterprise environments.
+CONTENT: ${pasteText}
+Return ONLY valid JSON — no markdown:
+{"relevance":"CRITICAL"|"HIGH"|"MEDIUM"|"LOW","relevance_score":<0-100>,"executive_summary":"<2-3 sentences>","technical_summary":"<3-4 sentences>","affected_systems":["<s>"],"affected_regions":["<r>"],"actions":[{"priority":1,"action":"<action>","owner":"<team>","timeframe":"<timeframe>"}],"patch_recommendation":"<instruction>","detection_queries":["<query>"],"share_message":"<alert, signed BCyberAware>","risk_if_unpatched":"<risk>","false_positive_note":"<caveats>"}`
+      );
+      setActiveAdv({ title:"Custom Advisory Analysis", source:"Pasted Content", summary:pasteText.slice(0,120)+"…" });
+      setBrief(r);
+    } catch(e) { setPasteErr("Analysis failed: " + e.message); }
+    setPasteLoad(false);
+  };
+
+  // Filtered + sorted feed
+  const filtered = advisories
+    .filter(a => {
+      if (filterSev !== "All" && a.severity !== filterSev) return false;
+      if (filterME && a.middle_east_relevance !== "HIGH")  return false;
+      if (filterExp && !a.exploit_in_wild)                 return false;
+      return true;
+    })
+    .sort((a,b) => SEV_ORDER.indexOf(a.severity) - SEV_ORDER.indexOf(b.severity));
+
+  const counts = { CRITICAL:0, HIGH:0, MEDIUM:0, LOW:0 };
+  advisories.forEach(a => { if (counts[a.severity] !== undefined) counts[a.severity]++; });
+
+  return (
+    <div style={{ minHeight:"100vh", background:"#05080f" }}>
+      <style>{`
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+        @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+        @keyframes shimmer{0%{left:-60%}100%{left:120%}}
+        @keyframes glow{0%,100%{opacity:0.7}50%{opacity:1}}
+        .nbtn:hover{border-color:rgba(0,200,255,0.4)!important;color:${ACCENT}!important}
+      `}</style>
+
+      {brief && <BriefModal brief={brief} adv={activeAdv} onClose={()=>{setBrief(null);setActiveAdv(null);}}/>}
+
+      {/* ── Top Bar ── */}
+      <div style={{ background:"rgba(0,0,0,0.65)", borderBottom:"1px solid rgba(0,200,255,0.08)", position:"sticky", top:0, zIndex:50 }}>
+        <div style={{ maxWidth:1060, margin:"0 auto", padding:"0 18px", display:"flex", alignItems:"center", justifyContent:"space-between", height:52 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:14 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:9 }}>
+              <div style={{ width:28, height:28, borderRadius:5, background:`linear-gradient(135deg,${ACCENT2},${ACCENT})`, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:900, color:"#fff", fontSize:14, animation:"glow 3s infinite" }}>B</div>
+              <div>
+                <div style={{ fontSize:12, fontWeight:900, color:ACCENT, letterSpacing:1.5, lineHeight:1 }}>BCyberAware</div>
+                <div style={{ fontSize:7, color:"rgba(200,220,240,0.3)", letterSpacing:1 }}>by Vikas Pandita</div>
+              </div>
+            </div>
+            <div style={{ width:1, height:20, background:"rgba(255,255,255,0.07)" }}/>
+            {[["feed","▦ LIVE FEED"],["paste","⎘ ANALYSE"],["sources","◎ SOURCES"],["about","◉ ABOUT"]].map(([v,l])=>(
+              <button key={v} className="nbtn" onClick={()=>setView(v)} style={{ padding:"4px 10px", background:view===v?"rgba(0,200,255,0.08)":"transparent", border:`1px solid ${view===v?"rgba(0,200,255,0.3)":"rgba(255,255,255,0.06)"}`, color:view===v?ACCENT:"rgba(200,220,240,0.35)", fontSize:7.5, letterSpacing:2, cursor:"pointer", fontFamily:"monospace", borderRadius:2, transition:"all 0.2s" }}>{l}</button>
+            ))}
+          </div>
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            {loading && <span style={{ fontSize:7.5, color:ACCENT, letterSpacing:2, animation:"pulse 1.5s infinite" }}>⟳ FETCHING LIVE DATA…</span>}
+            {!loading && feedMeta && <span style={{ fontSize:7.5, color:"rgba(200,220,240,0.22)" }}>Updated {feedMeta.fetched_at_human}</span>}
+            <button onClick={refreshFeed} disabled={loading} style={{ padding:"4px 10px", background:"transparent", border:`1px solid rgba(0,200,255,0.22)`, color:ACCENT, fontSize:7.5, letterSpacing:2, cursor:loading?"not-allowed":"pointer", fontFamily:"monospace", opacity:loading?0.4:1, borderRadius:2 }}>⟳ REFRESH</button>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ maxWidth:1060, margin:"0 auto", padding:"18px 18px" }}>
+
+        {/* ═══════════════ LIVE FEED ═══════════════ */}
+        {view==="feed"&&<div style={{ animation:"fadeIn 0.3s ease" }}>
+          {/* Stats */}
+          <div style={{ display:"flex", gap:7, marginBottom:14, flexWrap:"wrap" }}>
+            <StatCard label="Total" value={advisories.length} color={ACCENT}/>
+            <StatCard label="Critical" value={counts.CRITICAL} color="#ff4444"/>
+            <StatCard label="High" value={counts.HIGH} color="#ff9944"/>
+            <StatCard label="GCC Risk" value={advisories.filter(a=>a.middle_east_relevance==="HIGH").length} color="#00e676" sub="Middle East"/>
+            <StatCard label="Exploit in Wild" value={advisories.filter(a=>a.exploit_in_wild).length} color="#ff4444" sub="Active"/>
+          </div>
+
+          {/* Loading / Error */}
+          {loading&&<div style={{ height:2, background:"rgba(0,200,255,0.06)", overflow:"hidden", position:"relative", borderRadius:1, marginBottom:12 }}>
+            <div style={{ position:"absolute", height:"100%", width:"55%", background:`linear-gradient(90deg,transparent,${ACCENT},transparent)`, animation:"shimmer 1.4s infinite" }}/>
+          </div>}
+          {feedError&&<div style={{ padding:"10px 14px", background:"rgba(200,0,0,0.1)", border:"1px solid rgba(200,0,0,0.3)", borderRadius:3, marginBottom:12, fontSize:11, color:"#ff6666" }}>⚠ {feedError}</div>}
+
+          {/* Filters */}
+          <div style={{ display:"flex", gap:5, flexWrap:"wrap", marginBottom:12, alignItems:"center" }}>
+            <span style={{ fontSize:7.5, color:"rgba(200,220,240,0.22)", letterSpacing:2 }}>FILTER:</span>
+            {["All","CRITICAL","HIGH","MEDIUM","LOW"].map(s=>{
+              const ss = SEV_S[s];
+              return <button key={s} onClick={()=>setFilterSev(s)} style={{ padding:"3px 9px", fontSize:7.5, letterSpacing:1, cursor:"pointer", fontFamily:"monospace", background:filterSev===s?(ss?.bg||"rgba(0,200,255,0.08)"):"transparent", border:`1px solid ${filterSev===s?(ss?.border||ACCENT):"rgba(255,255,255,0.08)"}`, color:filterSev===s?(ss?.text||ACCENT):"rgba(200,220,240,0.3)", borderRadius:2 }}>{s}</button>;
+            })}
+            <div style={{ width:1, height:12, background:"rgba(255,255,255,0.07)" }}/>
+            <button onClick={()=>setFilterME(!filterME)} style={{ padding:"3px 9px", fontSize:7.5, letterSpacing:1, cursor:"pointer", fontFamily:"monospace", background:filterME?"rgba(0,166,81,0.1)":"transparent", border:`1px solid ${filterME?"#00a651":"rgba(255,255,255,0.08)"}`, color:filterME?"#00e676":"rgba(200,220,240,0.3)", borderRadius:2 }}>🌍 GCC / Middle East</button>
+            <button onClick={()=>setFilterExp(!filterExp)} style={{ padding:"3px 9px", fontSize:7.5, letterSpacing:1, cursor:"pointer", fontFamily:"monospace", background:filterExp?"rgba(200,0,0,0.12)":"transparent", border:`1px solid ${filterExp?"#c00000":"rgba(255,255,255,0.08)"}`, color:filterExp?"#ff4444":"rgba(200,220,240,0.3)", borderRadius:2 }}>⚡ Exploit in Wild</button>
+            <span style={{ fontSize:7.5, color:"rgba(200,220,240,0.2)" }}>{filtered.length} shown</span>
+          </div>
+
+          {/* Advisory list */}
+          {!loading && filtered.length===0&&<div style={{ textAlign:"center", padding:"40px 0", color:"rgba(200,220,240,0.25)", fontSize:11 }}>No advisories match the current filters.</div>}
+          {filtered.map(adv=><AdvisoryCard key={adv.id} adv={adv} onAnalyse={handleAnalyse} analysing={analysing===adv.id}/>)}
+        </div>}
+
+        {/* ═══════════════ ANALYSE ADVISORY ═══════════════ */}
+        {view==="paste"&&(
+          <div style={{ maxWidth:660, margin:"0 auto", animation:"fadeIn 0.3s ease" }}>
+            <div style={{ textAlign:"center", marginBottom:22 }}>
+              <div style={{ fontSize:7.5, letterSpacing:4, color:ACCENT, marginBottom:8 }}>BCYBERAWARE · ADVISORY ANALYSER</div>
+              <div style={{ fontSize:20, fontWeight:900, color:"#ddeeff", marginBottom:6 }}>Paste Any Threat Advisory</div>
+              <div style={{ fontSize:11, color:"rgba(200,220,240,0.3)" }}>CISA · NVD · NCSC · UAE CERT · CERT-In · Any vendor bulletin</div>
+            </div>
+            <div style={{ background:"rgba(255,255,255,0.02)", border:"1px solid rgba(0,200,255,0.1)", borderRadius:4, padding:"18px" }}>
+              <div style={{ fontSize:7.5, letterSpacing:3, color:"rgba(0,200,255,0.5)", marginBottom:8, fontFamily:"monospace" }}>▸ PASTE ADVISORY TEXT</div>
+              <textarea value={pasteText} onChange={e=>setPasteText(e.target.value)} style={{ width:"100%", minHeight:210, background:"rgba(0,0,0,0.45)", border:`1px solid rgba(0,200,255,0.15)`, borderRadius:2, color:"#c8d8e8", fontSize:11.5, padding:"12px", resize:"vertical", outline:"none", fontFamily:"monospace", lineHeight:1.65, boxSizing:"border-box" }} placeholder={"Paste full advisory text here…\n\n• CISA Known Exploited Vulnerabilities bulletin\n• Microsoft Patch Tuesday advisory\n• CVE description from NVD / CVE.org\n• UAE CERT / Saudi CERT / NCSC alert\n• Any vendor security bulletin or threat report"}/>
+              {pasteErr&&<div style={{ color:"#ff4444", fontSize:10.5, marginTop:8 }}>⚠ {pasteErr}</div>}
+              <button onClick={handlePasteAnalyse} disabled={pasteLoad||!pasteText.trim()} style={{ width:"100%", marginTop:11, padding:"12px", background:"transparent", border:`1px solid ${ACCENT}`, color:ACCENT, fontSize:9, letterSpacing:4, cursor:pasteLoad||!pasteText.trim()?"not-allowed":"pointer", fontFamily:"monospace", opacity:pasteLoad||!pasteText.trim()?0.45:1, borderRadius:2 }}>
+                {pasteLoad?"⟳ GENERATING BRIEF…":"▶ GENERATE INTELLIGENCE BRIEF"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ═══════════════ SOURCES ═══════════════ */}
+        {view==="sources"&&(
+          <div style={{ maxWidth:660, margin:"0 auto", animation:"fadeIn 0.3s ease" }}>
+            <div style={{ fontSize:7.5, letterSpacing:4, color:ACCENT, marginBottom:16, textAlign:"center" }}>INTELLIGENCE SOURCES</div>
+            {[
+              { name:"CISA Known Exploited Vulnerabilities", url:"https://www.cisa.gov/known-exploited-vulnerabilities-catalog", status:"live", flag:"🇺🇸", desc:"US Cybersecurity & Infrastructure Security Agency. The authoritative catalog of vulnerabilities actively exploited in the wild. Updated continuously.", color:"#e05000" },
+              { name:"NVD / CVE.org", url:"https://nvd.nist.gov", status:"live", flag:"🌐", desc:"NIST National Vulnerability Database. Comprehensive CVE scoring, CVSS ratings, and affected product data for all published vulnerabilities.", color:"#8b0000" },
+              { name:"CERT-In (India)", url:"https://www.cert-in.org.in", status:"live", flag:"🇮🇳", desc:"Indian Computer Emergency Response Team. Official security advisories from India's national CERT, covering enterprise software widely used in South Asia and the Middle East.", color:"#ff6b00" },
+              { name:"UAE CERT", url:"https://www.tra.gov.ae", status:"no_api", flag:"🇦🇪", desc:"UAE Telecommunications & Digital Government Regulatory Authority. Advisories are published on their portal but no public machine-readable API is available. GCC-relevant threats are tracked via CISA KEV and NVD.", color:"#00a651" },
+              { name:"Saudi CERT (NCSC-SA)", url:"https://www.ncsc.gov.sa", status:"no_api", flag:"🇸🇦", desc:"Saudi Arabia's National Cybersecurity Authority. No public feed API. Saudi-relevant advisories are surfaced through CISA KEV and NVD coverage.", color:"#006c35" },
+            ].map(src=>(
+              <div key={src.name} style={{ background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.06)", borderRadius:4, padding:"14px 16px", marginBottom:8 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:10 }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:6 }}>
+                      <span style={{ fontSize:14 }}>{src.flag}</span>
+                      <span style={{ fontSize:12.5, fontWeight:700, color:"#ddeeff" }}>{src.name}</span>
+                      <span style={{ fontSize:8, padding:"2px 7px", background:src.status==="live"?"rgba(0,150,70,0.12)":"rgba(200,170,0,0.1)", border:`1px solid ${src.status==="live"?"#008c46":"#c8a000"}`, color:src.status==="live"?"#00e676":"#ffd700", fontFamily:"monospace", letterSpacing:1 }}>
+                        {src.status==="live"?"● LIVE FEED":"◌ NO PUBLIC API"}
+                      </span>
+                    </div>
+                    <div style={{ fontSize:11, color:"rgba(200,220,240,0.45)", lineHeight:1.7 }}>{src.desc}</div>
+                  </div>
+                  <a href={src.url} target="_blank" rel="noopener noreferrer" style={{ fontSize:8, color:ACCENT, fontFamily:"monospace", border:`1px solid rgba(0,200,255,0.2)`, padding:"4px 10px", borderRadius:2, whiteSpace:"nowrap", flexShrink:0 }}>VISIT ↗</a>
+                </div>
+              </div>
+            ))}
+            <div style={{ marginTop:14, padding:"11px 14px", background:"rgba(0,200,255,0.04)", border:"1px solid rgba(0,200,255,0.12)", borderRadius:3, fontSize:10.5, color:"rgba(200,220,240,0.4)", lineHeight:1.7 }}>
+              ℹ The feed auto-refreshes every 6 hours. All CVE links connect directly to NVD. The AI analysis feature uses Anthropic Claude via a secure server-side proxy — your queries never expose the API key.
+            </div>
+          </div>
+        )}
+
+        {/* ═══════════════ ABOUT ═══════════════ */}
+        {view==="about"&&(
+          <div style={{ maxWidth:640, margin:"0 auto", animation:"fadeIn 0.3s ease" }}>
+            <div style={{ textAlign:"center", marginBottom:26 }}>
+              <div style={{ width:56, height:56, borderRadius:10, background:`linear-gradient(135deg,${ACCENT2},${ACCENT})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:26, fontWeight:900, color:"#fff", margin:"0 auto 14px" }}>B</div>
+              <div style={{ fontSize:20, fontWeight:900, color:"#ddeeff", letterSpacing:2, marginBottom:5 }}>BCyberAware</div>
+              <div style={{ fontSize:9.5, color:"rgba(200,220,240,0.3)", letterSpacing:2 }}>SECURITY INTELLIGENCE FOR THE MODERN ENTERPRISE</div>
+            </div>
+            <div style={{ background:"rgba(255,255,255,0.02)", border:"1px solid rgba(0,200,255,0.1)", borderRadius:4, padding:"18px 20px", marginBottom:10 }}>
+              <Lbl mt={0}>AUTHOR</Lbl>
+              <div style={{ fontSize:14, fontWeight:800, color:"#ddeeff", marginBottom:4 }}>Vikas Pandita</div>
+              <div style={{ fontSize:11, color:"rgba(200,220,240,0.4)", marginBottom:12 }}>Assistant CISO & Global Head of Security Architecture</div>
+              <div style={{ display:"flex", gap:7, flexWrap:"wrap" }}>
+                {["TOGAF 9.2","IIM Kozhikode EPGP","14+ Years Experience","Big 4 Consulting","IOC Security Architect","Security Architecture"].map(b=>(
+                  <span key={b} style={{ fontSize:8.5, color:ACCENT, fontFamily:"monospace", background:"rgba(0,200,255,0.06)", padding:"3px 9px", border:`1px solid rgba(0,200,255,0.18)`, borderRadius:2 }}>{b}</span>
+                ))}
+              </div>
+            </div>
+            <div style={{ background:"rgba(255,255,255,0.02)", border:"1px solid rgba(0,200,255,0.1)", borderRadius:4, padding:"18px 20px" }}>
+              <Lbl mt={0}>WHAT BCYBERAWARE DOES</Lbl>
+              {["Pulls real advisories from CISA KEV, NVD, and CERT-In India every 6 hours","All CVE IDs link directly to NVD source records","AI-powered enterprise impact analysis (Anthropic Claude, server-side proxy)","GCC / Middle East relevance scoring per advisory","CISO executive briefs with prioritised action plans","Paste-any-advisory instant analysis feature","SIEM / EDR hunt query generation","Ready-to-send team alert messages (WhatsApp / Teams)"].map((f,i)=>(
+                <div key={i} style={{ fontSize:11, color:"rgba(200,220,240,0.48)", padding:"5px 0", borderBottom:"1px solid rgba(255,255,255,0.04)", display:"flex", gap:8 }}>
+                  <span style={{ color:ACCENT }}>▸</span>{f}
+                </div>
+              ))}
+              <div style={{ marginTop:14, fontSize:8.5, color:"rgba(200,220,240,0.2)", fontFamily:"monospace" }}>Open source · MIT Licence · Contributions welcome</div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div style={{ borderTop:"1px solid rgba(255,255,255,0.04)", marginTop:28, padding:"13px 18px", textAlign:"center" }}>
+        <div style={{ fontSize:8, color:"rgba(200,220,240,0.18)", letterSpacing:1.5 }}>
+          BCyberAware · Vikas Pandita · {new Date().getFullYear()} · MIT Licence · Data: CISA KEV, NVD, CERT-In India
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<BCyberAwareDashboard />);
+</script>
+</body>
+</html>
