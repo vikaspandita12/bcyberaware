@@ -237,6 +237,11 @@ function BCyberAwareDashboard() {
   const counts      = { CRITICAL:0, HIGH:0, MEDIUM:0, LOW:0 };
   advisories.forEach(a => { if (counts[a.severity]!==undefined) counts[a.severity]++; });
 
+  // ── Replace VIDEO_ID below with your actual YouTube video ID ──────────────
+  // Example: https://www.youtube.com/watch?v=ABC123  →  VIDEO_ID = "ABC123"
+  const YOUTUBE_VIDEO_ID = "YOUR_VIDEO_ID_HERE";
+  const YOUTUBE_CHANNEL  = "https://www.youtube.com/@BCyberAwarebyvikaspandita";
+
   const FEED_TABS = [
     { id:"advisories", label:`🏛️ Advisories (${advisories.length})` },
     { id:"exploits",   label:`⚡ Exploits (${exploits.length})` },
@@ -528,6 +533,79 @@ function BCyberAwareDashboard() {
               border:"1px solid rgba(0,200,255,.12)", borderRadius:6,
               fontSize:13, color:"rgba(200,220,240,.45)", lineHeight:1.8 }}>
               ℹ The feed auto-refreshes every 6 hours. All CVE IDs link directly to NVD source records. Every advisory card has a direct link to the original source for verification.
+            </div>
+          </div>
+        )}
+
+        {/* ══════════ DEMO ══════════ */}
+        {view==="demo" && (
+          <div style={{ maxWidth:820, margin:"0 auto", animation:"fadeIn .3s ease" }}>
+            <div style={{ textAlign:"center", marginBottom:24 }}>
+              <div style={{ fontSize:13, letterSpacing:4, color:ACCENT,
+                marginBottom:8, fontFamily:"monospace" }}>▶ DEMO VIDEO</div>
+              <div style={{ fontSize:16, fontWeight:700, color:"#ddeeff", marginBottom:6 }}>
+                See BCyberAware in Action
+              </div>
+              <div style={{ fontSize:13, color:"rgba(200,220,240,.4)" }}>
+                Watch how real advisories are fetched, filtered and explored
+              </div>
+            </div>
+
+            {/* Video embed */}
+            <div style={{ position:"relative", paddingBottom:"56.25%", height:0,
+              borderRadius:10, overflow:"hidden",
+              border:`1px solid rgba(0,200,255,.2)`,
+              boxShadow:`0 0 40px rgba(0,200,255,.1)`,
+              marginBottom:20, background:"#000" }}>
+              {YOUTUBE_VIDEO_ID !== "YOUR_VIDEO_ID_HERE" ? (
+                <iframe
+                  src={`https://www.youtube.com/embed/${YOUTUBE_VIDEO_ID}?rel=0&modestbranding=1`}
+                  title="BCyberAware Demo by Vikas Pandita"
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  style={{ position:"absolute", top:0, left:0, width:"100%", height:"100%" }}
+                />
+              ) : (
+                <div style={{ position:"absolute", top:0, left:0, width:"100%", height:"100%",
+                  display:"flex", flexDirection:"column", alignItems:"center",
+                  justifyContent:"center", gap:16 }}>
+                  <div style={{ fontSize:60, opacity:.4 }}>▶</div>
+                  <div style={{ fontSize:14, color:"rgba(200,220,240,.4)", textAlign:"center" }}>
+                    Demo video coming soon
+                  </div>
+                  <a href={YOUTUBE_CHANNEL} target="_blank" rel="noopener noreferrer"
+                    style={{ fontSize:13, color:ACCENT, fontFamily:"monospace",
+                      border:`1px solid rgba(0,200,255,.3)`,
+                      padding:"8px 18px", borderRadius:4 }}>
+                    Visit YouTube Channel ↗
+                  </a>
+                </div>
+              )}
+            </div>
+
+            {/* Channel link */}
+            <div style={{ background:"rgba(255,0,0,.07)",
+              border:"1px solid rgba(255,0,0,.2)", borderRadius:8,
+              padding:"18px 22px", display:"flex",
+              alignItems:"center", justifyContent:"space-between",
+              flexWrap:"wrap", gap:14 }}>
+              <div>
+                <div style={{ fontSize:15, fontWeight:700, color:"#ddeeff", marginBottom:4 }}>
+                  🎬 BCyberAware YouTube Channel
+                </div>
+                <div style={{ fontSize:13, color:"rgba(200,220,240,.45)" }}>
+                  Cybersecurity tutorials, threat walkthroughs and security architecture by Vikas Pandita
+                </div>
+              </div>
+              <a href={YOUTUBE_CHANNEL} target="_blank" rel="noopener noreferrer"
+                style={{ display:"inline-flex", alignItems:"center", gap:8,
+                  fontSize:14, color:"#fff", fontWeight:700,
+                  background:"#ff0000", padding:"10px 20px",
+                  borderRadius:6, whiteSpace:"nowrap",
+                  textDecoration:"none" }}>
+                ▶ Subscribe
+              </a>
             </div>
           </div>
         )}
