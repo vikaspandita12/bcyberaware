@@ -9,3 +9,8 @@
 
 [functions]
   node_bundler = "esbuild"
+
+# ── Scheduled refresh every 15 minutes ───────────────────────────────────────
+# Keeps advisory data fresh even when nobody is visiting the site
+[functions."scheduled-refresh"]
+  schedule = "*/15 * * * *"
