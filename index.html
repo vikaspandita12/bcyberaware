@@ -208,6 +208,7 @@ function BCyberAwareDashboard() {
   const [advisories, setAdvisories] = useState([]);
   const [exploits,   setExploits]   = useState([]);
   const [news,       setNews]       = useState([]);
+  const [heatmap,    setHeatmap]    = useState([]);
   const [feedMeta,   setFeedMeta]   = useState(null);
   const [loading,    setLoading]    = useState(true);
   const [feedError,  setFeedError]  = useState(null);
@@ -224,6 +225,7 @@ function BCyberAwareDashboard() {
       setAdvisories(data.advisories || []);
       setExploits(data.exploits     || []);
       setNews(data.news             || []);
+      setHeatmap(data.heatmap       || []);
       setFeedMeta(data);
     } catch(e) { setFeedError("Could not reach live feed: " + e.message); }
     setLoading(false);
@@ -542,6 +544,155 @@ function BCyberAwareDashboard() {
               border:"1px solid rgba(0,200,255,.12)", borderRadius:6,
               fontSize:13, color:"rgba(200,220,240,.45)", lineHeight:1.8 }}>
               ℹ The feed auto-refreshes every 6 hours. All CVE IDs link directly to NVD source records. Every advisory card has a direct link to the original source for verification.
+            </div>
+          </div>
+        )}
+
+        {/* ══════════ ATTACK HEATMAP ══════════ */}
+        {view==="heatmap" && (
+          <div style={{ animation:"fadeIn .3s ease" }}>
+            <div style={{ textAlign:"center", marginBottom:24 }}>
+              <div style={{ fontSize:13, letterSpacing:4, color:ACCENT,
+                marginBottom:8, fontFamily:"monospace" }}>🌍 GLOBAL ATTACK HEATMAP</div>
+              <div style={{ fontSize:15, color:"rgba(200,220,240,.45)", marginBottom:4 }}>
+                Countries ranked by threat activity score — based on live advisory data
+              </div>
+              <div style={{ fontSize:12, color:"rgba(200,220,240,.25)" }}>
+                Updated every 1 hour · Scored by severity · CRITICAL=4pts HIGH=3pts MEDIUM=2pts LOW=1pt
+              </div>
+            </div>
+
+            {/* World Map SVG */}
+            <div style={{ background:"rgba(5,8,15,.95)",
+              border:"1px solid rgba(0,200,255,.12)", borderRadius:8,
+              padding:"24px", marginBottom:20 }}>
+
+              {/* Top threat countries bar chart */}
+              <div style={{ fontSize:11, letterSpacing:2, color:"rgba(0,200,255,.5)",
+                marginBottom:16, fontFamily:"monospace" }}>
+                TOP THREAT ACTIVITY BY COUNTRY
+              </div>
+
+              {heatmap.length === 0 ? (
+                <div style={{ textAlign:"center", padding:"40px 0",
+                  color:"rgba(200,220,240,.3)", fontSize:14 }}>
+                  Loading heatmap data…
+                </div>
+              ) : (
+                <div style={{ display:"grid", gap:10 }}>
+                  {heatmap.slice(0,15).map((c, i) => {
+                    const s   = SEV_S[c.level] || SEV_S.LOW;
+                    const max = heatmap[0]?.score || 1;
+                    const pct = Math.round((c.score / max) * 100);
+                    const flags = {
+                      US:"🇺🇸",GB:"🇬🇧",CN:"🇨🇳",RU:"🇷🇺",IN:"🇮🇳",
+                      DE:"🇩🇪",AU:"🇦🇺",CA:"🇨🇦",FR:"🇫🇷",IR:"🇮🇷",
+                      KP:"🇰🇵",AE:"🇦🇪",SA:"🇸🇦",QA:"🇶🇦",KW:"🇰🇼",
+                      PK:"🇵🇰",UA:"🇺🇦",BR:"🇧🇷",JP:"🇯🇵",KR:"🇰🇷",
+                      NL:"🇳🇱",SG:"🇸🇬",TR:"🇹🇷",IL:"🇮🇱",ZA:"🇿🇦",
+                    };
+                    return (
+                      <div key={c.code} style={{ display:"flex",
+                        alignItems:"center", gap:12 }}>
+                        {/* Rank */}
+                        <div style={{ fontSize:13, fontWeight:900,
+                          color:i<3?s.text:"rgba(200,220,240,.4)",
+                          fontFamily:"monospace", minWidth:26,
+                          textAlign:"right" }}>
+                          {String(i+1).padStart(2,"0")}
+                        </div>
+                        {/* Flag + Name */}
+                        <div style={{ display:"flex", alignItems:"center",
+                          gap:7, minWidth:160 }}>
+                          <span style={{ fontSize:18 }}>{flags[c.code]||"🌐"}</span>
+                          <span style={{ fontSize:13, color:"#ddeeff",
+                            fontWeight:600 }}>{c.name}</span>
+                        </div>
+                        {/* Bar */}
+                        <div style={{ flex:1, height:22, background:"rgba(255,255,255,.04)",
+                          borderRadius:3, overflow:"hidden", position:"relative" }}>
+                          <div style={{
+                            width:`${pct}%`, height:"100%",
+                            background:`linear-gradient(90deg, ${s.border}88, ${s.border})`,
+                            borderRadius:3, transition:"width .5s ease",
+                            minWidth:4
+                          }}/>
+                          <div style={{ position:"absolute", right:8, top:"50%",
+                            transform:"translateY(-50%)", fontSize:11,
+                            color:"rgba(200,220,240,.5)", fontFamily:"monospace" }}>
+                            {c.score} pts
+                          </div>
+                        </div>
+                        {/* Badge */}
+                        <div style={{ minWidth:70 }}>
+                          <span style={{ fontSize:10, padding:"3px 8px",
+                            background:s.bg, border:`1px solid ${s.border}`,
+                            color:s.text, fontFamily:"monospace",
+                            borderRadius:2, fontWeight:700 }}>
+                            {c.level}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Region summary cards */}
+            <div style={{ fontSize:11, letterSpacing:2, color:"rgba(0,200,255,.5)",
+              marginBottom:14, fontFamily:"monospace" }}>
+              REGIONAL THREAT SUMMARY
+            </div>
+            <div style={{ display:"flex", gap:10, flexWrap:"wrap", marginBottom:20 }}>
+              {[
+                { region:"🌍 Middle East / GCC", codes:["AE","SA","QA","KW","BH","OM","IQ","IR"],
+                  color:"#00e676", bg:"rgba(0,200,100,.08)", border:"rgba(0,200,100,.2)" },
+                { region:"🌏 Asia Pacific", codes:["IN","CN","JP","KR","AU","SG","PK"],
+                  color:ACCENT, bg:"rgba(0,200,255,.06)", border:"rgba(0,200,255,.18)" },
+                { region:"🌎 Americas", codes:["US","CA","BR","MX"],
+                  color:"#ff9944", bg:"rgba(220,100,0,.08)", border:"rgba(220,100,0,.2)" },
+                { region:"🌍 Europe", codes:["GB","DE","FR","NL","IT","ES","SE","UA"],
+                  color:"#c084fc", bg:"rgba(123,47,247,.08)", border:"rgba(123,47,247,.2)" },
+                { region:"⚠️ Threat Actors", codes:["RU","CN","IR","KP"],
+                  color:"#ff4444", bg:"rgba(200,0,0,.1)", border:"rgba(200,0,0,.25)" },
+              ].map(r => {
+                const total = heatmap
+                  .filter(h => r.codes.includes(h.code))
+                  .reduce((s,h) => s+h.score, 0);
+                const topCountry = heatmap.find(h => r.codes.includes(h.code));
+                return (
+                  <div key={r.region} style={{ flex:1, minWidth:160,
+                    background:r.bg, border:`1px solid ${r.border}`,
+                    borderRadius:6, padding:"14px 16px" }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:r.color,
+                      marginBottom:6 }}>{r.region}</div>
+                    <div style={{ fontSize:28, fontWeight:900, color:r.color,
+                      fontFamily:"monospace", lineHeight:1, marginBottom:4 }}>
+                      {total}
+                    </div>
+                    <div style={{ fontSize:11, color:"rgba(200,220,240,.4)" }}>
+                      threat score
+                    </div>
+                    {topCountry && (
+                      <div style={{ fontSize:11, color:"rgba(200,220,240,.35)",
+                        marginTop:6 }}>
+                        Top: {topCountry.name}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Disclaimer */}
+            <div style={{ padding:"12px 16px",
+              background:"rgba(0,200,255,.04)",
+              border:"1px solid rgba(0,200,255,.1)", borderRadius:6,
+              fontSize:12, color:"rgba(200,220,240,.4)", lineHeight:1.7 }}>
+              ℹ️ Heatmap scores are derived from advisory source data and CVE geographic metadata.
+              Scores represent threat advisory activity directed at or originating from each country —
+              not real-time attack traffic. Data refreshes every 1 hour.
             </div>
           </div>
         )}
