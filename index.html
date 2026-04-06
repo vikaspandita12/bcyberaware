@@ -61,8 +61,9 @@ const SEV_S = {
 };
 const SEV_ORDER = ["CRITICAL","HIGH","MEDIUM","LOW"];
 
-async function loadFeed() {
-  const r = await fetch(`${PROXY}?action=feed`);
+async function loadFeed(force = false) {
+  const url = force ? `${PROXY}?action=feed&bust=1` : `${PROXY}?action=feed`;
+  const r   = await fetch(url);
   if (!r.ok) throw new Error(`Feed error ${r.status}`);
   return r.json();
 }
@@ -218,10 +219,10 @@ function BCyberAwareDashboard() {
   const [view,       setView]       = useState("feed");
   const [feedTab,    setFeedTab]    = useState("advisories");
 
-  const refreshFeed = useCallback(async () => {
+  const refreshFeed = useCallback(async (force = false) => {
     setLoading(true); setFeedError(null);
     try {
-      const data = await loadFeed();
+      const data = await loadFeed(force);
       setAdvisories(data.advisories || []);
       setExploits(data.exploits     || []);
       setNews(data.news             || []);
@@ -490,7 +491,7 @@ function BCyberAwareDashboard() {
               <div style={{ fontSize:13, letterSpacing:4, color:ACCENT,
                 marginBottom:8, fontFamily:"monospace" }}>INTELLIGENCE SOURCES</div>
               <div style={{ fontSize:15, color:"rgba(200,220,240,.4)" }}>
-                9 live sources · auto-refreshed every 6 hours · no API key required
+                14 live sources · auto-refreshed every 1 hour · no API key required
               </div>
             </div>
             {["Advisory","Exploit","News"].map(cat => (
@@ -551,87 +552,200 @@ function BCyberAwareDashboard() {
         {/* ══════════ ATTACK HEATMAP ══════════ */}
         {view==="heatmap" && (
           <div style={{ animation:"fadeIn .3s ease" }}>
-            <div style={{ textAlign:"center", marginBottom:24 }}>
+            <div style={{ textAlign:"center", marginBottom:20 }}>
               <div style={{ fontSize:13, letterSpacing:4, color:ACCENT,
-                marginBottom:8, fontFamily:"monospace" }}>🌍 GLOBAL ATTACK HEATMAP</div>
-              <div style={{ fontSize:15, color:"rgba(200,220,240,.45)", marginBottom:4 }}>
-                Countries ranked by threat activity score — based on live advisory data
+                marginBottom:8, fontFamily:"monospace" }}>🌍 GLOBAL THREAT HEATMAP</div>
+              <div style={{ fontSize:14, color:"rgba(200,220,240,.45)", marginBottom:4 }}>
+                Countries ranked by threat activity · Updated every 1 hour
               </div>
               <div style={{ fontSize:12, color:"rgba(200,220,240,.25)" }}>
-                Updated every 1 hour · Scored by severity · CRITICAL=4pts HIGH=3pts MEDIUM=2pts LOW=1pt
+                CRITICAL=4pts · HIGH=3pts · MEDIUM=2pts · LOW=1pt
               </div>
             </div>
 
-            {/* World Map SVG */}
+            {/* ── VISUAL WORLD MAP ── */}
+            <div style={{ background:"rgba(5,8,15,.97)",
+              border:"1px solid rgba(0,200,255,.15)", borderRadius:8,
+              padding:"20px", marginBottom:16, overflowX:"auto" }}>
+              <div style={{ fontSize:11, letterSpacing:2,
+                color:"rgba(0,200,255,.5)", marginBottom:14,
+                fontFamily:"monospace" }}>WORLD THREAT MAP</div>
+
+              {/* SVG World Map – simplified geographic blocks */}
+              <svg viewBox="0 0 900 440" style={{ width:"100%", minWidth:600 }}
+                xmlns="http://www.w3.org/2000/svg">
+                <rect width="900" height="440" fill="#060c18" rx="6"/>
+                {/* Grid lines */}
+                {[110,220,330,440].map(y=>(
+                  <line key={y} x1="0" y1={y} x2="900" y2={y}
+                    stroke="rgba(0,200,255,.04)" strokeWidth="1"/>
+                ))}
+                {[180,360,540,720].map(x=>(
+                  <line key={x} x1={x} y1="0" x2={x} y2="440"
+                    stroke="rgba(0,200,255,.04)" strokeWidth="1"/>
+                ))}
+
+                {/* Country blocks — positioned approximately on world map */}
+                {[
+                  // North America
+                  { code:"US", x:120, y:140, w:130, h:80,  label:"United States" },
+                  { code:"CA", x:120, y:80,  w:130, h:55,  label:"Canada" },
+                  { code:"MX", x:130, y:225, w:80,  h:50,  label:"Mexico" },
+                  // South America
+                  { code:"BR", x:200, y:280, w:90,  h:80,  label:"Brazil" },
+                  // Europe
+                  { code:"GB", x:380, y:110, w:45,  h:40,  label:"UK" },
+                  { code:"DE", x:425, y:110, w:45,  h:40,  label:"Germany" },
+                  { code:"FR", x:395, y:148, w:45,  h:38,  label:"France" },
+                  { code:"NL", x:425, y:95,  w:30,  h:18,  label:"Netherlands" },
+                  { code:"UA", x:470, y:115, w:55,  h:40,  label:"Ukraine" },
+                  { code:"SE", x:440, y:75,  w:35,  h:38,  label:"Sweden" },
+                  { code:"IT", x:430, y:148, w:35,  h:48,  label:"Italy" },
+                  { code:"ES", x:382, y:150, w:42,  h:38,  label:"Spain" },
+                  // Russia
+                  { code:"RU", x:480, y:65,  w:180, h:90,  label:"Russia" },
+                  // Middle East
+                  { code:"TR", x:480, y:158, w:55,  h:35,  label:"Turkey" },
+                  { code:"IR", x:530, y:158, w:55,  h:45,  label:"Iran" },
+                  { code:"AE", x:555, y:210, w:35,  h:25,  label:"UAE" },
+                  { code:"SA", x:505, y:195, w:60,  h:50,  label:"Saudi Arabia" },
+                  { code:"IL", x:492, y:175, w:25,  h:25,  label:"Israel" },
+                  { code:"QA", x:548, y:210, w:20,  h:18,  label:"Qatar" },
+                  { code:"KW", x:530, y:193, w:22,  h:18,  label:"Kuwait" },
+                  // Africa
+                  { code:"NG", x:408, y:250, w:50,  h:45,  label:"Nigeria" },
+                  { code:"ZA", x:430, y:330, w:55,  h:50,  label:"S Africa" },
+                  // South Asia
+                  { code:"PK", x:590, y:160, w:45,  h:45,  label:"Pakistan" },
+                  { code:"IN", x:630, y:175, w:70,  h:70,  label:"India" },
+                  // East Asia
+                  { code:"CN", x:660, y:120, w:100, h:80,  label:"China" },
+                  { code:"KP", x:755, y:128, w:30,  h:30,  label:"N Korea" },
+                  { code:"KR", x:760, y:155, w:28,  h:28,  label:"S Korea" },
+                  { code:"JP", x:790, y:135, w:40,  h:55,  label:"Japan" },
+                  // Southeast Asia
+                  { code:"SG", x:710, y:265, w:20,  h:18,  label:"Singapore" },
+                  // Oceania
+                  { code:"AU", x:730, y:300, w:110, h:80,  label:"Australia" },
+                ].map(country => {
+                  const hm  = heatmap.find(h => h.code === country.code);
+                  const max = heatmap[0]?.score || 1;
+                  const pct = hm ? hm.score / max : 0;
+                  const s   = hm ? (SEV_S[hm.level]||SEV_S.LOW) : null;
+                  const fill= hm
+                    ? (hm.level==="CRITICAL" ? `rgba(200,0,0,${0.4+pct*0.5})`
+                      :hm.level==="HIGH"     ? `rgba(220,100,0,${0.35+pct*0.4})`
+                      :hm.level==="MEDIUM"   ? `rgba(200,170,0,${0.3+pct*0.35})`
+                      :`rgba(0,140,70,${0.25+pct*0.3})`)
+                    : "rgba(255,255,255,.04)";
+                  const stroke = hm ? (s?.border||"#444") : "rgba(0,200,255,.08)";
+                  const isTop3 = hm && heatmap.slice(0,3).some(h=>h.code===country.code);
+                  return (
+                    <g key={country.code}>
+                      <rect x={country.x} y={country.y}
+                        width={country.w} height={country.h}
+                        fill={fill} stroke={stroke}
+                        strokeWidth={isTop3?2:1} rx="3"
+                        style={{ filter: isTop3?`drop-shadow(0 0 8px ${stroke})`:"none" }}
+                      />
+                      {/* Pulse animation for top threats */}
+                      {isTop3 && (
+                        <rect x={country.x} y={country.y}
+                          width={country.w} height={country.h}
+                          fill="none" stroke={stroke} strokeWidth="2" rx="3"
+                          opacity="0.5">
+                          <animate attributeName="opacity"
+                            values="0.5;0;0.5" dur="2s" repeatCount="indefinite"/>
+                        </rect>
+                      )}
+                      {/* Country label */}
+                      <text x={country.x + country.w/2}
+                        y={country.y + country.h/2 - (hm?6:0)}
+                        textAnchor="middle" fontSize={country.w>60?11:9}
+                        fill={hm?"#fff":"rgba(200,220,240,.3)"} fontWeight="700">
+                        {country.code}
+                      </text>
+                      {hm && (
+                        <text x={country.x + country.w/2}
+                          y={country.y + country.h/2 + 10}
+                          textAnchor="middle" fontSize="9"
+                          fill={s?.text||"#fff"} fontWeight="600">
+                          {hm.score}pt
+                        </text>
+                      )}
+                    </g>
+                  );
+                })}
+
+                {/* Legend */}
+                {[
+                  { label:"CRITICAL", color:"rgba(200,0,0,.7)",   border:"#c00000" },
+                  { label:"HIGH",     color:"rgba(220,100,0,.6)", border:"#dd6600" },
+                  { label:"MEDIUM",   color:"rgba(200,170,0,.5)", border:"#c8a000" },
+                  { label:"LOW",      color:"rgba(0,140,70,.4)",  border:"#008c46" },
+                  { label:"NO DATA",  color:"rgba(255,255,255,.04)", border:"rgba(0,200,255,.1)" },
+                ].map((l,i) => (
+                  <g key={l.label} transform={`translate(${20+i*160}, 408)`}>
+                    <rect width="14" height="14" fill={l.color}
+                      stroke={l.border} strokeWidth="1" rx="2"/>
+                    <text x="20" y="11" fontSize="10"
+                      fill="rgba(200,220,240,.5)" fontFamily="monospace">{l.label}</text>
+                  </g>
+                ))}
+              </svg>
+            </div>
+
+            {/* ── TOP COUNTRIES BAR CHART ── */}
             <div style={{ background:"rgba(5,8,15,.95)",
               border:"1px solid rgba(0,200,255,.12)", borderRadius:8,
-              padding:"24px", marginBottom:20 }}>
-
-              {/* Top threat countries bar chart */}
-              <div style={{ fontSize:11, letterSpacing:2, color:"rgba(0,200,255,.5)",
-                marginBottom:16, fontFamily:"monospace" }}>
-                TOP THREAT ACTIVITY BY COUNTRY
-              </div>
-
-              {heatmap.length === 0 ? (
-                <div style={{ textAlign:"center", padding:"40px 0",
+              padding:"20px", marginBottom:16 }}>
+              <div style={{ fontSize:11, letterSpacing:2,
+                color:"rgba(0,200,255,.5)", marginBottom:16,
+                fontFamily:"monospace" }}>TOP 15 COUNTRIES BY THREAT SCORE</div>
+              {heatmap.length===0?(
+                <div style={{ textAlign:"center", padding:"30px",
                   color:"rgba(200,220,240,.3)", fontSize:14 }}>
-                  Loading heatmap data…
+                  Loading…
                 </div>
-              ) : (
-                <div style={{ display:"grid", gap:10 }}>
-                  {heatmap.slice(0,15).map((c, i) => {
-                    const s   = SEV_S[c.level] || SEV_S.LOW;
-                    const max = heatmap[0]?.score || 1;
-                    const pct = Math.round((c.score / max) * 100);
-                    const flags = {
-                      US:"🇺🇸",GB:"🇬🇧",CN:"🇨🇳",RU:"🇷🇺",IN:"🇮🇳",
+              ):(
+                <div style={{ display:"grid", gap:9 }}>
+                  {heatmap.slice(0,15).map((c,i)=>{
+                    const s   = SEV_S[c.level]||SEV_S.LOW;
+                    const max = heatmap[0]?.score||1;
+                    const pct = Math.round((c.score/max)*100);
+                    const FLAGS={US:"🇺🇸",GB:"🇬🇧",CN:"🇨🇳",RU:"🇷🇺",IN:"🇮🇳",
                       DE:"🇩🇪",AU:"🇦🇺",CA:"🇨🇦",FR:"🇫🇷",IR:"🇮🇷",
                       KP:"🇰🇵",AE:"🇦🇪",SA:"🇸🇦",QA:"🇶🇦",KW:"🇰🇼",
                       PK:"🇵🇰",UA:"🇺🇦",BR:"🇧🇷",JP:"🇯🇵",KR:"🇰🇷",
-                      NL:"🇳🇱",SG:"🇸🇬",TR:"🇹🇷",IL:"🇮🇱",ZA:"🇿🇦",
-                    };
+                      NL:"🇳🇱",SG:"🇸🇬",TR:"🇹🇷",IL:"🇮🇱",ZA:"🇿🇦",NG:"🇳🇬",MX:"🇲🇽"};
                     return (
-                      <div key={c.code} style={{ display:"flex",
-                        alignItems:"center", gap:12 }}>
-                        {/* Rank */}
-                        <div style={{ fontSize:13, fontWeight:900,
-                          color:i<3?s.text:"rgba(200,220,240,.4)",
-                          fontFamily:"monospace", minWidth:26,
-                          textAlign:"right" }}>
-                          {String(i+1).padStart(2,"0")}
-                        </div>
-                        {/* Flag + Name */}
+                      <div key={c.code} style={{ display:"flex", alignItems:"center", gap:12 }}>
+                        <div style={{ fontSize:13, fontWeight:900, fontFamily:"monospace",
+                          color:i<3?s.text:"rgba(200,220,240,.35)", minWidth:24,
+                          textAlign:"right" }}>{String(i+1).padStart(2,"0")}</div>
                         <div style={{ display:"flex", alignItems:"center",
-                          gap:7, minWidth:160 }}>
-                          <span style={{ fontSize:18 }}>{flags[c.code]||"🌐"}</span>
+                          gap:7, minWidth:155 }}>
+                          <span style={{ fontSize:18 }}>{FLAGS[c.code]||"🌐"}</span>
                           <span style={{ fontSize:13, color:"#ddeeff",
                             fontWeight:600 }}>{c.name}</span>
                         </div>
-                        {/* Bar */}
-                        <div style={{ flex:1, height:22, background:"rgba(255,255,255,.04)",
+                        <div style={{ flex:1, height:24, background:"rgba(255,255,255,.04)",
                           borderRadius:3, overflow:"hidden", position:"relative" }}>
-                          <div style={{
-                            width:`${pct}%`, height:"100%",
-                            background:`linear-gradient(90deg, ${s.border}88, ${s.border})`,
-                            borderRadius:3, transition:"width .5s ease",
-                            minWidth:4
-                          }}/>
+                          <div style={{ width:`${pct}%`, height:"100%",
+                            background:`linear-gradient(90deg,${s.border}66,${s.border})`,
+                            borderRadius:3, minWidth:4,
+                            boxShadow:i<3?`0 0 8px ${s.border}88`:"none" }}/>
                           <div style={{ position:"absolute", right:8, top:"50%",
                             transform:"translateY(-50%)", fontSize:11,
                             color:"rgba(200,220,240,.5)", fontFamily:"monospace" }}>
-                            {c.score} pts
+                            {c.score}pts
                           </div>
                         </div>
-                        {/* Badge */}
-                        <div style={{ minWidth:70 }}>
-                          <span style={{ fontSize:10, padding:"3px 8px",
-                            background:s.bg, border:`1px solid ${s.border}`,
-                            color:s.text, fontFamily:"monospace",
-                            borderRadius:2, fontWeight:700 }}>
-                            {c.level}
-                          </span>
-                        </div>
+                        <span style={{ fontSize:10, padding:"3px 8px",
+                          background:s.bg, border:`1px solid ${s.border}`,
+                          color:s.text, fontFamily:"monospace",
+                          borderRadius:2, fontWeight:700, minWidth:68,
+                          textAlign:"center" }}>{c.level}</span>
                       </div>
                     );
                   })}
@@ -639,46 +753,44 @@ function BCyberAwareDashboard() {
               )}
             </div>
 
-            {/* Region summary cards */}
-            <div style={{ fontSize:11, letterSpacing:2, color:"rgba(0,200,255,.5)",
-              marginBottom:14, fontFamily:"monospace" }}>
-              REGIONAL THREAT SUMMARY
-            </div>
-            <div style={{ display:"flex", gap:10, flexWrap:"wrap", marginBottom:20 }}>
+            {/* ── REGIONAL CARDS ── */}
+            <div style={{ fontSize:11, letterSpacing:2,
+              color:"rgba(0,200,255,.5)", marginBottom:12,
+              fontFamily:"monospace" }}>REGIONAL THREAT SUMMARY</div>
+            <div style={{ display:"flex", gap:10, flexWrap:"wrap", marginBottom:16 }}>
               {[
-                { region:"🌍 Middle East / GCC", codes:["AE","SA","QA","KW","BH","OM","IQ","IR"],
+                { region:"🌍 Middle East / GCC",
+                  codes:["AE","SA","QA","KW","BH","OM","IQ","IR"],
                   color:"#00e676", bg:"rgba(0,200,100,.08)", border:"rgba(0,200,100,.2)" },
-                { region:"🌏 Asia Pacific", codes:["IN","CN","JP","KR","AU","SG","PK"],
+                { region:"🌏 Asia Pacific",
+                  codes:["IN","CN","JP","KR","AU","SG","PK"],
                   color:ACCENT, bg:"rgba(0,200,255,.06)", border:"rgba(0,200,255,.18)" },
-                { region:"🌎 Americas", codes:["US","CA","BR","MX"],
+                { region:"🌎 Americas",
+                  codes:["US","CA","BR","MX"],
                   color:"#ff9944", bg:"rgba(220,100,0,.08)", border:"rgba(220,100,0,.2)" },
-                { region:"🌍 Europe", codes:["GB","DE","FR","NL","IT","ES","SE","UA"],
+                { region:"🌍 Europe",
+                  codes:["GB","DE","FR","NL","IT","ES","SE","UA"],
                   color:"#c084fc", bg:"rgba(123,47,247,.08)", border:"rgba(123,47,247,.2)" },
-                { region:"⚠️ Threat Actors", codes:["RU","CN","IR","KP"],
+                { region:"⚠️ Threat Actors",
+                  codes:["RU","CN","IR","KP"],
                   color:"#ff4444", bg:"rgba(200,0,0,.1)", border:"rgba(200,0,0,.25)" },
-              ].map(r => {
-                const total = heatmap
-                  .filter(h => r.codes.includes(h.code))
-                  .reduce((s,h) => s+h.score, 0);
-                const topCountry = heatmap.find(h => r.codes.includes(h.code));
+              ].map(r=>{
+                const total    = heatmap.filter(h=>r.codes.includes(h.code)).reduce((s,h)=>s+h.score,0);
+                const topCountry = heatmap.find(h=>r.codes.includes(h.code));
                 return (
-                  <div key={r.region} style={{ flex:1, minWidth:160,
+                  <div key={r.region} style={{ flex:1, minWidth:150,
                     background:r.bg, border:`1px solid ${r.border}`,
                     borderRadius:6, padding:"14px 16px" }}>
                     <div style={{ fontSize:13, fontWeight:700, color:r.color,
                       marginBottom:6 }}>{r.region}</div>
-                    <div style={{ fontSize:28, fontWeight:900, color:r.color,
-                      fontFamily:"monospace", lineHeight:1, marginBottom:4 }}>
-                      {total}
-                    </div>
-                    <div style={{ fontSize:11, color:"rgba(200,220,240,.4)" }}>
+                    <div style={{ fontSize:30, fontWeight:900, color:r.color,
+                      fontFamily:"monospace", lineHeight:1, marginBottom:4 }}>{total}</div>
+                    <div style={{ fontSize:11, color:"rgba(200,220,240,.35)" }}>
                       threat score
                     </div>
-                    {topCountry && (
-                      <div style={{ fontSize:11, color:"rgba(200,220,240,.35)",
-                        marginTop:6 }}>
-                        Top: {topCountry.name}
-                      </div>
+                    {topCountry&&(
+                      <div style={{ fontSize:11, color:"rgba(200,220,240,.3)",
+                        marginTop:5 }}>Top: {topCountry.name}</div>
                     )}
                   </div>
                 );
@@ -691,8 +803,8 @@ function BCyberAwareDashboard() {
               border:"1px solid rgba(0,200,255,.1)", borderRadius:6,
               fontSize:12, color:"rgba(200,220,240,.4)", lineHeight:1.7 }}>
               ℹ️ Heatmap scores are derived from advisory source data and CVE geographic metadata.
-              Scores represent threat advisory activity directed at or originating from each country —
-              not real-time attack traffic. Data refreshes every 1 hour.
+              Scores represent threat advisory activity — not real-time attack traffic.
+              Refreshes every 1 hour automatically.
             </div>
           </div>
         )}
