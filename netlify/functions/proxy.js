@@ -9,7 +9,7 @@
  */
 
 const CACHE    = {};
-const CACHE_MS = 1 * 60 * 60 * 1000; // ← 1 HOUR
+const CACHE_MS = 15 * 60 * 1000; // ← 15 MINUTES (scheduler keeps it warm)
 
 exports.handler = async (event) => {
   const headers = {
@@ -25,8 +25,9 @@ exports.handler = async (event) => {
   if (event.httpMethod === "GET" &&
       event.queryStringParameters?.action === "feed") {
     try {
-      const now = Date.now();
-      if (CACHE.feed && (now - CACHE.feed.ts) < CACHE_MS)
+      const now  = Date.now();
+      const bust = event.queryStringParameters?.bust === "1";
+      if (!bust && CACHE.feed && (now - CACHE.feed.ts) < CACHE_MS)
         return { statusCode:200, headers,
           body: JSON.stringify({ ...CACHE.feed.data, from_cache:true }) };
 
