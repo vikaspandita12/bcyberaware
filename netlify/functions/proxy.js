@@ -53,8 +53,8 @@ exports.handler = async (event) => {
 
       const [
         cisaKev, cisaAlerts, nvd, certIn, ncscUk,
-        exploitDb, thn, bc, sans,
-        otx, packetStorm, secWeek, krebs, telegram
+        exploitDb, packetStorm, thn, bc, sans,
+        otx, secWeek, krebs, telegram, theHindu, econTimes
       ] = results;
 
       const advisories = [
@@ -68,6 +68,7 @@ exports.handler = async (event) => {
         ...get(thn), ...get(bc), ...get(sans),
         ...get(secWeek), ...get(krebs),
         ...get(otx), ...get(telegram),
+        ...get(theHindu), ...get(econTimes),
       ];
 
       const sortAndDedup = arr => {
@@ -90,19 +91,21 @@ exports.handler = async (event) => {
           { name:"CISA KEV",          status:"live",   category:"advisory", flag:"🇺🇸" },
           { name:"CISA Alerts",       status:"live",   category:"advisory", flag:"🇺🇸" },
           { name:"NVD / CVE.org",     status:"live",   category:"advisory", flag:"🌐" },
-          { name:"CERT-In India",     status:"live",   category:"advisory", flag:"🇮🇳" },
-          { name:"NCSC UK",           status:"live",   category:"advisory", flag:"🇬🇧" },
-          { name:"Exploit-DB",        status:"live",   category:"exploit",  flag:"⚡" },
-          { name:"Packet Storm",      status:"live",   category:"exploit",  flag:"⚡" },
-          { name:"The Hacker News",   status:"live",   category:"news",     flag:"📰" },
-          { name:"Bleeping Computer", status:"live",   category:"news",     flag:"📰" },
-          { name:"SANS ISC",          status:"live",   category:"news",     flag:"🔍" },
-          { name:"SecurityWeek",      status:"live",   category:"news",     flag:"📰" },
-          { name:"Krebs on Security", status:"live",   category:"news",     flag:"📰" },
-          { name:"AlienVault OTX",    status:"live",   category:"news",     flag:"🛸" },
-          { name:"Telegram: DarkFeed",status:"live",   category:"news",     flag:"📡" },
-          { name:"UAE CERT",          status:"no_api", category:"advisory", flag:"🇦🇪" },
-          { name:"Saudi CERT",        status:"no_api", category:"advisory", flag:"🇸🇦" },
+          { name:"CERT-In India",      status:"live",   category:"advisory", flag:"🇮🇳" },
+          { name:"NCSC UK",            status:"live",   category:"advisory", flag:"🇬🇧" },
+          { name:"Exploit-DB",         status:"live",   category:"exploit",  flag:"⚡" },
+          { name:"Packet Storm",       status:"live",   category:"exploit",  flag:"⚡" },
+          { name:"The Hacker News",    status:"live",   category:"news",     flag:"📰" },
+          { name:"Bleeping Computer",  status:"live",   category:"news",     flag:"📰" },
+          { name:"SANS ISC",           status:"live",   category:"news",     flag:"🔍" },
+          { name:"SecurityWeek",       status:"live",   category:"news",     flag:"📰" },
+          { name:"Krebs on Security",  status:"live",   category:"news",     flag:"📰" },
+          { name:"AlienVault OTX",     status:"live",   category:"news",     flag:"🛸" },
+          { name:"Telegram: DarkFeed", status:"live",   category:"news",     flag:"📡" },
+          { name:"The Hindu Tech",     status:"live",   category:"news",     flag:"🇮🇳" },
+          { name:"Economic Times IT",  status:"live",   category:"news",     flag:"🇮🇳" },
+          { name:"UAE CERT",           status:"no_api", category:"advisory", flag:"🇦🇪" },
+          { name:"Saudi CERT",         status:"no_api", category:"advisory", flag:"🇸🇦" },
         ],
       };
 
@@ -402,6 +405,55 @@ async function fetchTelegramDarkFeed() {
     } catch {}
   }
   return results;
+}
+
+// ── 15. The Hindu — Technology & Cybersecurity ───────────────────────────────
+async function fetchTheHindu() {
+  const r   = await fetch("https://www.thehindu.com/sci-tech/technology/feeder/default.rss",
+                          { headers:{ "User-Agent":"BCyberAware/2.0" } });
+  const xml = await r.text();
+  const all = parseRSS(xml, {
+    id_prefix:"HINDU", source:"The Hindu Tech",
+    source_url:"https://www.thehindu.com/sci-tech/technology/",
+    source_color:"#b71c1c", source_flag:"🇮🇳",
+    category:"news", default_sev:"MEDIUM",
+    exploit_wild:false, patch_avail:false,
+    limit:15, countries:["IN"],
+  });
+  // Filter to only cyber/security related articles
+  const cyberKeywords = ["cyber","hack","breach","malware","ransomware","phishing",
+    "vulnerability","data leak","attack","security","fraud","scam","cert-in",
+    "nciipc","rbi","digital arrest","upi","banking fraud","password","privacy"];
+  return all.filter(a =>
+    cyberKeywords.some(k =>
+      (a.title + " " + a.summary).toLowerCase().includes(k)
+    )
+  );
+}
+
+// ── 16. Economic Times — IT & Cybersecurity ───────────────────────────────────
+async function fetchEconomicTimes() {
+  const r   = await fetch("https://economictimes.indiatimes.com/tech/rssfeeds/13357270.cms",
+                          { headers:{ "User-Agent":"BCyberAware/2.0" } });
+  const xml = await r.text();
+  const all = parseRSS(xml, {
+    id_prefix:"ET", source:"Economic Times IT",
+    source_url:"https://economictimes.indiatimes.com/tech/technology",
+    source_color:"#e65100", source_flag:"🇮🇳",
+    category:"news", default_sev:"MEDIUM",
+    exploit_wild:false, patch_avail:false,
+    limit:15, countries:["IN"],
+  });
+  // Filter to only cyber/security related articles
+  const cyberKeywords = ["cyber","hack","breach","malware","ransomware","phishing",
+    "vulnerability","data leak","attack","security","fraud","scam","cert-in",
+    "rbi","digital arrest","upi","banking fraud","password","privacy","darknet",
+    "scammer","deepfake","ai fraud","data protection","dpdp","meity"];
+  return all.filter(a =>
+    cyberKeywords.some(k =>
+      (a.title + " " + a.summary).toLowerCase().includes(k)
+    )
+  );
 }
 
 // ── Heatmap Builder ───────────────────────────────────────────────────────────
