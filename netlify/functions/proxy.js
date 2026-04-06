@@ -6,7 +6,7 @@
  */
 
 const CACHE    = {};
-const CACHE_MS = 15 * 60 * 1000;
+const CACHE_MS = 60 * 60 * 1000; // 1 hour — saves Netlify function invocations
 
 exports.handler = async (event) => {
   const headers = {
