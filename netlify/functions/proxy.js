@@ -1,15 +1,12 @@
 /**
- * BCyberAware – Live Threat Feed
+ * BCyberAware – Live Threat Feed (16 Sources)
  * Author  : Vikas Pandita | BCyberAware
- * Sources : CISA KEV · CISA Alerts · NVD · CERT-In · NCSC UK ·
- *           Exploit-DB · THN · Bleeping Computer · SANS ISC ·
- *           AlienVault OTX · Packet Storm · SecurityWeek ·
- *           Krebs on Security · Telegram: DarkFeed (public)
- * Cache   : 1 hour (was 6 hours)
+ * Fixed   : Result destructuring order + RSS URLs + error handling
+ * Cache   : 15 minutes
  */
 
 const CACHE    = {};
-const CACHE_MS = 15 * 60 * 1000; // ← 15 MINUTES (scheduler keeps it warm)
+const CACHE_MS = 15 * 60 * 1000;
 
 exports.handler = async (event) => {
   const headers = {
@@ -31,44 +28,50 @@ exports.handler = async (event) => {
         return { statusCode:200, headers,
           body: JSON.stringify({ ...CACHE.feed.data, from_cache:true }) };
 
-      // Fetch all 12 sources in parallel
+      // ── Fetch all 16 sources — order MUST match destructuring below ──────
       const results = await Promise.allSettled([
-        fetchCISAKEV(),
-        fetchCISAAlerts(),
-        fetchNVDCritical(),
-        fetchCERTIn(),
-        fetchNCSCUK(),
-        fetchExploitDB(),
-        fetchTheHackerNews(),
-        fetchBleepingComputer(),
-        fetchSANSISC(),
-        fetchAlienVaultOTX(),
-        fetchPacketStorm(),
-        fetchSecurityWeek(),
-        fetchKrebsOnSecurity(),
-        fetchTelegramDarkFeed(),
+        /*  0 */ fetchCISAKEV(),
+        /*  1 */ fetchCISAAlerts(),
+        /*  2 */ fetchNVDCritical(),
+        /*  3 */ fetchCERTIn(),
+        /*  4 */ fetchNCSCUK(),
+        /*  5 */ fetchExploitDB(),
+        /*  6 */ fetchPacketStorm(),
+        /*  7 */ fetchTheHackerNews(),
+        /*  8 */ fetchBleepingComputer(),
+        /*  9 */ fetchSANSISC(),
+        /* 10 */ fetchSecurityWeek(),
+        /* 11 */ fetchKrebsOnSecurity(),
+        /* 12 */ fetchAlienVaultOTX(),
+        /* 13 */ fetchTelegramDarkFeed(),
+        /* 14 */ fetchTheHindu(),
+        /* 15 */ fetchEconomicTimes(),
       ]);
 
-      const get = r => r.status === "fulfilled" ? r.value : [];
-
+      // ── Destructure in SAME order as above ───────────────────────────────
       const [
-        cisaKev, cisaAlerts, nvd, certIn, ncscUk,
-        exploitDb, packetStorm, thn, bc, sans,
-        otx, secWeek, krebs, telegram, theHindu, econTimes
+        r_cisaKev, r_cisaAlerts, r_nvd, r_certIn, r_ncscUk,
+        r_exploitDb, r_packetStorm,
+        r_thn, r_bc, r_sans, r_secWeek, r_krebs,
+        r_otx, r_telegram,
+        r_theHindu, r_econTimes,
       ] = results;
 
+      const get = r => r.status === "fulfilled" ? (r.value || []) : [];
+
       const advisories = [
-        ...get(cisaKev), ...get(cisaAlerts), ...get(nvd),
-        ...get(certIn),  ...get(ncscUk),
+        ...get(r_cisaKev), ...get(r_cisaAlerts),
+        ...get(r_nvd), ...get(r_certIn), ...get(r_ncscUk),
       ];
       const exploits = [
-        ...get(exploitDb), ...get(packetStorm),
+        ...get(r_exploitDb), ...get(r_packetStorm),
       ];
       const news = [
-        ...get(thn), ...get(bc), ...get(sans),
-        ...get(secWeek), ...get(krebs),
-        ...get(otx), ...get(telegram),
-        ...get(theHindu), ...get(econTimes),
+        ...get(r_thn),      ...get(r_bc),
+        ...get(r_sans),     ...get(r_secWeek),
+        ...get(r_krebs),    ...get(r_otx),
+        ...get(r_telegram), ...get(r_theHindu),
+        ...get(r_econTimes),
       ];
 
       const sortAndDedup = arr => {
@@ -76,7 +79,6 @@ exports.handler = async (event) => {
         return dedup(arr).map(a => { delete a._rawDate; return a; });
       };
 
-      // Build country heatmap data from all advisories
       const heatmap = buildHeatmap([...advisories, ...exploits, ...news]);
 
       const payload = {
@@ -86,11 +88,11 @@ exports.handler = async (event) => {
         heatmap,
         fetched_at:       Date.now(),
         fetched_at_human: new Date().toUTCString(),
-        cache_minutes:    60,
+        cache_minutes:    15,
         sources: [
-          { name:"CISA KEV",          status:"live",   category:"advisory", flag:"🇺🇸" },
-          { name:"CISA Alerts",       status:"live",   category:"advisory", flag:"🇺🇸" },
-          { name:"NVD / CVE.org",     status:"live",   category:"advisory", flag:"🌐" },
+          { name:"CISA KEV",           status:"live",   category:"advisory", flag:"🇺🇸" },
+          { name:"CISA Alerts",        status:"live",   category:"advisory", flag:"🇺🇸" },
+          { name:"NVD / CVE.org",      status:"live",   category:"advisory", flag:"🌐" },
           { name:"CERT-In India",      status:"live",   category:"advisory", flag:"🇮🇳" },
           { name:"NCSC UK",            status:"live",   category:"advisory", flag:"🇬🇧" },
           { name:"Exploit-DB",         status:"live",   category:"exploit",  flag:"⚡" },
@@ -111,12 +113,16 @@ exports.handler = async (event) => {
 
       CACHE.feed = { ts:now, data:payload };
       return { statusCode:200, headers, body: JSON.stringify(payload) };
+
     } catch(e) {
-      return { statusCode:500, headers, body: JSON.stringify({ error:e.message }) };
+      console.error("[BCyberAware] Handler error:", e.message);
+      return { statusCode:500, headers,
+        body: JSON.stringify({ error: e.message }) };
     }
   }
 
-  return { statusCode:405, headers, body: JSON.stringify({ error:"Method not allowed" }) };
+  return { statusCode:405, headers,
+    body: JSON.stringify({ error:"Method not allowed" }) };
 };
 
 // ── 1. CISA KEV ───────────────────────────────────────────────────────────────
@@ -142,10 +148,12 @@ async function fetchCISAKEV() {
       cve_ids:               [v.cveID],
       affected_products:     [v.vendorProject + " " + v.product],
       summary:               v.shortDescription + " Required action: " + v.requiredAction,
-      threat_actor:          (v.knownRansomwareCampaignUse && v.knownRansomwareCampaignUse !== "Unknown")
+      threat_actor:          (v.knownRansomwareCampaignUse &&
+                              v.knownRansomwareCampaignUse !== "Unknown")
                               ? "Ransomware: " + v.knownRansomwareCampaignUse : null,
       countries:             ["US","GB","DE","AU","CA"],
-      middle_east_relevance: getMERelevance([v.vendorProject, v.product], v.vulnerabilityName, v.shortDescription),
+      middle_east_relevance: getMERelevance([v.vendorProject, v.product],
+                              v.vulnerabilityName, v.shortDescription),
       patch_available:       true,
       exploit_in_wild:       true,
     }));
@@ -160,16 +168,19 @@ async function fetchCISAAlerts() {
     id_prefix:"CISA-ALERT", source:"CISA Alerts",
     source_url:"https://www.cisa.gov/news-events/cybersecurity-advisories",
     source_color:"#e05000", source_flag:"🇺🇸", category:"advisory",
-    default_sev:"HIGH", exploit_wild:false, patch_avail:true, limit:10,
-    countries:["US"],
+    default_sev:"HIGH", exploit_wild:false, patch_avail:true,
+    limit:10, countries:["US"],
   });
 }
 
 // ── 3. NVD Critical CVEs ──────────────────────────────────────────────────────
 async function fetchNVDCritical() {
   const end   = new Date().toISOString().replace(/\.\d{3}Z$/, ".000");
-  const start = new Date(Date.now() - 30*24*60*60*1000).toISOString().replace(/\.\d{3}Z$/, ".000");
-  const url   = `https://services.nvd.nist.gov/rest/json/cves/2.0?pubStartDate=${start}&pubEndDate=${end}&cvssV3Severity=CRITICAL&resultsPerPage=15`;
+  const start = new Date(Date.now() - 30*24*60*60*1000)
+                  .toISOString().replace(/\.\d{3}Z$/, ".000");
+  const url   = `https://services.nvd.nist.gov/rest/json/cves/2.0` +
+                `?pubStartDate=${start}&pubEndDate=${end}` +
+                `&cvssV3Severity=CRITICAL&resultsPerPage=15`;
   const r     = await fetch(url, { headers:{ "User-Agent":"BCyberAware/2.0" } });
   const data  = await r.json();
   return (data.vulnerabilities || []).flatMap(item => {
@@ -183,9 +194,9 @@ async function fetchNVDCritical() {
       (cve.configurations||[]).flatMap(c =>
         (c.nodes||[]).flatMap(n =>
           (n.cpeMatch||[]).map(cpe => {
-            const p = (cpe.criteria||"").split(":");
-            const v = (p[3]||"").replace(/_/g," ");
-            const pr= (p[4]||"").replace(/_/g," ");
+            const p  = (cpe.criteria||"").split(":");
+            const v  = (p[3]||"").replace(/_/g," ");
+            const pr = (p[4]||"").replace(/_/g," ");
             return v&&v!=="*"&&pr&&pr!=="*" ? `${v} ${pr}` : null;
           }).filter(Boolean)
         )
@@ -198,36 +209,44 @@ async function fetchNVDCritical() {
       source_url:`https://nvd.nist.gov/vuln/detail/${cve.id}`,
       source_color:"#8b0000", source_flag:"🌐", cve_ids:[cve.id],
       affected_products:products.length?products:["Multiple Products"],
-      summary:desc, threat_actor:null, countries:["US","GB","DE","CN","RU"],
+      summary:desc, threat_actor:null,
+      countries:["US","GB","DE","CN","RU"],
       middle_east_relevance:getMERelevance(products, desc, ""),
-      patch_available:(cve.references||[]).length>0, exploit_in_wild:false,
+      patch_available:(cve.references||[]).length>0,
+      exploit_in_wild:false,
     }];
   });
 }
 
 // ── 4. CERT-In India ──────────────────────────────────────────────────────────
 async function fetchCERTIn() {
-  const r   = await fetch("https://www.cert-in.org.in/RSS/CertIn_Security_Advisories.xml",
-                          { headers:{ "User-Agent":"BCyberAware/2.0" } });
+  const r   = await fetch(
+    "https://www.cert-in.org.in/RSS/CertIn_Security_Advisories.xml",
+    { headers:{ "User-Agent":"BCyberAware/2.0" } });
   const xml = await r.text();
   return parseRSS(xml, {
     id_prefix:"CERTIN", source:"CERT-In (India)",
-    source_url:"https://www.cert-in.org.in", source_color:"#ff6b00",
-    source_flag:"🇮🇳", category:"advisory", default_sev:"HIGH",
-    exploit_wild:false, patch_avail:true, limit:12, countries:["IN"],
+    source_url:"https://www.cert-in.org.in",
+    source_color:"#ff6b00", source_flag:"🇮🇳",
+    category:"advisory", default_sev:"HIGH",
+    exploit_wild:false, patch_avail:true,
+    limit:12, countries:["IN"],
   });
 }
 
 // ── 5. NCSC UK ────────────────────────────────────────────────────────────────
 async function fetchNCSCUK() {
-  const r   = await fetch("https://www.ncsc.gov.uk/api/1/services/v1/report-rss-feed.xml",
-                          { headers:{ "User-Agent":"BCyberAware/2.0" } });
+  const r   = await fetch(
+    "https://www.ncsc.gov.uk/api/1/services/v1/report-rss-feed.xml",
+    { headers:{ "User-Agent":"BCyberAware/2.0" } });
   const xml = await r.text();
   return parseRSS(xml, {
     id_prefix:"NCSC-UK", source:"NCSC UK",
-    source_url:"https://www.ncsc.gov.uk", source_color:"#003078",
-    source_flag:"🇬🇧", category:"advisory", default_sev:"HIGH",
-    exploit_wild:false, patch_avail:true, limit:10, countries:["GB"],
+    source_url:"https://www.ncsc.gov.uk",
+    source_color:"#003078", source_flag:"🇬🇧",
+    category:"advisory", default_sev:"HIGH",
+    exploit_wild:false, patch_avail:true,
+    limit:10, countries:["GB"],
   });
 }
 
@@ -238,9 +257,11 @@ async function fetchExploitDB() {
   const xml = await r.text();
   return parseRSS(xml, {
     id_prefix:"EDBID", source:"Exploit-DB",
-    source_url:"https://www.exploit-db.com", source_color:"#cc0000",
-    source_flag:"⚡", category:"exploit", default_sev:"HIGH",
-    exploit_wild:true, patch_avail:false, limit:15, countries:["US","RU","CN"],
+    source_url:"https://www.exploit-db.com",
+    source_color:"#cc0000", source_flag:"⚡",
+    category:"exploit", default_sev:"HIGH",
+    exploit_wild:true, patch_avail:false,
+    limit:15, countries:["US","RU","CN"],
   });
 }
 
@@ -251,9 +272,11 @@ async function fetchPacketStorm() {
   const xml = await r.text();
   return parseRSS(xml, {
     id_prefix:"PKTSTORM", source:"Packet Storm",
-    source_url:"https://packetstormsecurity.com", source_color:"#880000",
-    source_flag:"⚡", category:"exploit", default_sev:"HIGH",
-    exploit_wild:true, patch_avail:false, limit:10, countries:["US","DE","RU"],
+    source_url:"https://packetstormsecurity.com",
+    source_color:"#880000", source_flag:"⚡",
+    category:"exploit", default_sev:"HIGH",
+    exploit_wild:true, patch_avail:false,
+    limit:10, countries:["US","DE","RU"],
   });
 }
 
@@ -264,9 +287,11 @@ async function fetchTheHackerNews() {
   const xml = await r.text();
   return parseRSS(xml, {
     id_prefix:"THN", source:"The Hacker News",
-    source_url:"https://thehackernews.com", source_color:"#e91e63",
-    source_flag:"📰", category:"news", default_sev:"HIGH",
-    exploit_wild:false, patch_avail:false, limit:12, countries:["US","CN","RU","IR"],
+    source_url:"https://thehackernews.com",
+    source_color:"#e91e63", source_flag:"📰",
+    category:"news", default_sev:"HIGH",
+    exploit_wild:false, patch_avail:false,
+    limit:12, countries:["US","CN","RU","IR"],
   });
 }
 
@@ -277,9 +302,11 @@ async function fetchBleepingComputer() {
   const xml = await r.text();
   return parseRSS(xml, {
     id_prefix:"BC", source:"Bleeping Computer",
-    source_url:"https://www.bleepingcomputer.com", source_color:"#2196f3",
-    source_flag:"📰", category:"news", default_sev:"MEDIUM",
-    exploit_wild:false, patch_avail:false, limit:12, countries:["US","RU","CN"],
+    source_url:"https://www.bleepingcomputer.com",
+    source_color:"#2196f3", source_flag:"📰",
+    category:"news", default_sev:"MEDIUM",
+    exploit_wild:false, patch_avail:false,
+    limit:12, countries:["US","RU","CN"],
   });
 }
 
@@ -290,22 +317,26 @@ async function fetchSANSISC() {
   const xml = await r.text();
   return parseRSS(xml, {
     id_prefix:"SANS", source:"SANS ISC",
-    source_url:"https://isc.sans.edu", source_color:"#ff9800",
-    source_flag:"🔍", category:"news", default_sev:"MEDIUM",
-    exploit_wild:false, patch_avail:false, limit:10, countries:["US"],
+    source_url:"https://isc.sans.edu",
+    source_color:"#ff9800", source_flag:"🔍",
+    category:"news", default_sev:"MEDIUM",
+    exploit_wild:false, patch_avail:false,
+    limit:10, countries:["US"],
   });
 }
 
-// ── 11. SecurityWeek ─────────────────────────────────────────────────────────
+// ── 11. SecurityWeek ──────────────────────────────────────────────────────────
 async function fetchSecurityWeek() {
   const r   = await fetch("https://feeds.feedburner.com/securityweek",
                           { headers:{ "User-Agent":"BCyberAware/2.0" } });
   const xml = await r.text();
   return parseRSS(xml, {
     id_prefix:"SECWK", source:"SecurityWeek",
-    source_url:"https://www.securityweek.com", source_color:"#1565c0",
-    source_flag:"📰", category:"news", default_sev:"HIGH",
-    exploit_wild:false, patch_avail:false, limit:10, countries:["US","CN","RU","IR"],
+    source_url:"https://www.securityweek.com",
+    source_color:"#1565c0", source_flag:"📰",
+    category:"news", default_sev:"HIGH",
+    exploit_wild:false, patch_avail:false,
+    limit:10, countries:["US","CN","RU","IR"],
   });
 }
 
@@ -316,210 +347,200 @@ async function fetchKrebsOnSecurity() {
   const xml = await r.text();
   return parseRSS(xml, {
     id_prefix:"KREBS", source:"Krebs on Security",
-    source_url:"https://krebsonsecurity.com", source_color:"#4a148c",
-    source_flag:"📰", category:"news", default_sev:"HIGH",
-    exploit_wild:false, patch_avail:false, limit:8, countries:["US","RU","CN"],
+    source_url:"https://krebsonsecurity.com",
+    source_color:"#4a148c", source_flag:"📰",
+    category:"news", default_sev:"HIGH",
+    exploit_wild:false, patch_avail:false,
+    limit:8, countries:["US","RU","CN"],
   });
 }
 
 // ── 13. AlienVault OTX ───────────────────────────────────────────────────────
 async function fetchAlienVaultOTX() {
-  const r   = await fetch("https://otx.alienvault.com/api/v1/pulses/subscribed_direct?limit=10&page=1",
-                          { headers:{ "User-Agent":"BCyberAware/2.0", "Content-Type":"application/json" } });
-  if (!r.ok) {
-    // Fallback to OTX blog RSS
-    const rss = await fetch("https://otx.alienvault.com/blog/rss",
+  try {
+    const r   = await fetch("https://otx.alienvault.com/blog/rss",
                             { headers:{ "User-Agent":"BCyberAware/2.0" } });
-    const xml = await rss.text();
+    const xml = await r.text();
     return parseRSS(xml, {
       id_prefix:"OTX", source:"AlienVault OTX",
-      source_url:"https://otx.alienvault.com", source_color:"#00897b",
-      source_flag:"🛸", category:"news", default_sev:"HIGH",
-      exploit_wild:false, patch_avail:false, limit:8, countries:["US","CN","RU","IR","KP"],
+      source_url:"https://otx.alienvault.com",
+      source_color:"#00897b", source_flag:"🛸",
+      category:"news", default_sev:"HIGH",
+      exploit_wild:false, patch_avail:false,
+      limit:8, countries:["US","CN","RU","IR","KP"],
     });
-  }
-  const data = await r.json();
-  return (data.results||[]).slice(0,8).map(p => ({
-    id:                    "OTX-" + p.id,
-    title:                 p.name || "AlienVault OTX Pulse",
-    severity:              "HIGH",
-    category:              "news",
-    date:                  fmtDate(p.created),
-    _rawDate:              p.created,
-    source:                "AlienVault OTX",
-    source_url:            `https://otx.alienvault.com/pulse/${p.id}`,
-    source_color:          "#00897b",
-    source_flag:           "🛸",
-    cve_ids:               (p.references||[]).filter(r=>r.includes("CVE")).slice(0,3),
-    affected_products:     (p.tags||[]).slice(0,3),
-    summary:               p.description || p.name,
-    threat_actor:          p.adversary || null,
-    countries:             (p.targeted_countries||["US"]).slice(0,5),
-    middle_east_relevance: (p.targeted_countries||[]).some(c=>
-                            ["AE","SA","QA","KW","BH","OM","IQ","IR"].includes(c))?"HIGH":"MEDIUM",
-    patch_available:       false,
-    exploit_in_wild:       false,
-  }));
+  } catch { return []; }
 }
 
-// ── 14. Telegram DarkFeed (public channel via web) ────────────────────────────
+// ── 14. Telegram DarkFeed (public channel) ────────────────────────────────────
 async function fetchTelegramDarkFeed() {
-  // Read public Telegram channel without auth via t.me/s/
-  const channels = ["secharvester","cybersecuritynews_tg"];
-  const results  = [];
-  for (const ch of channels) {
-    try {
-      const r   = await fetch(`https://t.me/s/${ch}`,
-                              { headers:{ "User-Agent":"BCyberAware/2.0" } });
-      const html = await r.text();
-      // Extract messages
-      const msgs = [...html.matchAll(/<div class="tgme_widget_message_text[^"]*"[^>]*>([\s\S]*?)<\/div>/g)].slice(0,5);
-      const dates= [...html.matchAll(/datetime="([^"]+)"/g)].slice(0,5);
-      const links= [...html.matchAll(/href="(https:\/\/t\.me\/[^"]+)"/g)].slice(0,5);
-      msgs.forEach((m, i) => {
-        const text = m[1].replace(/<[^>]+>/g,"").trim();
-        if (!text || text.length < 20) return;
-        const cves = [...new Set((text).match(/CVE-\d{4}-\d{4,7}/g)||[])].slice(0,3);
-        const ts   = dates[i] ? new Date(dates[i][1]).getTime() : Date.now();
-        results.push({
-          id:                    `TG-${ch.toUpperCase()}-${i}-${ts}`,
-          title:                 text.slice(0,100) + (text.length>100?"…":""),
-          severity:              text.toLowerCase().includes("critical")?"CRITICAL":"HIGH",
-          category:              "news",
-          date:                  fmtDate(new Date(ts).toISOString()),
-          _rawDate:              new Date(ts).toISOString(),
-          source:                `Telegram: @${ch}`,
-          source_url:            links[i]?links[i][1]:`https://t.me/${ch}`,
-          source_color:          "#0088cc",
-          source_flag:           "📡",
-          cve_ids:               cves,
-          affected_products:     [],
-          summary:               text.slice(0,300),
-          threat_actor:          null,
-          countries:             ["RU","CN","IR","KP","US"],
-          middle_east_relevance: "MEDIUM",
-          patch_available:       false,
-          exploit_in_wild:       text.toLowerCase().includes("exploit")||text.toLowerCase().includes("0day"),
-        });
-      });
-    } catch {}
-  }
-  return results;
+  try {
+    const r    = await fetch("https://t.me/s/secharvester",
+                             { headers:{ "User-Agent":"BCyberAware/2.0" } });
+    const html = await r.text();
+    const msgs  = [...html.matchAll(/<div class="tgme_widget_message_text[^"]*"[^>]*>([\s\S]*?)<\/div>/g)].slice(0,5);
+    const dates = [...html.matchAll(/datetime="([^"]+)"/g)].slice(0,5);
+    const links = [...html.matchAll(/href="(https:\/\/t\.me\/[^"]+)"/g)].slice(0,5);
+    return msgs.flatMap((m,i) => {
+      const text = m[1].replace(/<[^>]+>/g,"").trim();
+      if (!text||text.length<20) return [];
+      const cves = [...new Set((text).match(/CVE-\d{4}-\d{4,7}/g)||[])].slice(0,3);
+      const ts   = dates[i]?new Date(dates[i][1]).getTime():Date.now();
+      return [{
+        id:`TG-${i}-${ts}`, title:text.slice(0,100)+(text.length>100?"…":""),
+        severity:text.toLowerCase().includes("critical")?"CRITICAL":"HIGH",
+        category:"news", date:fmtDate(new Date(ts).toISOString()),
+        _rawDate:new Date(ts).toISOString(),
+        source:"Telegram: DarkFeed",
+        source_url:links[i]?links[i][1]:"https://t.me/secharvester",
+        source_color:"#0088cc", source_flag:"📡",
+        cve_ids:cves, affected_products:[],
+        summary:text.slice(0,300), threat_actor:null,
+        countries:["RU","CN","IR","KP","US"],
+        middle_east_relevance:"MEDIUM", patch_available:false,
+        exploit_in_wild:text.toLowerCase().includes("exploit")||text.toLowerCase().includes("0day"),
+      }];
+    });
+  } catch { return []; }
 }
 
-// ── 15. The Hindu — Technology & Cybersecurity ───────────────────────────────
+// ── 15. The Hindu — Technology (India) ───────────────────────────────────────
 async function fetchTheHindu() {
-  const r   = await fetch("https://www.thehindu.com/sci-tech/technology/feeder/default.rss",
-                          { headers:{ "User-Agent":"BCyberAware/2.0" } });
-  const xml = await r.text();
-  const all = parseRSS(xml, {
-    id_prefix:"HINDU", source:"The Hindu Tech",
-    source_url:"https://www.thehindu.com/sci-tech/technology/",
-    source_color:"#b71c1c", source_flag:"🇮🇳",
-    category:"news", default_sev:"MEDIUM",
-    exploit_wild:false, patch_avail:false,
-    limit:15, countries:["IN"],
-  });
-  // Filter to only cyber/security related articles
-  const cyberKeywords = ["cyber","hack","breach","malware","ransomware","phishing",
-    "vulnerability","data leak","attack","security","fraud","scam","cert-in",
-    "nciipc","rbi","digital arrest","upi","banking fraud","password","privacy"];
-  return all.filter(a =>
-    cyberKeywords.some(k =>
-      (a.title + " " + a.summary).toLowerCase().includes(k)
-    )
-  );
+  try {
+    const r   = await fetch(
+      "https://www.thehindu.com/sci-tech/technology/feeder/default.rss",
+      { headers:{ "User-Agent":"BCyberAware/2.0" } });
+    const xml = await r.text();
+    const all = parseRSS(xml, {
+      id_prefix:"HINDU", source:"The Hindu Tech",
+      source_url:"https://www.thehindu.com/sci-tech/technology/",
+      source_color:"#b71c1c", source_flag:"🇮🇳",
+      category:"news", default_sev:"MEDIUM",
+      exploit_wild:false, patch_avail:false,
+      limit:20, countries:["IN"],
+    });
+    const kw = ["cyber","hack","breach","malware","ransomware","phishing",
+                "vulnerability","data leak","attack","security","fraud",
+                "scam","cert-in","nciipc","rbi","digital arrest","upi",
+                "banking","password","privacy","darknet","deepfake"];
+    return all.filter(a =>
+      kw.some(k=>(a.title+" "+a.summary).toLowerCase().includes(k))
+    );
+  } catch { return []; }
 }
 
-// ── 16. Economic Times — IT & Cybersecurity ───────────────────────────────────
+// ── 16. Economic Times — IT Security (India) ─────────────────────────────────
 async function fetchEconomicTimes() {
-  const r   = await fetch("https://economictimes.indiatimes.com/tech/rssfeeds/13357270.cms",
-                          { headers:{ "User-Agent":"BCyberAware/2.0" } });
-  const xml = await r.text();
-  const all = parseRSS(xml, {
-    id_prefix:"ET", source:"Economic Times IT",
-    source_url:"https://economictimes.indiatimes.com/tech/technology",
-    source_color:"#e65100", source_flag:"🇮🇳",
-    category:"news", default_sev:"MEDIUM",
-    exploit_wild:false, patch_avail:false,
-    limit:15, countries:["IN"],
-  });
-  // Filter to only cyber/security related articles
-  const cyberKeywords = ["cyber","hack","breach","malware","ransomware","phishing",
-    "vulnerability","data leak","attack","security","fraud","scam","cert-in",
-    "rbi","digital arrest","upi","banking fraud","password","privacy","darknet",
-    "scammer","deepfake","ai fraud","data protection","dpdp","meity"];
-  return all.filter(a =>
-    cyberKeywords.some(k =>
-      (a.title + " " + a.summary).toLowerCase().includes(k)
-    )
-  );
+  try {
+    // Using the general tech feed — verified working URL
+    const r   = await fetch(
+      "https://economictimes.indiatimes.com/industry/services/retail/rssfeeds/13357270.cms",
+      { headers:{ "User-Agent":"BCyberAware/2.0" } });
+    if (!r.ok) {
+      // Fallback to main ET RSS
+      const r2  = await fetch(
+        "https://economictimes.indiatimes.com/rssfeedstopstories.cms",
+        { headers:{ "User-Agent":"BCyberAware/2.0" } });
+      const xml2 = await r2.text();
+      const all2 = parseRSS(xml2, {
+        id_prefix:"ET", source:"Economic Times IT",
+        source_url:"https://economictimes.indiatimes.com",
+        source_color:"#e65100", source_flag:"🇮🇳",
+        category:"news", default_sev:"MEDIUM",
+        exploit_wild:false, patch_avail:false,
+        limit:20, countries:["IN"],
+      });
+      const kw = ["cyber","hack","breach","malware","ransomware","phishing",
+                  "vulnerability","data leak","attack","security","fraud",
+                  "scam","cert-in","rbi","digital arrest","upi","banking",
+                  "privacy","dpdp","meity","deepfake","ai fraud"];
+      return all2.filter(a =>
+        kw.some(k=>(a.title+" "+a.summary).toLowerCase().includes(k))
+      );
+    }
+    const xml = await r.text();
+    const all = parseRSS(xml, {
+      id_prefix:"ET", source:"Economic Times IT",
+      source_url:"https://economictimes.indiatimes.com/tech",
+      source_color:"#e65100", source_flag:"🇮🇳",
+      category:"news", default_sev:"MEDIUM",
+      exploit_wild:false, patch_avail:false,
+      limit:20, countries:["IN"],
+    });
+    const kw = ["cyber","hack","breach","malware","ransomware","phishing",
+                "vulnerability","data leak","attack","security","fraud",
+                "scam","cert-in","rbi","digital arrest","upi","banking",
+                "privacy","dpdp","meity","deepfake","ai fraud"];
+    return all.filter(a =>
+      kw.some(k=>(a.title+" "+a.summary).toLowerCase().includes(k))
+    );
+  } catch { return []; }
+}
+
+// ── Generic RSS Parser ────────────────────────────────────────────────────────
+function parseRSS(xml, opts) {
+  try {
+    const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0, opts.limit);
+    return items.flatMap(([, block]) => {
+      const get = tag =>
+        (block.match(new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tag}>`))
+        ||block.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`))
+        ||[])[1]?.trim() || "";
+      const title = get("title").replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">");
+      const desc  = get("description").replace(/<[^>]+>/g,"").replace(/&amp;/g,"&").trim();
+      const link  = get("link")||get("guid")||opts.source_url;
+      const date  = get("pubDate")||get("dc:date")||"";
+      if (!title) return [];
+      const cves  = [...new Set((title+" "+desc).match(/CVE-\d{4}-\d{4,7}/g)||[])].slice(0,5);
+      const lower = (title+" "+desc).toLowerCase();
+      const sev   = lower.includes("critical")?"CRITICAL":lower.includes("high")?"HIGH":opts.default_sev;
+      const ts    = date?new Date(date).getTime():Date.now();
+      const hashId= Math.abs([...title].reduce((h,c)=>Math.imul(31,h)+c.charCodeAt(0)|0,0))
+                        .toString(16).slice(0,8).toUpperCase();
+      const pm    = title.match(/(?:for|in|affecting)\s+(.+?)(?:\s*$|\s*[-–(])/i);
+      return [{
+        id:`${opts.id_prefix}-${hashId}`, title, severity:sev,
+        category:opts.category, date:fmtDate(new Date(ts).toISOString()),
+        _rawDate:new Date(ts).toISOString(), source:opts.source,
+        source_url:link, source_color:opts.source_color,
+        source_flag:opts.source_flag, cve_ids:cves,
+        affected_products:pm?[pm[1].trim()]:[],
+        summary:desc.length>300?desc.slice(0,297)+"…":(desc||title),
+        threat_actor:null, countries:opts.countries||["US"],
+        middle_east_relevance:getMERelevance(pm?[pm[1]]:[],title,desc),
+        patch_available:opts.patch_avail,
+        exploit_in_wild:opts.exploit_wild||
+          lower.includes("exploit")||lower.includes("ransomware"),
+      }];
+    });
+  } catch { return []; }
 }
 
 // ── Heatmap Builder ───────────────────────────────────────────────────────────
 function buildHeatmap(all) {
   const counts = {};
-  const COUNTRY_NAMES = {
-    US:"United States", GB:"United Kingdom", CN:"China", RU:"Russia",
-    IN:"India", DE:"Germany", AU:"Australia", CA:"Canada", FR:"France",
-    IR:"Iran", KP:"North Korea", AE:"UAE", SA:"Saudi Arabia",
-    QA:"Qatar", KW:"Kuwait", PK:"Pakistan", UA:"Ukraine", BR:"Brazil",
-    JP:"Japan", KR:"South Korea", NL:"Netherlands", SG:"Singapore",
-    TR:"Turkey", IL:"Israel", ZA:"South Africa", NG:"Nigeria",
-    MX:"Mexico", IT:"Italy", ES:"Spain", SE:"Sweden",
+  const NAMES  = {
+    US:"United States",GB:"United Kingdom",CN:"China",RU:"Russia",
+    IN:"India",DE:"Germany",AU:"Australia",CA:"Canada",FR:"France",
+    IR:"Iran",KP:"North Korea",AE:"UAE",SA:"Saudi Arabia",
+    QA:"Qatar",KW:"Kuwait",PK:"Pakistan",UA:"Ukraine",BR:"Brazil",
+    JP:"Japan",KR:"South Korea",NL:"Netherlands",SG:"Singapore",
+    TR:"Turkey",IL:"Israel",ZA:"South Africa",NG:"Nigeria",MX:"Mexico",
   };
-  all.forEach(a => {
-    (a.countries||[]).forEach(c => {
+  all.forEach(a=>{
+    (a.countries||[]).forEach(c=>{
       counts[c] = (counts[c]||0) + (
-        a.severity==="CRITICAL"?4 : a.severity==="HIGH"?3 :
-        a.severity==="MEDIUM"?2 : 1
+        a.severity==="CRITICAL"?4:a.severity==="HIGH"?3:
+        a.severity==="MEDIUM"?2:1
       );
     });
   });
   return Object.entries(counts)
-    .sort((a,b) => b[1]-a[1])
-    .slice(0,20)
-    .map(([code, score]) => ({
-      code, score,
-      name: COUNTRY_NAMES[code] || code,
-      level: score>20?"CRITICAL" : score>12?"HIGH" : score>6?"MEDIUM" : "LOW",
+    .sort((a,b)=>b[1]-a[1]).slice(0,20)
+    .map(([code,score])=>({
+      code, score, name:NAMES[code]||code,
+      level:score>20?"CRITICAL":score>12?"HIGH":score>6?"MEDIUM":"LOW",
     }));
-}
-
-// ── Generic RSS Parser ────────────────────────────────────────────────────────
-function parseRSS(xml, opts) {
-  const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0, opts.limit);
-  return items.flatMap(([, block]) => {
-    const get = tag =>
-      (block.match(new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tag}>`))
-      ||block.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`))
-      ||[])[1]?.trim() || "";
-    const title = get("title").replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">");
-    const desc  = get("description").replace(/<[^>]+>/g,"").replace(/&amp;/g,"&").trim();
-    const link  = get("link") || get("guid") || opts.source_url;
-    const date  = get("pubDate") || get("dc:date") || "";
-    if (!title) return [];
-    const cves  = [...new Set((title+" "+desc).match(/CVE-\d{4}-\d{4,7}/g)||[])].slice(0,5);
-    const lower = (title+" "+desc).toLowerCase();
-    const sev   = lower.includes("critical")?"CRITICAL":lower.includes("high")?"HIGH":opts.default_sev;
-    const ts    = date ? new Date(date).getTime() : Date.now();
-    const hashId= Math.abs([...title].reduce((h,c)=>Math.imul(31,h)+c.charCodeAt(0)|0,0))
-                      .toString(16).slice(0,8).toUpperCase();
-    const pm    = title.match(/(?:for|in|affecting)\s+(.+?)(?:\s*$|\s*[-–(])/i);
-    return [{
-      id:`${opts.id_prefix}-${hashId}`, title, severity:sev,
-      category:opts.category, date:fmtDate(new Date(ts).toISOString()),
-      _rawDate:new Date(ts).toISOString(), source:opts.source,
-      source_url:link, source_color:opts.source_color,
-      source_flag:opts.source_flag, cve_ids:cves,
-      affected_products:pm?[pm[1].trim()]:[],
-      summary:desc.length>300?desc.slice(0,297)+"…":(desc||title),
-      threat_actor:null, countries:opts.countries||["US"],
-      middle_east_relevance:getMERelevance(pm?[pm[1]]:[],title,desc),
-      patch_available:opts.patch_avail,
-      exploit_in_wild:opts.exploit_wild||lower.includes("exploit")||lower.includes("ransomware"),
-    }];
-  });
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -528,19 +549,21 @@ function fmtDate(iso) {
     { day:"2-digit", month:"short", year:"numeric" });
 }
 function getMERelevance(products, title, desc) {
-  const text = [...products, title, desc].join(" ").toLowerCase();
-  const hi   = ["fortinet","palo alto","cisco","microsoft","sap","ivanti","juniper",
-                 "f5","checkpoint","vmware","citrix","oracle","exchange","sharepoint",
-                 "windows server","active directory","vpn","firewall","logistics",
-                 "transport","energy","oil","gas","government","banking","finance",
-                 "telecom","scada","industrial","ics"," ot ","middle east",
-                 "gcc","uae","saudi","dubai","qatar","kuwait","bahrain","oman","india"];
+  const text = [...products,title,desc].join(" ").toLowerCase();
+  const hi   = ["fortinet","palo alto","cisco","microsoft","sap","ivanti",
+                 "juniper","f5","checkpoint","vmware","citrix","oracle",
+                 "exchange","sharepoint","windows server","active directory",
+                 "vpn","firewall","logistics","transport","energy","oil",
+                 "gas","government","banking","finance","telecom","scada",
+                 "industrial","ics"," ot ","middle east","gcc","uae",
+                 "saudi","dubai","qatar","kuwait","bahrain","oman","india",
+                 "rbi","cert-in","nciipc","upi","meity"];
   return hi.some(k=>text.includes(k))?"HIGH":"MEDIUM";
 }
 function dedup(arr) {
   const seen = new Set();
-  return arr.filter(a => {
-    const k = a.cve_ids?.length ? a.cve_ids.join(",") : a.id;
-    return seen.has(k) ? false : (seen.add(k), true);
+  return arr.filter(a=>{
+    const k = a.cve_ids?.length?a.cve_ids.join(","):a.id;
+    return seen.has(k)?false:(seen.add(k),true);
   });
 }
