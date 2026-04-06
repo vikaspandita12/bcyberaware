@@ -259,6 +259,8 @@ function BCyberAwareDashboard() {
     {name:"Krebs on Security",cat:"News",flag:"📰",status:"live",url:"https://krebsonsecurity.com",desc:"In-depth security news and investigation by Brian Krebs."},
     {name:"AlienVault OTX",cat:"News",flag:"🛸",status:"live",url:"https://otx.alienvault.com",desc:"Open Threat Exchange — community-powered threat intelligence and indicators."},
     {name:"Telegram: DarkFeed",cat:"News",flag:"📡",status:"live",url:"https://t.me/secharvester",desc:"Public Telegram threat intelligence channel — no login required."},
+    {name:"The Hindu Tech",      cat:"News",     flag:"🇮🇳", status:"live",   url:"https://www.thehindu.com/sci-tech/technology/", desc:"India's most credible newspaper — cybersecurity filtered feed covering Indian cyber incidents, government alerts, banking fraud and digital crime."},
+    {name:"Economic Times IT",   cat:"News",     flag:"🇮🇳", status:"live",   url:"https://economictimes.indiatimes.com/tech/technology", desc:"India's leading business newspaper — covers RBI cybersecurity directives, Indian banking breaches, DPDP Act updates, MeitY announcements and tech fraud."},
     {name:"UAE CERT",cat:"Advisory",flag:"🇦🇪",status:"no_api",url:"https://www.tra.gov.ae",desc:"UAE CERT advisories published on portal — no public machine-readable API."},
     {name:"Saudi CERT",cat:"Advisory",flag:"🇸🇦",status:"no_api",url:"https://www.ncsc.gov.sa",desc:"Saudi CERT — no public API. GCC threats covered via CISA KEV and NVD."},
     {name:"Twitter/X Security",cat:"News",flag:"🐦",status:"no_api",url:"https://twitter.com",desc:"Twitter API now requires $100/month paid plan. Covered via THN and Bleeping Computer."},
@@ -278,63 +280,77 @@ function BCyberAwareDashboard() {
       <div style={{ background:"rgba(0,0,0,.7)",
         borderBottom:"1px solid rgba(0,200,255,.1)",
         position:"sticky", top:0, zIndex:50 }}>
-        <div style={{ maxWidth:1150, margin:"0 auto", padding:"0 20px",
+        <div style={{ maxWidth:1400, margin:"0 auto", padding:"0 16px",
           display:"flex", alignItems:"center",
-          justifyContent:"space-between", height:70 }}>
-          {/* Logo + Nav */}
-          <div style={{ display:"flex", alignItems:"center", gap:18 }}>
-            <div style={{ display:"flex", alignItems:"center", gap:13 }}>
-              <div style={{ width:46, height:46, borderRadius:10,
-                background:`linear-gradient(135deg,${ACCENT2},${ACCENT})`,
-                display:"flex", alignItems:"center", justifyContent:"center",
-                fontWeight:900, color:"#fff", fontSize:24,
-                fontFamily:"Arial Black,sans-serif",
-                boxShadow:`0 0 22px ${ACCENT}44`,
-                animation:"glow 3s infinite" }}>B</div>
-              <div>
-                <div style={{ fontSize:20, fontWeight:900, color:ACCENT,
-                  letterSpacing:2, lineHeight:1.1,
-                  fontFamily:"Arial Black,sans-serif" }}>BCyberAware</div>
-                <div style={{ fontSize:11, color:"rgba(200,220,240,.45)",
-                  letterSpacing:1.5, marginTop:2 }}>by Vikas Pandita</div>
-              </div>
-            </div>
-            <div style={{ width:1, height:28,
-              background:"rgba(255,255,255,.08)" }}/>
-            <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-              {navBtn("feed",    "▦ Live Feed")}
-              {navBtn("heatmap", "🌍 Heatmap")}
-              {navBtn("sources", "◎ Sources")}
-              {navBtn("demo",    "▶ Demo")}
-              {navBtn("about",   "◉ About")}
+          justifyContent:"space-between", height:58, gap:10 }}>
+
+          {/* Logo */}
+          <div style={{ display:"flex", alignItems:"center", gap:10, flexShrink:0 }}>
+            <div style={{ width:36, height:36, borderRadius:8,
+              background:`linear-gradient(135deg,${ACCENT2},${ACCENT})`,
+              display:"flex", alignItems:"center", justifyContent:"center",
+              fontWeight:900, color:"#fff", fontSize:18,
+              fontFamily:"Arial Black,sans-serif",
+              boxShadow:`0 0 16px ${ACCENT}44`,
+              animation:"glow 3s infinite" }}>B</div>
+            <div>
+              <div style={{ fontSize:15, fontWeight:900, color:ACCENT,
+                letterSpacing:1.5, lineHeight:1.1,
+                fontFamily:"Arial Black,sans-serif" }}>BCyberAware</div>
+              <div style={{ fontSize:9, color:"rgba(200,220,240,.4)",
+                letterSpacing:1 }}>by Vikas Pandita</div>
             </div>
           </div>
-          {/* Right */}
-          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-            {loading&&(
-              <span style={{ fontSize:12, color:ACCENT, letterSpacing:1.5,
-                animation:"pulse 1.5s infinite", fontFamily:"monospace" }}>
+
+          <div style={{ width:1, height:22, background:"rgba(255,255,255,.08)", flexShrink:0 }}/>
+
+          {/* Nav — all in one line */}
+          <div style={{ display:"flex", gap:4, flexShrink:0 }}>
+            {[["feed","▦ Live Feed"],["heatmap","🌍 Heatmap"],
+              ["sources","◎ Sources"],["demo","▶ Demo"],
+              ["about","◉ About"]].map(([v,l])=>(
+              <button key={v} onClick={()=>setView(v)} style={{
+                padding:"5px 10px", whiteSpace:"nowrap",
+                background:view===v?"rgba(0,200,255,0.1)":"transparent",
+                border:`1px solid ${view===v?"rgba(0,200,255,0.35)":"rgba(255,255,255,0.08)"}`,
+                color:view===v?ACCENT:"rgba(200,220,240,0.45)",
+                fontSize:12, letterSpacing:.5, cursor:"pointer",
+                fontFamily:"monospace", borderRadius:4,
+                fontWeight:view===v?700:400 }}>{l}</button>
+            ))}
+          </div>
+
+          <div style={{ width:1, height:22, background:"rgba(255,255,255,.08)", flexShrink:0 }}/>
+
+          {/* Right — status + buttons */}
+          <div style={{ display:"flex", alignItems:"center", gap:8, flexShrink:0 }}>
+            {loading?(
+              <span style={{ fontSize:11, color:ACCENT,
+                animation:"pulse 1.5s infinite",
+                fontFamily:"monospace", whiteSpace:"nowrap" }}>
                 ⟳ Fetching…
               </span>
-            )}
-            {!loading&&feedMeta&&(
-              <span style={{ fontSize:11, color:"rgba(200,220,240,.28)",
-                fontFamily:"monospace" }}>
-                {feedMeta.from_cache?"⚡ Cached":"🔄 Live"} · {feedMeta.fetched_at_human}
+            ):(
+              feedMeta&&<span style={{ fontSize:10,
+                color:"rgba(200,220,240,.28)",
+                fontFamily:"monospace", whiteSpace:"nowrap" }}>
+                {feedMeta.from_cache?"⚡":"🔄"} {feedMeta.fetched_at_human}
               </span>
             )}
             <button onClick={()=>refreshFeed(false)} disabled={loading} style={{
-              padding:"6px 14px", background:"transparent",
+              padding:"5px 12px", background:"transparent",
               border:`1px solid rgba(0,200,255,.3)`, color:ACCENT,
-              fontSize:13, cursor:loading?"not-allowed":"pointer",
+              fontSize:12, cursor:loading?"not-allowed":"pointer",
               fontFamily:"monospace", opacity:loading?.4:1,
-              borderRadius:4, fontWeight:600 }}>⟳ Refresh</button>
+              borderRadius:4, fontWeight:600,
+              whiteSpace:"nowrap" }}>⟳ Refresh</button>
             <button onClick={()=>refreshFeed(true)} disabled={loading} style={{
-              padding:"6px 14px", background:"rgba(255,100,0,.08)",
+              padding:"5px 12px", background:"rgba(255,100,0,.08)",
               border:`1px solid rgba(255,100,0,.35)`, color:"#ff9944",
-              fontSize:13, cursor:loading?"not-allowed":"pointer",
+              fontSize:12, cursor:loading?"not-allowed":"pointer",
               fontFamily:"monospace", opacity:loading?.4:1,
-              borderRadius:4, fontWeight:600 }}>⚡ Force Latest</button>
+              borderRadius:4, fontWeight:600,
+              whiteSpace:"nowrap" }}>⚡ Force Latest</button>
           </div>
         </div>
       </div>
@@ -845,7 +861,7 @@ function BCyberAwareDashboard() {
                 PLATFORM CAPABILITIES
               </div>
               {[
-                "14 live intelligence sources — advisories, exploits, security news",
+                "16 live intelligence sources — advisories, exploits, security news",
                 "CISA KEV — actively exploited vulnerabilities updated daily",
                 "CISA Alerts — full US-CERT security advisories",
                 "NVD / CVE.org — critical CVEs from the last 30 days",
@@ -853,7 +869,7 @@ function BCyberAwareDashboard() {
                 "NCSC UK — UK National Cyber Security Centre threat reports",
                 "Exploit-DB + Packet Storm — public proof-of-concept exploits",
                 "The Hacker News · Bleeping Computer · SANS ISC · SecurityWeek · Krebs",
-                "AlienVault OTX — community threat intelligence",
+                "The Hindu Tech · Economic Times IT — Indian cyber news filtered for security content",
                 "Telegram public threat intel channels",
                 "GCC / Middle East relevance scoring per advisory",
                 "Global threat heatmap — country-level risk visualisation",
@@ -882,9 +898,10 @@ function BCyberAwareDashboard() {
         marginTop:32, padding:"18px 24px", textAlign:"center" }}>
         <div style={{ fontSize:12, color:"rgba(200,220,240,.2)", letterSpacing:1 }}>
           BCyberAware · Vikas Pandita · {new Date().getFullYear()} · MIT Licence ·
-          14 Sources: CISA KEV · CISA Alerts · NVD · CERT-In · NCSC UK ·
+          16 Sources: CISA KEV · CISA Alerts · NVD · CERT-In · NCSC UK ·
           Exploit-DB · Packet Storm · THN · Bleeping Computer · SANS ISC ·
-          SecurityWeek · Krebs · AlienVault OTX · Telegram
+          SecurityWeek · Krebs · AlienVault OTX · Telegram ·
+          The Hindu · Economic Times
         </div>
       </div>
     </div>
