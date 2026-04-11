@@ -76,9 +76,9 @@ module.exports = async (req, res) => {
     };
 
     const payload = {
-      advisories: sortAndDedup(advisories).slice(0, 40),
-      exploits:   sortAndDedup(exploits).slice(0, 20),
-      news:       sortAndDedup(news).slice(0, 40),
+      advisories: sortAndDedup(advisories).slice(0, 60),
+      exploits:   sortAndDedup(exploits).slice(0, 30),
+      news:       sortAndDedup(news).slice(0, 60),
       heatmap:    buildHeatmap([...advisories, ...exploits, ...news]),
       fetched_at:       now,
       fetched_at_human: new Date().toUTCString(),
@@ -97,11 +97,11 @@ module.exports = async (req, res) => {
 async function fetchCISAKEV() {
   const r    = await fetch("https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json");
   const data = await r.json();
-  const cutoff = Date.now() - 60 * 24 * 60 * 60 * 1000;
+  const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
   return data.vulnerabilities
     .filter(v => new Date(v.dateAdded) >= cutoff)
     .sort((a,b) => new Date(b.dateAdded) - new Date(a.dateAdded))
-    .slice(0, 20)
+    .slice(0, 30)
     .map(v => ({
       id:"CISA-KEV-"+v.cveID, title:v.vulnerabilityName,
       severity:"CRITICAL", category:"advisory",
@@ -123,7 +123,7 @@ async function fetchCISAKEV() {
 async function fetchCISAAlerts() {
   try {
     const r = await fetch("https://www.cisa.gov/uscert/ncas/alerts.xml",{headers:{"User-Agent":"BCyberAware/2.0"}});
-    return parseRSS(await r.text(),{id_prefix:"CISA-ALERT",source:"CISA Alerts",source_url:"https://www.cisa.gov/news-events/cybersecurity-advisories",source_color:"#e05000",source_flag:"🇺🇸",category:"advisory",default_sev:"HIGH",exploit_wild:false,patch_avail:true,limit:10,countries:["US"]});
+    return parseRSS(await r.text(),{id_prefix:"CISA-ALERT",source:"CISA Alerts",source_url:"https://www.cisa.gov/news-events/cybersecurity-advisories",source_color:"#e05000",source_flag:"🇺🇸",category:"advisory",default_sev:"HIGH",exploit_wild:false,patch_avail:true,limit:15,countries:["US"]});
   } catch { return []; }
 }
 
@@ -132,7 +132,7 @@ async function fetchNVDCritical() {
   try {
     const end   = new Date().toISOString().replace(/\.\d{3}Z$/,".000");
     const start = new Date(Date.now()-30*24*60*60*1000).toISOString().replace(/\.\d{3}Z$/,".000");
-    const r     = await fetch(`https://services.nvd.nist.gov/rest/json/cves/2.0?pubStartDate=${start}&pubEndDate=${end}&cvssV3Severity=CRITICAL&resultsPerPage=15`,{headers:{"User-Agent":"BCyberAware/2.0"}});
+    const r     = await fetch(`https://services.nvd.nist.gov/rest/json/cves/2.0?pubStartDate=${start}&pubEndDate=${end}&cvssV3Severity=CRITICAL&resultsPerPage=20`,{headers:{"User-Agent":"BCyberAware/2.0"}});
     const data  = await r.json();
     return (data.vulnerabilities||[]).flatMap(item=>{
       const cve=item.cve;
@@ -147,52 +147,52 @@ async function fetchNVDCritical() {
 
 // ── 4. CERT-In India ──────────────────────────────────────────────────────────
 async function fetchCERTIn() {
-  try{const r=await fetch("https://www.cert-in.org.in/RSS/CertIn_Security_Advisories.xml",{headers:{"User-Agent":"BCyberAware/2.0"}});return parseRSS(await r.text(),{id_prefix:"CERTIN",source:"CERT-In (India)",source_url:"https://www.cert-in.org.in",source_color:"#ff6b00",source_flag:"🇮🇳",category:"advisory",default_sev:"HIGH",exploit_wild:false,patch_avail:true,limit:12,countries:["IN"]});}catch{return[];}
+  try{const r=await fetch("https://www.cert-in.org.in/RSS/CertIn_Security_Advisories.xml",{headers:{"User-Agent":"BCyberAware/2.0"}});return parseRSS(await r.text(),{id_prefix:"CERTIN",source:"CERT-In (India)",source_url:"https://www.cert-in.org.in",source_color:"#ff6b00",source_flag:"🇮🇳",category:"advisory",default_sev:"HIGH",exploit_wild:false,patch_avail:true,limit:15,countries:["IN"]});}catch{return[];}
 }
 
 // ── 5. NCSC UK ────────────────────────────────────────────────────────────────
 async function fetchNCSCUK() {
-  try{const r=await fetch("https://www.ncsc.gov.uk/api/1/services/v1/report-rss-feed.xml",{headers:{"User-Agent":"BCyberAware/2.0"}});return parseRSS(await r.text(),{id_prefix:"NCSC-UK",source:"NCSC UK",source_url:"https://www.ncsc.gov.uk",source_color:"#003078",source_flag:"🇬🇧",category:"advisory",default_sev:"HIGH",exploit_wild:false,patch_avail:true,limit:10,countries:["GB"]});}catch{return[];}
+  try{const r=await fetch("https://www.ncsc.gov.uk/api/1/services/v1/report-rss-feed.xml",{headers:{"User-Agent":"BCyberAware/2.0"}});return parseRSS(await r.text(),{id_prefix:"NCSC-UK",source:"NCSC UK",source_url:"https://www.ncsc.gov.uk",source_color:"#003078",source_flag:"🇬🇧",category:"advisory",default_sev:"HIGH",exploit_wild:false,patch_avail:true,limit:12,countries:["GB"]});}catch{return[];}
 }
 
 // ── 6. Exploit-DB ─────────────────────────────────────────────────────────────
 async function fetchExploitDB() {
-  try{const r=await fetch("https://www.exploit-db.com/rss.xml",{headers:{"User-Agent":"BCyberAware/2.0"}});return parseRSS(await r.text(),{id_prefix:"EDBID",source:"Exploit-DB",source_url:"https://www.exploit-db.com",source_color:"#cc0000",source_flag:"⚡",category:"exploit",default_sev:"HIGH",exploit_wild:true,patch_avail:false,limit:15,countries:["US","RU","CN"]});}catch{return[];}
+  try{const r=await fetch("https://www.exploit-db.com/rss.xml",{headers:{"User-Agent":"BCyberAware/2.0"}});return parseRSS(await r.text(),{id_prefix:"EDBID",source:"Exploit-DB",source_url:"https://www.exploit-db.com",source_color:"#cc0000",source_flag:"⚡",category:"exploit",default_sev:"HIGH",exploit_wild:true,patch_avail:false,limit:20,countries:["US","RU","CN"]});}catch{return[];}
 }
 
 // ── 7. Packet Storm ───────────────────────────────────────────────────────────
 async function fetchPacketStorm() {
-  try{const r=await fetch("https://rss.packetstormsecurity.com/files/",{headers:{"User-Agent":"BCyberAware/2.0"}});return parseRSS(await r.text(),{id_prefix:"PKTSTORM",source:"Packet Storm",source_url:"https://packetstormsecurity.com",source_color:"#880000",source_flag:"⚡",category:"exploit",default_sev:"HIGH",exploit_wild:true,patch_avail:false,limit:10,countries:["US","DE","RU"]});}catch{return[];}
+  try{const r=await fetch("https://rss.packetstormsecurity.com/files/",{headers:{"User-Agent":"BCyberAware/2.0"}});return parseRSS(await r.text(),{id_prefix:"PKTSTORM",source:"Packet Storm",source_url:"https://packetstormsecurity.com",source_color:"#880000",source_flag:"⚡",category:"exploit",default_sev:"HIGH",exploit_wild:true,patch_avail:false,limit:15,countries:["US","DE","RU"]});}catch{return[];}
 }
 
 // ── 8. The Hacker News ────────────────────────────────────────────────────────
 async function fetchTheHackerNews() {
-  try{const r=await fetch("https://feeds.feedburner.com/TheHackersNews",{headers:{"User-Agent":"BCyberAware/2.0"}});return parseRSS(await r.text(),{id_prefix:"THN",source:"The Hacker News",source_url:"https://thehackernews.com",source_color:"#e91e63",source_flag:"📰",category:"news",default_sev:"HIGH",exploit_wild:false,patch_avail:false,limit:12,countries:["US","CN","RU","IR"]});}catch{return[];}
+  try{const r=await fetch("https://feeds.feedburner.com/TheHackersNews",{headers:{"User-Agent":"BCyberAware/2.0"}});return parseRSS(await r.text(),{id_prefix:"THN",source:"The Hacker News",source_url:"https://thehackernews.com",source_color:"#e91e63",source_flag:"📰",category:"news",default_sev:"HIGH",exploit_wild:false,patch_avail:false,limit:15,countries:["US","CN","RU","IR"]});}catch{return[];}
 }
 
 // ── 9. Bleeping Computer ──────────────────────────────────────────────────────
 async function fetchBleepingComputer() {
-  try{const r=await fetch("https://www.bleepingcomputer.com/feed/",{headers:{"User-Agent":"BCyberAware/2.0"}});return parseRSS(await r.text(),{id_prefix:"BC",source:"Bleeping Computer",source_url:"https://www.bleepingcomputer.com",source_color:"#2196f3",source_flag:"📰",category:"news",default_sev:"MEDIUM",exploit_wild:false,patch_avail:false,limit:12,countries:["US","RU","CN"]});}catch{return[];}
+  try{const r=await fetch("https://www.bleepingcomputer.com/feed/",{headers:{"User-Agent":"BCyberAware/2.0"}});return parseRSS(await r.text(),{id_prefix:"BC",source:"Bleeping Computer",source_url:"https://www.bleepingcomputer.com",source_color:"#2196f3",source_flag:"📰",category:"news",default_sev:"MEDIUM",exploit_wild:false,patch_avail:false,limit:15,countries:["US","RU","CN"]});}catch{return[];}
 }
 
 // ── 10. SANS ISC ──────────────────────────────────────────────────────────────
 async function fetchSANSISC() {
-  try{const r=await fetch("https://isc.sans.edu/rssfeed.xml",{headers:{"User-Agent":"BCyberAware/2.0"}});return parseRSS(await r.text(),{id_prefix:"SANS",source:"SANS ISC",source_url:"https://isc.sans.edu",source_color:"#ff9800",source_flag:"🔍",category:"news",default_sev:"MEDIUM",exploit_wild:false,patch_avail:false,limit:10,countries:["US"]});}catch{return[];}
+  try{const r=await fetch("https://isc.sans.edu/rssfeed.xml",{headers:{"User-Agent":"BCyberAware/2.0"}});return parseRSS(await r.text(),{id_prefix:"SANS",source:"SANS ISC",source_url:"https://isc.sans.edu",source_color:"#ff9800",source_flag:"🔍",category:"news",default_sev:"MEDIUM",exploit_wild:false,patch_avail:false,limit:12,countries:["US"]});}catch{return[];}
 }
 
 // ── 11. SecurityWeek ──────────────────────────────────────────────────────────
 async function fetchSecurityWeek() {
-  try{const r=await fetch("https://feeds.feedburner.com/securityweek",{headers:{"User-Agent":"BCyberAware/2.0"}});return parseRSS(await r.text(),{id_prefix:"SECWK",source:"SecurityWeek",source_url:"https://www.securityweek.com",source_color:"#1565c0",source_flag:"📰",category:"news",default_sev:"HIGH",exploit_wild:false,patch_avail:false,limit:10,countries:["US","CN","RU","IR"]});}catch{return[];}
+  try{const r=await fetch("https://feeds.feedburner.com/securityweek",{headers:{"User-Agent":"BCyberAware/2.0"}});return parseRSS(await r.text(),{id_prefix:"SECWK",source:"SecurityWeek",source_url:"https://www.securityweek.com",source_color:"#1565c0",source_flag:"📰",category:"news",default_sev:"HIGH",exploit_wild:false,patch_avail:false,limit:12,countries:["US","CN","RU","IR"]});}catch{return[];}
 }
 
 // ── 12. Krebs on Security ─────────────────────────────────────────────────────
 async function fetchKrebsOnSecurity() {
-  try{const r=await fetch("https://krebsonsecurity.com/feed/",{headers:{"User-Agent":"BCyberAware/2.0"}});return parseRSS(await r.text(),{id_prefix:"KREBS",source:"Krebs on Security",source_url:"https://krebsonsecurity.com",source_color:"#4a148c",source_flag:"📰",category:"news",default_sev:"HIGH",exploit_wild:false,patch_avail:false,limit:8,countries:["US","RU","CN"]});}catch{return[];}
+  try{const r=await fetch("https://krebsonsecurity.com/feed/",{headers:{"User-Agent":"BCyberAware/2.0"}});return parseRSS(await r.text(),{id_prefix:"KREBS",source:"Krebs on Security",source_url:"https://krebsonsecurity.com",source_color:"#4a148c",source_flag:"📰",category:"news",default_sev:"HIGH",exploit_wild:false,patch_avail:false,limit:10,countries:["US","RU","CN"]});}catch{return[];}
 }
 
 // ── 13. AlienVault OTX ───────────────────────────────────────────────────────
 async function fetchAlienVaultOTX() {
-  try{const r=await fetch("https://otx.alienvault.com/blog/rss",{headers:{"User-Agent":"BCyberAware/2.0"}});return parseRSS(await r.text(),{id_prefix:"OTX",source:"AlienVault OTX",source_url:"https://otx.alienvault.com",source_color:"#00897b",source_flag:"🛸",category:"news",default_sev:"HIGH",exploit_wild:false,patch_avail:false,limit:8,countries:["US","CN","RU","IR","KP"]});}catch{return[];}
+  try{const r=await fetch("https://otx.alienvault.com/blog/rss",{headers:{"User-Agent":"BCyberAware/2.0"}});return parseRSS(await r.text(),{id_prefix:"OTX",source:"AlienVault OTX",source_url:"https://otx.alienvault.com",source_color:"#00897b",source_flag:"🛸",category:"news",default_sev:"HIGH",exploit_wild:false,patch_avail:false,limit:10,countries:["US","CN","RU","IR","KP"]});}catch{return[];}
 }
 
 // ── 14. Telegram ─────────────────────────────────────────────────────────────
@@ -200,9 +200,9 @@ async function fetchTelegramDarkFeed() {
   try{
     const r=await fetch("https://t.me/s/secharvester",{headers:{"User-Agent":"BCyberAware/2.0"}});
     const html=await r.text();
-    const msgs=[...html.matchAll(/<div class="tgme_widget_message_text[^"]*"[^>]*>([\s\S]*?)<\/div>/g)].slice(0,5);
-    const dates=[...html.matchAll(/datetime="([^"]+)"/g)].slice(0,5);
-    const links=[...html.matchAll(/href="(https:\/\/t\.me\/[^"]+)"/g)].slice(0,5);
+    const msgs=[...html.matchAll(/<div class="tgme_widget_message_text[^"]*"[^>]*>([\s\S]*?)<\/div>/g)].slice(0,8);
+    const dates=[...html.matchAll(/datetime="([^"]+)"/g)].slice(0,8);
+    const links=[...html.matchAll(/href="(https:\/\/t\.me\/[^"]+)"/g)].slice(0,8);
     return msgs.flatMap((m,i)=>{
       const text=m[1].replace(/<[^>]+>/g,"").trim();
       if(!text||text.length<20)return[];
@@ -216,7 +216,7 @@ async function fetchTelegramDarkFeed() {
 async function fetchTheHindu() {
   try{
     const r=await fetch("https://www.thehindu.com/sci-tech/technology/feeder/default.rss",{headers:{"User-Agent":"BCyberAware/2.0"}});
-    const all=parseRSS(await r.text(),{id_prefix:"HINDU",source:"The Hindu Tech",source_url:"https://www.thehindu.com/sci-tech/technology/",source_color:"#b71c1c",source_flag:"🇮🇳",category:"news",default_sev:"MEDIUM",exploit_wild:false,patch_avail:false,limit:20,countries:["IN"]});
+    const all=parseRSS(await r.text(),{id_prefix:"HINDU",source:"The Hindu Tech",source_url:"https://www.thehindu.com/sci-tech/technology/",source_color:"#b71c1c",source_flag:"🇮🇳",category:"news",default_sev:"MEDIUM",exploit_wild:false,patch_avail:false,limit:30,countries:["IN"]});
     const kw=["cyber","hack","breach","malware","ransomware","phishing","vulnerability","data leak","attack","security","fraud","scam","cert-in","rbi","digital arrest","upi","banking","privacy","deepfake"];
     return all.filter(a=>kw.some(k=>(a.title+" "+a.summary).toLowerCase().includes(k)));
   }catch{return[];}
@@ -226,7 +226,7 @@ async function fetchTheHindu() {
 async function fetchEconomicTimes() {
   try{
     const r=await fetch("https://economictimes.indiatimes.com/rssfeedstopstories.cms",{headers:{"User-Agent":"BCyberAware/2.0"}});
-    const all=parseRSS(await r.text(),{id_prefix:"ET",source:"Economic Times IT",source_url:"https://economictimes.indiatimes.com/tech",source_color:"#e65100",source_flag:"🇮🇳",category:"news",default_sev:"MEDIUM",exploit_wild:false,patch_avail:false,limit:20,countries:["IN"]});
+    const all=parseRSS(await r.text(),{id_prefix:"ET",source:"Economic Times IT",source_url:"https://economictimes.indiatimes.com/tech",source_color:"#e65100",source_flag:"🇮🇳",category:"news",default_sev:"MEDIUM",exploit_wild:false,patch_avail:false,limit:30,countries:["IN"]});
     const kw=["cyber","hack","breach","malware","ransomware","phishing","vulnerability","data leak","attack","security","fraud","scam","cert-in","rbi","digital arrest","upi","banking","privacy","dpdp","meity","deepfake"];
     return all.filter(a=>kw.some(k=>(a.title+" "+a.summary).toLowerCase().includes(k)));
   }catch{return[];}
