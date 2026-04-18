@@ -112,6 +112,254 @@ function AdvisoryCard({ adv }) {
   );
 }
 
+// ── GenAI / OWASP data ────────────────────────────────────────────────────────
+const AI_KW=["artificial intelligence","machine learning"," llm ","large language","chatgpt","openai","copilot","gemini","claude ","anthropic","genai","generative ai","prompt injection","model theft","training data poisoning","deepfake","foundation model","ai-powered","ai vulnerability","agentic ai","gpt-","ai agent","chatbot security","voice cloning","ai fraud","ai phishing","ai scam","ai attack","owasp llm","llm security","stable diffusion","midjourney","dall-e","synthetic media","vector database","rag attack"];
+
+const OWASP_LLM=[
+  {id:"LLM01",name:"Prompt Injection",risk:"CRITICAL",desc:"Attackers craft inputs that override system instructions, causing LLMs to perform unintended actions or leak sensitive data from the system prompt or context window."},
+  {id:"LLM02",name:"Insecure Output Handling",risk:"HIGH",desc:"LLM outputs passed to downstream systems (shells, browsers, SQL engines) without sanitisation lead to RCE, XSS, or SQL injection vulnerabilities."},
+  {id:"LLM03",name:"Training Data Poisoning",risk:"HIGH",desc:"Malicious actors corrupt training datasets to introduce backdoors, biases, or vulnerabilities into the deployed model's behaviour at inference time."},
+  {id:"LLM04",name:"Model Denial of Service",risk:"HIGH",desc:"Resource-intensive prompts exhaust compute budgets, causing denial of service for legitimate users and inflating API costs at scale."},
+  {id:"LLM05",name:"Supply Chain Vulnerabilities",risk:"HIGH",desc:"Compromised pre-trained models, third-party datasets, or plugins introduce malicious code throughout the AI development and deployment supply chain."},
+  {id:"LLM06",name:"Sensitive Information Disclosure",risk:"CRITICAL",desc:"LLMs may reveal confidential data from training corpora, system prompts, or prior conversation context to adversaries through targeted queries."},
+  {id:"LLM07",name:"Insecure Plugin Design",risk:"HIGH",desc:"LLM plugins with excessive permissions or insufficient input validation can be weaponised for data exfiltration or unauthorised system actions."},
+  {id:"LLM08",name:"Excessive Agency",risk:"HIGH",desc:"Autonomous AI agents granted excessive permissions can take destructive or unauthorised real-world actions without adequate human oversight controls."},
+  {id:"LLM09",name:"Overreliance",risk:"MEDIUM",desc:"Blind trust in AI outputs without human oversight leads to undetected errors, misinformation propagation, and exploitable security gaps in decision pipelines."},
+  {id:"LLM10",name:"Model Theft",risk:"HIGH",desc:"Adversaries extract proprietary model weights or replicate model behaviour through systematic API querying, stealing valuable IP and enabling targeted attacks."},
+];
+
+// ── CISO Weekly Brief ─────────────────────────────────────────────────────────
+function CISOBriefView({ advisories, exploits, news }) {
+  const now = new Date();
+  const day = now.getDay();
+  const monday = new Date(now); monday.setDate(now.getDate()-(day===0?6:day-1));
+  const friday = new Date(monday); friday.setDate(monday.getDate()+4);
+  const fmt = d => d.toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"});
+  const weekRange = `${fmt(monday)} – ${fmt(friday)}`;
+
+  const allItems=[...advisories,...exploits];
+  const criticals=allItems.filter(a=>a.severity==="CRITICAL");
+  const wildExploits=allItems.filter(a=>a.exploit_in_wild);
+  const meItems=allItems.filter(a=>a.middle_east_relevance==="HIGH").slice(0,3);
+  const threatActors=[...new Set(allItems.filter(a=>a.threat_actor).map(a=>a.threat_actor))];
+  const patchNow=[...new Map(allItems.filter(a=>a.exploit_in_wild||a.severity==="CRITICAL").map(a=>[a.id,a])).values()].slice(0,5);
+  const monitor=advisories.filter(a=>a.severity==="HIGH"&&!a.exploit_in_wild).slice(0,4);
+  const watchList=news.slice(0,4);
+
+  const sectors={};
+  allItems.forEach(a=>{
+    const txt=([...(a.affected_products||[]),a.title,a.summary]).join(" ").toLowerCase();
+    if(/microsoft|windows|exchange|sharepoint|active directory|azure|office 365/.test(txt)) sectors["Enterprise IT (Microsoft)"]=(sectors["Enterprise IT (Microsoft)"]||0)+1;
+    if(/fortinet|palo alto|cisco|vpn|firewall|juniper|checkpoint|ivanti|f5/.test(txt)) sectors["Network Security"]=(sectors["Network Security"]||0)+1;
+    if(/sap|oracle|erp|banking|payment|swift/.test(txt)) sectors["ERP / Finance"]=(sectors["ERP / Finance"]||0)+1;
+    if(/scada|ics|industrial|energy|oil|gas|critical infrastructure/.test(txt)) sectors["Critical Infrastructure"]=(sectors["Critical Infrastructure"]||0)+1;
+    if(/android|apple|ios|mobile|iphone/.test(txt)) sectors["Mobile / Endpoints"]=(sectors["Mobile / Endpoints"]||0)+1;
+    if(/linux|apache|nginx|kubernetes|docker|cloud|aws|gcp|container/.test(txt)) sectors["Cloud / Linux"]=(sectors["Cloud / Linux"]||0)+1;
+  });
+  const topSectors=Object.entries(sectors).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const riskLevel=criticals.length>5?"ELEVATED":criticals.length>2?"HIGH":"MODERATE";
+  const riskColor=riskLevel==="ELEVATED"?"#ff4444":riskLevel==="HIGH"?"#ff9944":"#ffd700";
+
+  const ActionRow=({item,label,labelColor,labelBg})=>(
+    <div style={{background:"rgba(5,8,15,.92)",border:"1px solid rgba(255,255,255,.07)",borderLeft:`4px solid ${SEV_S[item.severity]?.border||"#444"}`,borderRadius:5,padding:"14px 16px",marginBottom:10}}>
+      <div style={{display:"flex",gap:7,flexWrap:"wrap",alignItems:"center",marginBottom:8}}>
+        <span style={{fontSize:11,fontWeight:800,padding:"3px 10px",background:labelBg,border:`1px solid ${labelColor}`,color:labelColor,borderRadius:3,fontFamily:"monospace",letterSpacing:1}}>{label}</span>
+        <SevBadge sev={item.severity}/>
+        {item.exploit_in_wild&&<span style={{fontSize:11,padding:"3px 8px",background:"rgba(200,0,0,.15)",border:"1px solid #c00000",color:"#ff4444",borderRadius:3,fontFamily:"monospace"}}>⚡ WILD</span>}
+        <span style={{fontSize:11,color:"rgba(200,220,240,.35)"}}>{item.source_flag} {item.source}</span>
+      </div>
+      <div style={{fontSize:14,fontWeight:700,color:"#eef4ff",marginBottom:6,lineHeight:1.4}}>{item.title}</div>
+      {item.cve_ids?.length>0&&<div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}}>{item.cve_ids.slice(0,3).map(c=><a key={c} href={`https://nvd.nist.gov/vuln/detail/${c}`} target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:ACCENT,fontFamily:"monospace",background:"rgba(0,200,255,.07)",padding:"3px 9px",border:"1px solid rgba(0,200,255,.22)",borderRadius:3}}>{c} ↗</a>)}</div>}
+      <div style={{fontSize:13,color:"rgba(200,220,240,.55)",lineHeight:1.6}}>{(item.summary||"").slice(0,180)}{(item.summary||"").length>180?"…":""}</div>
+    </div>
+  );
+
+  return (
+    <div style={{maxWidth:820,margin:"0 auto",animation:"fadeIn .3s ease"}}>
+      <div style={{background:"rgba(0,200,255,.04)",border:"1px solid rgba(0,200,255,.15)",borderRadius:8,padding:"22px 24px",marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12}}>
+        <div>
+          <div style={{fontSize:11,letterSpacing:3,color:"rgba(0,200,255,.6)",marginBottom:6,fontFamily:"monospace"}}>📋 CISO WEEKLY THREAT BRIEF</div>
+          <div style={{fontSize:22,fontWeight:900,color:"#ddeeff",marginBottom:4}}>Executive Threat Summary</div>
+          <div style={{fontSize:13,color:"rgba(200,220,240,.4)"}}>Week of {weekRange} · Vikas Pandita, Global Head of Security Architecture</div>
+        </div>
+        <div style={{textAlign:"right"}}>
+          <div style={{fontSize:11,letterSpacing:2,color:"rgba(200,220,240,.35)",fontFamily:"monospace",marginBottom:4}}>OVERALL RISK LEVEL</div>
+          <div style={{fontSize:26,fontWeight:900,color:riskColor,fontFamily:"monospace"}}>{riskLevel}</div>
+          <div style={{fontSize:11,color:"rgba(200,220,240,.3)"}}>{criticals.length} critical · {wildExploits.length} exploited in wild</div>
+        </div>
+      </div>
+
+      <div style={{background:"rgba(123,47,247,.06)",border:"1px solid rgba(123,47,247,.2)",borderRadius:8,padding:"20px 22px",marginBottom:16}}>
+        <div style={{fontSize:11,letterSpacing:3,color:"rgba(123,47,247,.8)",marginBottom:10,fontFamily:"monospace"}}>SITUATION OVERVIEW</div>
+        <div style={{fontSize:14,color:"rgba(200,220,240,.75)",lineHeight:1.85}}>
+          This week's threat intelligence from <strong style={{color:ACCENT}}>{advisories.length+exploits.length+news.length} sources</strong> identifies <strong style={{color:"#ff4444"}}>{criticals.length} critical vulnerabilities</strong>, with <strong style={{color:"#ff9944"}}>{wildExploits.length} actively exploited in the wild</strong>.{threatActors.length>0&&<> Active ransomware / APT campaigns confirmed: <strong style={{color:"#c084fc"}}>{threatActors.slice(0,3).join(", ")}</strong>.</>}{" "}<strong style={{color:"#00e676"}}>{meItems.length} advisories</strong> carry direct GCC / Middle East risk.{topSectors.length>0&&<> Highest-exposure sectors: <strong style={{color:ACCENT}}>{topSectors.slice(0,3).map(s=>s[0]).join(", ")}</strong>.</>}
+        </div>
+      </div>
+
+      <div style={{fontSize:11,letterSpacing:3,color:"rgba(200,0,0,.7)",marginBottom:10,fontFamily:"monospace"}}>🔴 PATCH NOW — CRITICAL &amp; ACTIVELY EXPLOITED</div>
+      {patchNow.length===0
+        ?<div style={{fontSize:14,color:"rgba(200,220,240,.3)",marginBottom:16,padding:"14px",background:"rgba(255,255,255,.02)",borderRadius:6}}>No critical/exploited items this period.</div>
+        :patchNow.map(a=><ActionRow key={a.id} item={a} label="PATCH NOW" labelColor="#ff4444" labelBg="rgba(200,0,0,.15)"/>)}
+
+      <div style={{fontSize:11,letterSpacing:3,color:"rgba(220,100,0,.7)",marginBottom:10,fontFamily:"monospace",marginTop:20}}>🟡 MONITOR — HIGH SEVERITY</div>
+      {monitor.length===0
+        ?<div style={{fontSize:14,color:"rgba(200,220,240,.3)",marginBottom:16,padding:"14px",background:"rgba(255,255,255,.02)",borderRadius:6}}>No high-severity items this period.</div>
+        :monitor.map(a=><ActionRow key={a.id} item={a} label="MONITOR" labelColor="#ff9944" labelBg="rgba(220,100,0,.12)"/>)}
+
+      {topSectors.length>0&&<>
+        <div style={{fontSize:11,letterSpacing:3,color:"rgba(0,200,255,.6)",marginBottom:10,fontFamily:"monospace",marginTop:20}}>🏭 SECTOR EXPOSURE THIS WEEK</div>
+        <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:16}}>
+          {topSectors.map(([sector,count])=>{
+            const pct=Math.round((count/(topSectors[0][1]||1))*100);
+            return(
+              <div key={sector} style={{flex:1,minWidth:140,background:"rgba(255,255,255,.025)",border:"1px solid rgba(255,255,255,.07)",borderRadius:6,padding:"14px 16px"}}>
+                <div style={{fontSize:13,fontWeight:700,color:"#ddeeff",marginBottom:8}}>{sector}</div>
+                <div style={{height:4,background:"rgba(255,255,255,.06)",borderRadius:2,overflow:"hidden",marginBottom:6}}><div style={{width:`${pct}%`,height:"100%",background:`linear-gradient(90deg,${ACCENT}55,${ACCENT})`,borderRadius:2}}/></div>
+                <div style={{fontSize:11,color:"rgba(200,220,240,.4)",fontFamily:"monospace"}}>{count} advisories</div>
+              </div>
+            );
+          })}
+        </div>
+      </>}
+
+      {threatActors.length>0&&<>
+        <div style={{fontSize:11,letterSpacing:3,color:"rgba(192,132,252,.7)",marginBottom:10,fontFamily:"monospace",marginTop:4}}>🎯 ACTIVE THREAT ACTORS</div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>{threatActors.map(ta=><span key={ta} style={{fontSize:13,color:"#c084fc",fontFamily:"monospace",background:"rgba(123,47,247,.09)",padding:"7px 14px",border:"1px solid rgba(123,47,247,.25)",borderRadius:4}}>{ta}</span>)}</div>
+      </>}
+
+      {meItems.length>0&&<>
+        <div style={{fontSize:11,letterSpacing:3,color:"rgba(0,200,100,.6)",marginBottom:10,fontFamily:"monospace",marginTop:4}}>🌍 GCC / MIDDLE EAST ALERT</div>
+        {meItems.map(a=><ActionRow key={a.id} item={a} label="GCC RISK" labelColor="#00e676" labelBg="rgba(0,200,100,.1)"/>)}
+      </>}
+
+      <div style={{fontSize:11,letterSpacing:3,color:"rgba(0,200,255,.5)",marginBottom:10,fontFamily:"monospace",marginTop:20}}>📰 WATCH — EMERGING INTELLIGENCE</div>
+      {watchList.map(a=><ActionRow key={a.id} item={a} label="WATCH" labelColor="#64b5f6" labelBg="rgba(25,118,210,.12)"/>)}
+
+      <div style={{padding:"14px 16px",background:"rgba(0,200,255,.03)",border:"1px solid rgba(0,200,255,.08)",borderRadius:6,marginTop:16,fontSize:12,color:"rgba(200,220,240,.35)",lineHeight:1.7}}>
+        📋 Auto-generated from {advisories.length+exploits.length+news.length} live sources · BCyberAware by Vikas Pandita (Global Head of Security Architecture · TOGAF 9.2 · IIM Kozhikode EPGP) · Sources refresh every 1 hour
+      </div>
+    </div>
+  );
+}
+
+// ── GenAI Security View ───────────────────────────────────────────────────────
+function GenAISecurityView({ advisories, exploits, news }) {
+  const [aiTab,setAiTab]=useState("overview");
+  const isAI=item=>{
+    const text=(item.title+" "+item.summary).toLowerCase();
+    return AI_KW.some(kw=>text.includes(kw));
+  };
+  const aiAdvisories=advisories.filter(isAI);
+  const aiExploits=exploits.filter(isAI);
+  const aiNews=news.filter(isAI);
+  const totalAI=aiAdvisories.length+aiExploits.length+aiNews.length;
+
+  return (
+    <div style={{animation:"fadeIn .3s ease"}}>
+      <div style={{textAlign:"center",marginBottom:20}}>
+        <div style={{fontSize:13,letterSpacing:4,color:ACCENT2,marginBottom:8,fontFamily:"monospace"}}>🤖 GENAI SECURITY INTELLIGENCE</div>
+        <div style={{fontSize:22,fontWeight:900,color:"#ddeeff",marginBottom:6}}>AI &amp; LLM Threat Landscape</div>
+        <div style={{fontSize:14,color:"rgba(200,220,240,.4)"}}>Curated by Vikas Pandita · GenAI Security Specialist</div>
+      </div>
+
+      <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
+        <StatCard label="AI Advisories" value={aiAdvisories.length} color={ACCENT2}/>
+        <StatCard label="AI Exploits"   value={aiExploits.length}   color="#ff4444"/>
+        <StatCard label="AI News Items" value={aiNews.length}       color="#e91e63"/>
+        <StatCard label="Total AI Items" value={totalAI}            color={ACCENT}/>
+      </div>
+
+      <div style={{display:"flex",gap:4,marginBottom:16,borderBottom:"1px solid rgba(255,255,255,.07)"}}>
+        {[["overview","📊 Overview"],["owasp","🔟 OWASP LLM Top 10"],["feed","📡 Live AI Feed"]].map(([id,lbl])=>(
+          <button key={id} onClick={()=>setAiTab(id)} style={{padding:"10px 18px",background:"transparent",border:"none",borderBottom:aiTab===id?`3px solid ${ACCENT2}`:"3px solid transparent",color:aiTab===id?ACCENT2:"rgba(200,220,240,.45)",fontSize:14,cursor:"pointer",fontFamily:"monospace",fontWeight:aiTab===id?700:400}}>{lbl}</button>
+        ))}
+      </div>
+
+      {aiTab==="overview"&&(
+        <div>
+          <div style={{fontSize:11,letterSpacing:3,color:"rgba(123,47,247,.7)",marginBottom:12,fontFamily:"monospace"}}>AI THREAT CATEGORIES</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:10,marginBottom:20}}>
+            {[
+              {icon:"💉",name:"Prompt Injection",         desc:"Crafted inputs override LLM system instructions to bypass safety controls or exfiltrate confidential data",risk:"CRITICAL",color:"#ff4444",bg:"rgba(200,0,0,.08)"},
+              {icon:"🎭",name:"Deepfakes & Synthetic Media",desc:"AI-generated fake audio/video used for fraud, social engineering, and large-scale disinformation campaigns",risk:"HIGH",   color:"#ff9944",bg:"rgba(220,100,0,.08)"},
+              {icon:"🕵️",name:"AI-Powered Phishing",      desc:"LLMs generating highly personalised, grammatically perfect phishing at scale in any language",             risk:"HIGH",   color:"#ff9944",bg:"rgba(220,100,0,.08)"},
+              {icon:"☠️",name:"Training Data Poisoning",   desc:"Corrupting datasets to embed backdoors or malicious biases into production AI models before deployment",   risk:"HIGH",   color:"#ff9944",bg:"rgba(220,100,0,.08)"},
+              {icon:"🔓",name:"Data Exfiltration via LLM", desc:"Extracting sensitive PII or IP through crafted prompts against RAG systems and vector databases",          risk:"CRITICAL",color:"#ff4444",bg:"rgba(200,0,0,.08)"},
+              {icon:"🤖",name:"Rogue AI Agents",           desc:"Agentic AI with excessive permissions taking unauthorised real-world actions without human oversight",       risk:"HIGH",   color:"#ff9944",bg:"rgba(220,100,0,.08)"},
+              {icon:"🧬",name:"Model Theft",               desc:"Stealing proprietary AI models via systematic API extraction or direct model-weight exfiltration",          risk:"HIGH",   color:"#ff9944",bg:"rgba(220,100,0,.08)"},
+              {icon:"💰",name:"AI Fraud & Scams",          desc:"Voice cloning and AI personas used for financial fraud, BEC, and executive impersonation at scale",         risk:"HIGH",   color:"#ff9944",bg:"rgba(220,100,0,.08)"},
+            ].map(t=>(
+              <div key={t.name} style={{background:t.bg,border:`1px solid ${t.color}22`,borderLeft:`3px solid ${t.color}`,borderRadius:6,padding:"16px"}}>
+                <div style={{fontSize:22,marginBottom:6}}>{t.icon}</div>
+                <div style={{fontSize:14,fontWeight:700,color:"#eef4ff",marginBottom:5}}>{t.name}</div>
+                <div style={{fontSize:12,color:"rgba(200,220,240,.5)",lineHeight:1.6,marginBottom:8}}>{t.desc}</div>
+                <span style={{fontSize:11,fontWeight:800,padding:"3px 10px",background:"rgba(0,0,0,.2)",border:`1px solid ${t.color}`,color:t.color,borderRadius:3,fontFamily:"monospace"}}>{t.risk}</span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{background:"rgba(0,166,81,.06)",border:"1px solid rgba(0,166,81,.2)",borderRadius:8,padding:"20px 22px",marginBottom:16}}>
+            <div style={{fontSize:11,letterSpacing:3,color:"rgba(0,200,100,.7)",marginBottom:10,fontFamily:"monospace"}}>🌍 AI RISK FOR GCC / MIDDLE EAST ORGANISATIONS</div>
+            {[
+              {threat:"AI-Enhanced BEC & Wire Fraud",        impact:"GCC banking sector facing AI-generated executive voice cloning targeting fraudulent wire transfer approvals"},
+              {threat:"Deepfake Government Communications",  impact:"AI-forged official communications targeting GCC public sector — verify all digital correspondence and requests"},
+              {threat:"Arabic-Language AI Phishing",         impact:"LLMs now produce fluent Arabic phishing — language quality is no longer a reliable detection indicator"},
+              {threat:"Smart City & ICS AI Attacks",         impact:"AI-optimised attacks on Vision 2030 and UAE smart city infrastructure (SCADA + AI convergence risk)"},
+            ].map(r=>(
+              <div key={r.threat} style={{display:"flex",gap:12,padding:"10px 0",borderBottom:"1px solid rgba(0,200,100,.08)"}}>
+                <span style={{color:"#00e676",flexShrink:0}}>▸</span>
+                <div>
+                  <div style={{fontSize:13,fontWeight:700,color:"#00e676",marginBottom:3}}>{r.threat}</div>
+                  <div style={{fontSize:13,color:"rgba(200,220,240,.5)",lineHeight:1.6}}>{r.impact}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {aiTab==="owasp"&&(
+        <div>
+          <div style={{background:"rgba(255,255,255,.02)",border:"1px solid rgba(0,200,255,.1)",borderRadius:8,padding:"16px 20px",marginBottom:16,fontSize:13,color:"rgba(200,220,240,.5)",lineHeight:1.7}}>
+            The <strong style={{color:ACCENT}}>OWASP Top 10 for LLM Applications</strong> defines the most critical security risks in large language model deployments. As a GenAI Security specialist, these are the controls every AI system must address before going to production.
+          </div>
+          <div style={{display:"grid",gap:10}}>
+            {OWASP_LLM.map(item=>{
+              const s=SEV_S[item.risk]||SEV_S.LOW;
+              return(
+                <div key={item.id} style={{background:"rgba(5,8,15,.92)",border:`1px solid ${s.border}33`,borderLeft:`4px solid ${s.border}`,borderRadius:6,padding:"16px 18px"}}>
+                  <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:8,flexWrap:"wrap"}}>
+                    <span style={{fontSize:13,fontWeight:900,color:ACCENT2,fontFamily:"monospace",minWidth:52}}>{item.id}</span>
+                    <span style={{fontSize:15,fontWeight:700,color:"#eef4ff"}}>{item.name}</span>
+                    <SevBadge sev={item.risk}/>
+                  </div>
+                  <div style={{fontSize:13,color:"rgba(200,220,240,.6)",lineHeight:1.75}}>{item.desc}</div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{padding:"12px 16px",background:"rgba(123,47,247,.05)",border:"1px solid rgba(123,47,247,.15)",borderRadius:6,marginTop:14,fontSize:12,color:"rgba(200,220,240,.4)",lineHeight:1.7}}>
+            Source: <a href="https://owasp.org/www-project-top-10-for-large-language-model-applications/" target="_blank" rel="noopener noreferrer" style={{color:ACCENT2}}>OWASP Top 10 for LLM Applications ↗</a> · Curated for GCC practitioners by Vikas Pandita
+          </div>
+        </div>
+      )}
+
+      {aiTab==="feed"&&(
+        <div>
+          {totalAI===0
+            ?<div style={{textAlign:"center",padding:"40px",color:"rgba(200,220,240,.3)",fontSize:14}}>No AI-specific items in current feed. Try ⚡ Force Latest to refresh.</div>
+            :<>
+              {aiAdvisories.length>0&&<><div style={{fontSize:11,letterSpacing:2,color:"rgba(0,200,255,.5)",marginBottom:10,fontFamily:"monospace"}}>🏛️ AI-RELATED ADVISORIES ({aiAdvisories.length})</div>{aiAdvisories.map(a=><AdvisoryCard key={a.id} adv={a}/>)}</>}
+              {aiExploits.length>0&&<><div style={{fontSize:11,letterSpacing:2,color:"rgba(200,0,0,.6)",marginBottom:10,fontFamily:"monospace",marginTop:16}}>⚡ AI-RELATED EXPLOITS ({aiExploits.length})</div>{aiExploits.map(a=><AdvisoryCard key={a.id} adv={a}/>)}</>}
+              {aiNews.length>0&&<><div style={{fontSize:11,letterSpacing:2,color:"rgba(233,30,99,.6)",marginBottom:10,fontFamily:"monospace",marginTop:16}}>📰 AI SECURITY NEWS ({aiNews.length})</div>{aiNews.map(a=><AdvisoryCard key={a.id} adv={a}/>)}</>}
+            </>
+          }
+        </div>
+      )}
+    </div>
+  );
+}
+
 function BCyberAwareDashboard() {
   const [advisories,setAdvisories] = useState([]);
   const [exploits,  setExploits]   = useState([]);
@@ -205,7 +453,7 @@ function BCyberAwareDashboard() {
           </div>
           <div style={{width:1,height:22,background:"rgba(255,255,255,.08)",flexShrink:0}}/>
           <div style={{display:"flex",gap:4,flexShrink:0}}>
-            {[["feed","▦ Live Feed"],["heatmap","🌍 Heatmap"],["sources","◎ Sources"],["demo","▶ Demo"],["about","◉ About"]].map(([v,l])=>navBtn(v,l))}
+            {[["feed","▦ Live Feed"],["heatmap","🌍 Heatmap"],["ciso","📋 CISO Brief"],["genai","🤖 GenAI"],["sources","◎ Sources"],["demo","▶ Demo"],["about","◉ About"]].map(([v,l])=>navBtn(v,l))}
           </div>
           <div style={{width:1,height:22,background:"rgba(255,255,255,.08)",flexShrink:0}}/>
           <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
@@ -447,6 +695,13 @@ function BCyberAwareDashboard() {
             </div>
           </div>
         )}
+
+        {/* ══ CISO BRIEF ══ */}
+        {view==="ciso"&&<CISOBriefView advisories={advisories} exploits={exploits} news={news}/>}
+
+        {/* ══ GENAI SECURITY ══ */}
+        {view==="genai"&&<GenAISecurityView advisories={advisories} exploits={exploits} news={news}/>}
+
       </div>
 
       {/* Footer */}
