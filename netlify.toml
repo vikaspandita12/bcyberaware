@@ -11,4 +11,4 @@
   node_bundler = "esbuild"
 
 # Scheduled function REMOVED — was consuming too many free tier invocations
-# Data now refreshes on first visit after cache expires (every 1 hour)
+# Data now refreshes on first visit after cache expires (every 2 hours)
