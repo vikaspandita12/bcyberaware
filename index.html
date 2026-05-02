@@ -360,6 +360,184 @@ function GenAISecurityView({ advisories, exploits, news }) {
   );
 }
 
+// ── Dark Web Early Warning ─────────────────────────────────────────────────────
+function DarkWebView() {
+  const DW_RED    = "#ff1744";
+  const DW_PURPLE = "#7c4dff";
+  const DW_ORANGE = "#ff6d00";
+
+  const [data,    setData]    = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState(null);
+  const [tab,     setTab]     = useState("victims");
+
+  const load = useCallback(async (force = false) => {
+    setLoading(true); setError(null);
+    try {
+      const r = await fetch(force ? "/api/darkweb?bust=1" : "/api/darkweb");
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      setData(await r.json());
+    } catch (e) { setError(e.message); }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const victims      = data?.ransomware_victims || [];
+  const groups       = data?.ransomware_groups  || [];
+  const breaches     = data?.data_breaches      || [];
+  const c2s          = data?.c2_servers         || [];
+  const activeGroups = groups.filter(g => (g.status || "").toLowerCase().includes("activ")).length;
+
+  const DWCard = ({ left, children }) => (
+    <div style={{background:"rgba(5,8,15,.92)",border:`1px solid ${left}33`,borderLeft:`4px solid ${left}`,borderRadius:6,padding:"16px 18px",marginBottom:10}}>
+      {children}
+    </div>
+  );
+
+  const Tag = ({ color, bg, border, children }) => (
+    <span style={{fontSize:12,fontWeight:800,padding:"3px 10px",background:bg||`${color}22`,border:`1px solid ${border||color}`,color,borderRadius:3,fontFamily:"monospace",letterSpacing:1}}>{children}</span>
+  );
+
+  if (loading) return (
+    <div style={{animation:"fadeIn .3s ease",textAlign:"center",padding:"60px 20px"}}>
+      <div style={{fontSize:14,color:DW_RED,fontFamily:"monospace",letterSpacing:3,animation:"pulse 1.5s infinite"}}>⟳ SCANNING DARK WEB SOURCES…</div>
+      <div style={{fontSize:12,color:"rgba(200,220,240,.3)",marginTop:10}}>ransomware.live · HaveIBeenPwned · Cybercrime Tracker</div>
+    </div>
+  );
+
+  if (error) return (
+    <div style={{padding:"18px 20px",background:"rgba(200,0,0,.1)",border:"1px solid rgba(200,0,0,.3)",borderRadius:6,fontSize:14,color:"#ff6666"}}>
+      ⚠ Dark web feed unavailable: {error}
+      <button onClick={()=>load(true)} style={{marginLeft:14,padding:"4px 12px",background:"rgba(200,0,0,.15)",border:"1px solid rgba(200,0,0,.4)",color:"#ff6666",fontSize:12,cursor:"pointer",fontFamily:"monospace",borderRadius:4}}>Retry</button>
+    </div>
+  );
+
+  return (
+    <div style={{animation:"fadeIn .3s ease"}}>
+
+      {/* Warning Banner */}
+      <div style={{background:"rgba(139,0,0,.12)",border:"1px solid rgba(255,23,68,.25)",borderRadius:8,padding:"18px 22px",marginBottom:20,display:"flex",alignItems:"flex-start",gap:16,flexWrap:"wrap"}}>
+        <span style={{fontSize:30,flexShrink:0,lineHeight:1}}>🕵️</span>
+        <div style={{flex:1,minWidth:260}}>
+          <div style={{fontSize:15,fontWeight:900,color:DW_RED,marginBottom:6,letterSpacing:1.5,fontFamily:"monospace"}}>DARK WEB EARLY WARNING SYSTEM</div>
+          <div style={{fontSize:13,color:"rgba(200,220,240,.55)",lineHeight:1.75}}>
+            Open-source dark web intelligence: ransomware leak sites, public breach notifications, and C2 server tracking.
+            {" "}Sources: <strong style={{color:"rgba(200,220,240,.8)"}}>ransomware.live</strong> · <strong style={{color:"rgba(200,220,240,.8)"}}>HaveIBeenPwned</strong> · <strong style={{color:"rgba(200,220,240,.8)"}}>Cybercrime Tracker</strong> · No personal data lookups.
+          </div>
+        </div>
+        <button onClick={()=>load(true)} disabled={loading} style={{flexShrink:0,padding:"7px 16px",background:"rgba(255,23,68,.1)",border:"1px solid rgba(255,23,68,.35)",color:DW_RED,fontSize:12,cursor:"pointer",fontFamily:"monospace",borderRadius:4,fontWeight:700,whiteSpace:"nowrap"}}>⚡ Force Latest</button>
+      </div>
+
+      {/* Stats */}
+      <div style={{display:"flex",gap:10,marginBottom:20,flexWrap:"wrap"}}>
+        <StatCard label="Ransomware Victims"  value={victims.length}  color={DW_RED}    sub="Recent (leak sites)"/>
+        <StatCard label="Active Groups"       value={activeGroups}    color="#ff4444"   sub="Ransomware Gangs"/>
+        <StatCard label="Known Data Breaches" value={breaches.length} color={DW_PURPLE} sub="via HaveIBeenPwned"/>
+        <StatCard label="C2 Servers Tracked"  value={c2s.length}      color={DW_ORANGE} sub="Cybercrime Tracker"/>
+      </div>
+
+      {/* Tabs */}
+      <div style={{display:"flex",gap:4,marginBottom:16,borderBottom:"1px solid rgba(255,255,255,.07)",flexWrap:"wrap"}}>
+        {[
+          ["victims", `🎯 Ransomware Victims (${victims.length})`],
+          ["groups",  `💀 Active Groups (${groups.length})`],
+          ["breaches",`🔓 Data Breaches (${breaches.length})`],
+          ["c2",      `🕷️ C2 Servers (${c2s.length})`],
+        ].map(([id,lbl])=>(
+          <button key={id} onClick={()=>setTab(id)} style={{padding:"10px 18px",background:"transparent",border:"none",borderBottom:tab===id?`3px solid ${DW_RED}`:"3px solid transparent",color:tab===id?DW_RED:"rgba(200,220,240,.45)",fontSize:14,cursor:"pointer",fontFamily:"monospace",fontWeight:tab===id?700:400,whiteSpace:"nowrap"}}>{lbl}</button>
+        ))}
+      </div>
+
+      {/* Ransomware Victims */}
+      {tab==="victims"&&(
+        victims.length===0
+          ?<div style={{textAlign:"center",padding:"40px",color:"rgba(200,220,240,.3)",fontSize:14}}>No victim data loaded. Try ⚡ Force Latest.</div>
+          :victims.map((v,i)=>(
+            <DWCard key={i} left="#c00000">
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",marginBottom:10}}>
+                <Tag color="#ff4444" bg="rgba(200,0,0,.15)" border="#c00000">🎯 RANSOMWARE VICTIM</Tag>
+                <span style={{fontSize:12,color:"#c084fc",fontFamily:"monospace",background:"rgba(123,47,247,.09)",padding:"3px 10px",border:"1px solid rgba(123,47,247,.25)",borderRadius:3}}>{v.group}</span>
+                {v.country&&<span style={{fontSize:12,color:"rgba(200,220,240,.45)",fontFamily:"monospace",padding:"3px 8px",border:"1px solid rgba(255,255,255,.1)",borderRadius:3}}>{v.country}</span>}
+                {v.sector&&<span style={{fontSize:12,color:"rgba(200,220,240,.35)"}}>{v.sector}</span>}
+                <span style={{fontSize:11,color:"rgba(200,220,240,.3)",marginLeft:"auto",fontFamily:"monospace"}}>{v.date?new Date(v.date).toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"}):""}</span>
+              </div>
+              <div style={{fontSize:16,fontWeight:700,color:"#eef4ff",marginBottom:v.description?8:0}}>{v.victim}</div>
+              {v.description&&<div style={{fontSize:13,color:"rgba(200,220,240,.5)",lineHeight:1.75}}>{v.description}</div>}
+              {v.website&&<div style={{marginTop:12,paddingTop:10,borderTop:"1px solid rgba(255,255,255,.05)"}}><span style={{fontSize:12,color:ACCENT,fontFamily:"monospace",background:"rgba(0,200,255,.07)",padding:"4px 12px",border:"1px solid rgba(0,200,255,.22)",borderRadius:3}}>🌐 {v.website}</span></div>}
+            </DWCard>
+          ))
+      )}
+
+      {/* Active Groups */}
+      {tab==="groups"&&(
+        groups.length===0
+          ?<div style={{textAlign:"center",padding:"40px",color:"rgba(200,220,240,.3)",fontSize:14}}>No group data loaded. Try ⚡ Force Latest.</div>
+          :<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:10}}>
+            {groups.map((g,i)=>{
+              const isActive=(g.status||"").toLowerCase().includes("activ");
+              return(
+                <div key={i} style={{background:"rgba(5,8,15,.92)",border:`1px solid ${isActive?"rgba(255,23,68,.2)":"rgba(255,255,255,.07)"}`,borderLeft:`4px solid ${isActive?"#c00000":"#333"}`,borderRadius:6,padding:"16px 18px"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10,gap:8}}>
+                    <div style={{fontSize:15,fontWeight:700,color:"#eef4ff"}}>{g.name}</div>
+                    <span style={{fontSize:10,fontWeight:700,padding:"2px 8px",background:isActive?"rgba(200,0,0,.15)":"rgba(255,255,255,.04)",border:`1px solid ${isActive?"#c00000":"rgba(255,255,255,.1)"}`,color:isActive?"#ff4444":"rgba(200,220,240,.35)",borderRadius:3,fontFamily:"monospace",flexShrink:0,whiteSpace:"nowrap"}}>{isActive?"● ACTIVE":"◌ INACTIVE"}</span>
+                  </div>
+                  {g.victim_count>0&&<><div style={{fontSize:30,fontWeight:900,color:isActive?"#ff4444":"rgba(200,220,240,.3)",fontFamily:"monospace",lineHeight:1}}>{g.victim_count}</div><div style={{fontSize:10,color:"rgba(200,220,240,.3)",letterSpacing:2,fontFamily:"monospace",marginTop:2,marginBottom:8}}>KNOWN VICTIMS</div></>}
+                  {g.last_seen&&<div style={{fontSize:12,color:"rgba(200,220,240,.3)",marginBottom:4}}>Last seen: {g.last_seen}</div>}
+                  {g.description&&<div style={{fontSize:12,color:"rgba(200,220,240,.4)",lineHeight:1.65,marginTop:6}}>{g.description}</div>}
+                  {g.locations?.length>0&&<div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:8}}>{g.locations.slice(0,3).map(loc=><span key={loc} style={{fontSize:10,color:"rgba(200,220,240,.35)",fontFamily:"monospace",padding:"2px 6px",border:"1px solid rgba(255,255,255,.07)",borderRadius:2}}>{loc}</span>)}</div>}
+                </div>
+              );
+            })}
+          </div>
+      )}
+
+      {/* Data Breaches */}
+      {tab==="breaches"&&(
+        breaches.length===0
+          ?<div style={{textAlign:"center",padding:"40px",color:"rgba(200,220,240,.3)",fontSize:14}}>No breach data loaded. Try ⚡ Force Latest.</div>
+          :breaches.map((b,i)=>(
+            <DWCard key={i} left="#7c4dff">
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",marginBottom:10}}>
+                <Tag color="#b39ddb" bg="rgba(124,77,255,.15)" border="#7c4dff">🔓 DATA BREACH</Tag>
+                {b.is_verified&&<Tag color="#ff6666" bg="rgba(200,0,0,.1)" border="rgba(200,0,0,.35)">✓ VERIFIED</Tag>}
+                {b.is_sensitive&&<Tag color="#ff9944" bg="rgba(255,100,0,.1)" border="rgba(255,100,0,.3)">⚠ SENSITIVE</Tag>}
+                <span style={{fontSize:11,color:"rgba(200,220,240,.35)",marginLeft:"auto",fontFamily:"monospace"}}>{b.breach_date}</span>
+              </div>
+              <div style={{fontSize:16,fontWeight:700,color:"#eef4ff",marginBottom:4}}>{b.title}</div>
+              {b.domain&&<div style={{fontSize:13,color:"rgba(0,200,255,.6)",fontFamily:"monospace",marginBottom:8}}>{b.domain}</div>}
+              {b.description&&<div style={{fontSize:13,color:"rgba(200,220,240,.5)",lineHeight:1.75,marginBottom:10}}>{b.description}</div>}
+              {b.data_classes?.length>0&&<div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>{b.data_classes.map(dc=><span key={dc} style={{fontSize:11,color:"#b39ddb",fontFamily:"monospace",background:"rgba(124,77,255,.09)",padding:"3px 9px",border:"1px solid rgba(124,77,255,.2)",borderRadius:3}}>{dc}</span>)}</div>}
+              {b.pwn_count>0&&<div style={{fontSize:13,color:"rgba(200,220,240,.4)",fontFamily:"monospace",borderTop:"1px solid rgba(255,255,255,.05)",paddingTop:8}}><span style={{color:"#ff4444",fontWeight:700}}>{b.pwn_count.toLocaleString()}</span> accounts compromised</div>}
+            </DWCard>
+          ))
+      )}
+
+      {/* C2 Servers */}
+      {tab==="c2"&&(
+        c2s.length===0
+          ?<div style={{textAlign:"center",padding:"40px",color:"rgba(200,220,240,.3)",fontSize:14}}>No C2 data loaded. Try ⚡ Force Latest.</div>
+          :c2s.map((c,i)=>(
+            <DWCard key={i} left="#e65100">
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",marginBottom:8}}>
+                <Tag color="#ff9944" bg="rgba(255,109,0,.12)" border="#e65100">🕷️ C2 SERVER</Tag>
+                <span style={{fontSize:11,color:"rgba(200,220,240,.3)",fontFamily:"monospace"}}>{c.date?new Date(c.date).toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"}):""}</span>
+              </div>
+              <div style={{fontSize:15,fontWeight:700,color:"#eef4ff",marginBottom:c.description?6:0}}>{c.title}</div>
+              {c.description&&<div style={{fontSize:13,color:"rgba(200,220,240,.5)",lineHeight:1.75}}>{c.description}</div>}
+            </DWCard>
+          ))
+      )}
+
+      {/* Footer */}
+      <div style={{marginTop:20,padding:"12px 16px",background:"rgba(255,23,68,.04)",border:"1px solid rgba(255,23,68,.1)",borderRadius:6,fontSize:12,color:"rgba(200,220,240,.35)",lineHeight:1.75}}>
+        🕵️ Sources: <strong style={{color:"rgba(200,220,240,.5)"}}>ransomware.live</strong> (public API) · <strong style={{color:"rgba(200,220,240,.5)"}}>HaveIBeenPwned</strong> (public breach list — no personal lookups) · <strong style={{color:"rgba(200,220,240,.5)"}}>Cybercrime Tracker</strong> (C2 RSS) · Cache: 2 hours · For awareness and defence only.
+        {data?.fetched_at_human&&<span style={{marginLeft:8}}>· {data.fetched_at_human}</span>}
+      </div>
+    </div>
+  );
+}
+
 function BCyberAwareDashboard() {
   const [advisories,setAdvisories] = useState([]);
   const [exploits,  setExploits]   = useState([]);
@@ -453,7 +631,7 @@ function BCyberAwareDashboard() {
           </div>
           <div style={{width:1,height:22,background:"rgba(255,255,255,.08)",flexShrink:0}}/>
           <div style={{display:"flex",gap:4,flexShrink:0}}>
-            {[["feed","▦ Live Feed"],["heatmap","🌍 Heatmap"],["ciso","📋 CISO Brief"],["genai","🤖 GenAI"],["sources","◎ Sources"],["demo","▶ Demo"],["about","◉ About"]].map(([v,l])=>navBtn(v,l))}
+            {[["feed","▦ Live Feed"],["heatmap","🌍 Heatmap"],["ciso","📋 CISO Brief"],["genai","🤖 GenAI"],["darkweb","🕵️ Dark Web"],["sources","◎ Sources"],["demo","▶ Demo"],["about","◉ About"]].map(([v,l])=>navBtn(v,l))}
           </div>
           <div style={{width:1,height:22,background:"rgba(255,255,255,.08)",flexShrink:0}}/>
           <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
@@ -701,6 +879,9 @@ function BCyberAwareDashboard() {
 
         {/* ══ GENAI SECURITY ══ */}
         {view==="genai"&&<GenAISecurityView advisories={advisories} exploits={exploits} news={news}/>}
+
+        {/* ══ DARK WEB EARLY WARNING ══ */}
+        {view==="darkweb"&&<DarkWebView/>}
 
       </div>
 

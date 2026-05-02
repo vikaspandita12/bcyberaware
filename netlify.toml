@@ -3,6 +3,11 @@
   functions = "netlify/functions"
 
 [[redirects]]
+  from   = "/api/darkweb"
+  to     = "/.netlify/functions/darkweb"
+  status = 200
+
+[[redirects]]
   from   = "/api/*"
   to     = "/.netlify/functions/proxy"
   status = 200
