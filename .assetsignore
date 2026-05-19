@@ -1,0 +1,13 @@
+# Do not publish as static assets (API handled by worker.js)
+api/
+netlify/
+netlify.toml
+vercel.json
+functions/
+worker.js
+wrangler.toml
+wrangler.jsonc
+.assetsignore
+.git/
+node_modules/
+.wrangler/
