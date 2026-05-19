@@ -236,7 +236,7 @@ function CISOBriefView({ advisories, exploits, news }) {
       {watchList.map(a=><ActionRow key={a.id} item={a} label="WATCH" labelColor="#64b5f6" labelBg="rgba(25,118,210,.12)"/>)}
 
       <div style={{padding:"14px 16px",background:"rgba(0,200,255,.03)",border:"1px solid rgba(0,200,255,.08)",borderRadius:6,marginTop:16,fontSize:12,color:"rgba(200,220,240,.35)",lineHeight:1.7}}>
-        📋 Auto-generated from {advisories.length+exploits.length+news.length} live sources · BCyberAware by Vikas Pandita (Global Head of Security Architecture · TOGAF 9.2 · IIM Kozhikode EPGP) · Sources refresh every 1 hour
+        📋 Auto-generated from {advisories.length+exploits.length+news.length} live sources · BCyberAware by Vikas Pandita (Global Head of Security Architecture · TOGAF 9.2 · IIM Kozhikode EPGP) · Sources refresh every 2 hours
       </div>
     </div>
   );
@@ -594,6 +594,7 @@ function BCyberAwareDashboard() {
     {name:"NVD / CVE.org",cat:"Advisory",flag:"🌐",status:"live",url:"https://nvd.nist.gov",desc:"NIST National Vulnerability Database — all published CVEs with CVSS scoring."},
     {name:"CERT-In India",cat:"Advisory",flag:"🇮🇳",status:"live",url:"https://www.cert-in.org.in",desc:"India's national CERT — enterprise software advisories."},
     {name:"NCSC UK",cat:"Advisory",flag:"🇬🇧",status:"live",url:"https://www.ncsc.gov.uk",desc:"UK National Cyber Security Centre — official threat reports and guidance."},
+    {name:"Microsoft MSRC",cat:"Advisory",flag:"🇺🇸",status:"live",url:"https://msrc.microsoft.com/blog/",desc:"Microsoft Security Response Center — patches, advisories, and vulnerability disclosures."},
     {name:"Exploit-DB",cat:"Exploit",flag:"⚡",status:"live",url:"https://www.exploit-db.com",desc:"Public exploit database — proof-of-concept exploits for known vulnerabilities."},
     {name:"Packet Storm",cat:"Exploit",flag:"⚡",status:"live",url:"https://packetstormsecurity.com",desc:"Security tools, exploits and advisories from the security research community."},
     {name:"The Hacker News",cat:"News",flag:"📰",status:"live",url:"https://thehackernews.com",desc:"Leading cybersecurity news — APTs, data breaches, and vulnerabilities."},
@@ -601,6 +602,15 @@ function BCyberAwareDashboard() {
     {name:"SANS ISC",cat:"News",flag:"🔍",status:"live",url:"https://isc.sans.edu",desc:"SANS Internet Storm Center — daily threat intelligence and handler diaries."},
     {name:"SecurityWeek",cat:"News",flag:"📰",status:"live",url:"https://www.securityweek.com",desc:"Enterprise security news covering vulnerabilities, threats and industry trends."},
     {name:"Krebs on Security",cat:"News",flag:"📰",status:"live",url:"https://krebsonsecurity.com",desc:"In-depth security news and investigation by Brian Krebs."},
+    {name:"Cisco Talos",cat:"News",flag:"🛡️",status:"live",url:"https://blog.talosintelligence.com",desc:"Cisco Talos threat research — malware, campaigns, and enterprise threats (GCC-relevant vendors)."},
+    {name:"Dark Reading",cat:"News",flag:"📰",status:"live",url:"https://www.darkreading.com",desc:"Enterprise security news — vulnerabilities, cloud, and risk for global SOCs."},
+    {name:"Google Project Zero",cat:"News",flag:"🔬",status:"live",url:"https://googleprojectzero.blogspot.com",desc:"Elite vulnerability research — zero-days and exploit analysis."},
+    {name:"Malwarebytes Labs",cat:"News",flag:"📰",status:"live",url:"https://www.malwarebytes.com/blog",desc:"Malware trends, ransomware families, and threat actor activity."},
+    {name:"Help Net Security",cat:"News",flag:"📰",status:"live",url:"https://www.helpnetsecurity.com",desc:"Daily cybersecurity news for practitioners and CISOs."},
+    {name:"Threatpost",cat:"News",flag:"📰",status:"live",url:"https://threatpost.com",desc:"Breaking news on vulnerabilities, breaches, and nation-state activity."},
+    {name:"Infosecurity Magazine",cat:"News",flag:"📰",status:"live",url:"https://www.infosecurity-magazine.com",desc:"European and global infosec news — regulations, breaches, and defence."},
+    {name:"IBM Security Intelligence",cat:"News",flag:"🌐",status:"live",url:"https://securityintelligence.com",desc:"IBM X-Force insights — APTs, fraud, and enterprise threat trends."},
+    {name:"Ars Technica Security",cat:"News",flag:"📰",status:"live",url:"https://arstechnica.com/security/",desc:"In-depth technical security coverage (filtered from Ars feed)."},
     {name:"AlienVault OTX",cat:"News",flag:"🛸",status:"live",url:"https://otx.alienvault.com",desc:"Open Threat Exchange — community-powered threat intelligence and indicators."},
     {name:"Telegram: DarkFeed",cat:"News",flag:"📡",status:"live",url:"https://t.me/secharvester",desc:"Public Telegram threat intelligence channel — no login required."},
     {name:"The Hindu Tech",cat:"News",flag:"🇮🇳",status:"live",url:"https://www.thehindu.com/sci-tech/technology/",desc:"India's most credible newspaper — cybersecurity filtered feed."},
@@ -693,7 +703,7 @@ function BCyberAwareDashboard() {
           <div style={{animation:"fadeIn .3s ease"}}>
             <div style={{textAlign:"center",marginBottom:20}}>
               <div style={{fontSize:13,letterSpacing:4,color:ACCENT,marginBottom:8,fontFamily:"monospace"}}>🌍 GLOBAL THREAT HEATMAP</div>
-              <div style={{fontSize:14,color:"rgba(200,220,240,.45)",marginBottom:4}}>Countries ranked by threat activity · Refreshed every 1 hour</div>
+              <div style={{fontSize:14,color:"rgba(200,220,240,.45)",marginBottom:4}}>Countries ranked by threat activity · Refreshed every 2 hours</div>
               <div style={{fontSize:12,color:"rgba(200,220,240,.25)"}}>CRITICAL=4pts · HIGH=3pts · MEDIUM=2pts · LOW=1pt</div>
             </div>
             <div style={{background:"rgba(5,8,15,.97)",border:"1px solid rgba(0,200,255,.15)",borderRadius:8,padding:"20px",marginBottom:16,overflowX:"auto"}}>
@@ -795,7 +805,7 @@ function BCyberAwareDashboard() {
           <div style={{maxWidth:780,margin:"0 auto",animation:"fadeIn .3s ease"}}>
             <div style={{textAlign:"center",marginBottom:24}}>
               <div style={{fontSize:13,letterSpacing:4,color:ACCENT,marginBottom:8,fontFamily:"monospace"}}>INTELLIGENCE SOURCES</div>
-              <div style={{fontSize:15,color:"rgba(200,220,240,.4)"}}>16 live sources · auto-refreshed every 1 hour · no API key required</div>
+              <div style={{fontSize:15,color:"rgba(200,220,240,.4)"}}>26 live sources · auto-refreshed every 2 hours · no API key required</div>
             </div>
             {["Advisory","Exploit","News"].map(cat=>(
               <div key={cat} style={{marginBottom:28}}>
@@ -864,7 +874,7 @@ function BCyberAwareDashboard() {
             </div>
             <div style={{background:"rgba(255,255,255,.025)",border:"1px solid rgba(0,200,255,.12)",borderRadius:6,padding:"22px 24px"}}>
               <div style={{fontSize:12,letterSpacing:3,color:"rgba(0,200,255,.55)",marginBottom:12,fontFamily:"monospace",fontWeight:700}}>PLATFORM CAPABILITIES</div>
-              {["16 live intelligence sources — advisories, exploits, security news","CISA KEV — actively exploited vulnerabilities updated daily","NVD / CVE.org — critical CVEs from the last 30 days","CERT-In India — India's national CERT advisories","NCSC UK — UK National Cyber Security Centre threat reports","Exploit-DB + Packet Storm — public proof-of-concept exploits","The Hacker News · Bleeping Computer · SANS ISC · SecurityWeek · Krebs","AlienVault OTX — community threat intelligence","The Hindu Tech · Economic Times IT — Indian cyber news","Telegram public threat intel channels","GCC / Middle East relevance scoring per advisory","Global threat heatmap — country-level risk visualisation","Source verification link on every advisory card","Auto-refresh every 1 hour — always current"].map((f,i)=>(
+              {["26 live intelligence sources — advisories, exploits, security news","CISA KEV · Microsoft MSRC · NVD · CERT-In · NCSC UK","Cisco Talos · Dark Reading · Project Zero · Threatpost · IBM Security Intelligence","Exploit-DB + Packet Storm — public proof-of-concept exploits","The Hacker News · Bleeping Computer · SANS ISC · SecurityWeek · Krebs · Help Net Security","AlienVault OTX · Infosecurity Magazine · Ars Technica (security-filtered)","The Hindu Tech · Economic Times IT — Indian & GCC-relevant cyber news","Telegram public threat intel channels","GCC / Middle East relevance scoring per advisory","Global threat heatmap — country-level risk visualisation","Source verification link on every advisory card","Auto-refresh every 2 hours — always current"].map((f,i)=>(
                 <div key={i} style={{fontSize:14,color:"rgba(200,220,240,.55)",padding:"7px 0",borderBottom:"1px solid rgba(255,255,255,.05)",display:"flex",gap:10,lineHeight:1.5}}>
                   <span style={{color:ACCENT,flexShrink:0}}>▸</span>{f}
                 </div>
@@ -888,7 +898,7 @@ function BCyberAwareDashboard() {
       {/* Footer */}
       <div style={{borderTop:"1px solid rgba(255,255,255,.05)",marginTop:32,padding:"18px 24px",textAlign:"center"}}>
         <div style={{fontSize:12,color:"rgba(200,220,240,.2)",letterSpacing:1,marginBottom:10}}>
-          BCyberAware · Vikas Pandita · {new Date().getFullYear()} · MIT Licence · 16 Sources: CISA KEV · CISA Alerts · NVD · CERT-In · NCSC UK · Exploit-DB · Packet Storm · THN · Bleeping Computer · SANS ISC · SecurityWeek · Krebs · AlienVault OTX · Telegram · The Hindu · Economic Times
+          BCyberAware · Vikas Pandita · {new Date().getFullYear()} · MIT Licence · 26 live sources · CISA · MSRC · NVD · Talos · Dark Reading · Project Zero · Threatpost · IBM Security Intelligence · +16 more
         </div>
       </div>
     </div>

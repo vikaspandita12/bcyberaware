@@ -1,6 +1,6 @@
 /**
  * BCyberAware – Live Threat Feed (Cloudflare Pages)
- * Sources : 16 live sources · Cache : 2 hours
+ * Sources : 26 live sources · Cache : 2 hours
  */
 
 import { jsonResponse } from "./http.js";
@@ -37,6 +37,16 @@ export async function handleFeedRequest(request) {
       /* 13 */ fetchTelegramDarkFeed(),
       /* 14 */ fetchTheHindu(),
       /* 15 */ fetchEconomicTimes(),
+      /* 16 */ fetchCiscoTalos(),
+      /* 17 */ fetchMSRC(),
+      /* 18 */ fetchDarkReading(),
+      /* 19 */ fetchProjectZero(),
+      /* 20 */ fetchMalwarebytes(),
+      /* 21 */ fetchHelpNetSecurity(),
+      /* 22 */ fetchThreatpost(),
+      /* 23 */ fetchInfosecurityMag(),
+      /* 24 */ fetchSecurityIntelligence(),
+      /* 25 */ fetchArsTechnica(),
     ]);
 
     const [
@@ -45,6 +55,8 @@ export async function handleFeedRequest(request) {
       r_thn, r_bc, r_sans, r_secWeek, r_krebs,
       r_otx, r_telegram,
       r_theHindu, r_econTimes,
+      r_talos, r_msrc, r_darkReading, r_p0, r_malwarebytes,
+      r_helpnet, r_threatpost, r_infosec, r_secintel, r_ars,
     ] = results;
 
     const get = r => r.status === "fulfilled" ? (r.value || []) : [];
@@ -52,6 +64,7 @@ export async function handleFeedRequest(request) {
     const advisories = [
       ...get(r_cisaKev), ...get(r_cisaAlerts),
       ...get(r_nvd),     ...get(r_certIn), ...get(r_ncscUk),
+      ...get(r_msrc),
     ];
     const exploits = [...get(r_exploitDb), ...get(r_packetStorm)];
     const news = [
@@ -60,6 +73,9 @@ export async function handleFeedRequest(request) {
       ...get(r_krebs),    ...get(r_otx),
       ...get(r_telegram), ...get(r_theHindu),
       ...get(r_econTimes),
+      ...get(r_talos),    ...get(r_darkReading), ...get(r_p0),
+      ...get(r_malwarebytes), ...get(r_helpnet), ...get(r_threatpost),
+      ...get(r_infosec),  ...get(r_secintel), ...get(r_ars),
     ];
 
     const sortAndDedup = arr => {
@@ -70,7 +86,7 @@ export async function handleFeedRequest(request) {
     const payload = {
       advisories: sortAndDedup(advisories).slice(0, 60),
       exploits:   sortAndDedup(exploits).slice(0, 30),
-      news:       sortAndDedup(news).slice(0, 60),
+      news:       sortAndDedup(news).slice(0, 80),
       heatmap:    buildHeatmap([...advisories, ...exploits, ...news]),
       fetched_at:       now,
       fetched_at_human: new Date().toUTCString(),
@@ -224,18 +240,117 @@ async function fetchEconomicTimes() {
   }catch{return[];}
 }
 
-// ── RSS Parser ────────────────────────────────────────────────────────────────
+// ── 17–26. Global enterprise & research feeds ─────────────────────────────────
+const RSS_UA = { headers: { "User-Agent": "BCyberAware/2.0" } };
+
+async function fetchRSS(url, opts) {
+  try {
+    const r = await fetch(url, RSS_UA);
+    if (!r.ok) return [];
+    return parseRSS(await r.text(), opts);
+  } catch { return []; }
+}
+
+async function fetchCiscoTalos() {
+  return fetchRSS("https://blog.talosintelligence.com/rss/", {
+    id_prefix: "TALOS", source: "Cisco Talos", source_url: "https://blog.talosintelligence.com",
+    source_color: "#049fd9", source_flag: "🛡️", category: "news", default_sev: "HIGH",
+    exploit_wild: false, patch_avail: false, limit: 12, countries: ["US", "GB", "DE", "AE", "SA"],
+  });
+}
+
+async function fetchMSRC() {
+  return fetchRSS("https://msrc.microsoft.com/blog/feed", {
+    id_prefix: "MSRC", source: "Microsoft MSRC", source_url: "https://msrc.microsoft.com/blog/",
+    source_color: "#0078d4", source_flag: "🇺🇸", category: "advisory", default_sev: "HIGH",
+    exploit_wild: false, patch_avail: true, limit: 12, countries: ["US", "GB", "DE", "AE", "SA", "IN"],
+  });
+}
+
+async function fetchDarkReading() {
+  return fetchRSS("https://www.darkreading.com/rss.xml", {
+    id_prefix: "DARKRD", source: "Dark Reading", source_url: "https://www.darkreading.com",
+    source_color: "#c62828", source_flag: "📰", category: "news", default_sev: "HIGH",
+    exploit_wild: false, patch_avail: false, limit: 12, countries: ["US", "GB", "DE"],
+  });
+}
+
+async function fetchProjectZero() {
+  return fetchRSS("https://googleprojectzero.blogspot.com/feeds/posts/default", {
+    id_prefix: "P0", source: "Google Project Zero", source_url: "https://googleprojectzero.blogspot.com",
+    source_color: "#4285f4", source_flag: "🔬", category: "news", default_sev: "HIGH",
+    exploit_wild: true, patch_avail: false, limit: 8, countries: ["US", "GB"],
+  });
+}
+
+async function fetchMalwarebytes() {
+  return fetchRSS("https://www.malwarebytes.com/blog/feed/index.xml", {
+    id_prefix: "MBAM", source: "Malwarebytes Labs", source_url: "https://www.malwarebytes.com/blog",
+    source_color: "#0d47a1", source_flag: "📰", category: "news", default_sev: "MEDIUM",
+    exploit_wild: false, patch_avail: false, limit: 10, countries: ["US", "GB"],
+  });
+}
+
+async function fetchHelpNetSecurity() {
+  return fetchRSS("https://www.helpnetsecurity.com/feed/", {
+    id_prefix: "HNS", source: "Help Net Security", source_url: "https://www.helpnetsecurity.com",
+    source_color: "#1565c0", source_flag: "📰", category: "news", default_sev: "MEDIUM",
+    exploit_wild: false, patch_avail: false, limit: 12, countries: ["US", "GB", "DE"],
+  });
+}
+
+async function fetchThreatpost() {
+  return fetchRSS("https://threatpost.com/feed/", {
+    id_prefix: "THREATPOST", source: "Threatpost", source_url: "https://threatpost.com",
+    source_color: "#6a1b9a", source_flag: "📰", category: "news", default_sev: "HIGH",
+    exploit_wild: false, patch_avail: false, limit: 10, countries: ["US", "RU", "CN"],
+  });
+}
+
+async function fetchInfosecurityMag() {
+  return fetchRSS("https://www.infosecurity-magazine.com/rss/news/", {
+    id_prefix: "INFOSEC", source: "Infosecurity Magazine", source_url: "https://www.infosecurity-magazine.com",
+    source_color: "#004d40", source_flag: "📰", category: "news", default_sev: "MEDIUM",
+    exploit_wild: false, patch_avail: false, limit: 10, countries: ["US", "GB", "DE"],
+  });
+}
+
+async function fetchSecurityIntelligence() {
+  return fetchRSS("https://securityintelligence.com/feed/", {
+    id_prefix: "IBMSEC", source: "IBM Security Intelligence", source_url: "https://securityintelligence.com",
+    source_color: "#0530ad", source_flag: "🌐", category: "news", default_sev: "HIGH",
+    exploit_wild: false, patch_avail: false, limit: 10, countries: ["US", "GB", "DE", "AE"],
+  });
+}
+
+async function fetchArsTechnica() {
+  try {
+    const all = await fetchRSS("https://feeds.arstechnica.com/arstechnica/index", {
+      id_prefix: "ARS", source: "Ars Technica", source_url: "https://arstechnica.com/security/",
+      source_color: "#ff6600", source_flag: "📰", category: "news", default_sev: "MEDIUM",
+      exploit_wild: false, patch_avail: false, limit: 25, countries: ["US"],
+    });
+    const kw = ["security", "hack", "breach", "malware", "ransomware", "vulnerability", "cve", "exploit", "phishing", "cyber", "apt", "zero-day", "zero day"];
+    return all.filter(a => kw.some(k => (a.title + " " + a.summary).toLowerCase().includes(k)));
+  } catch { return []; }
+}
+
+// ── RSS / Atom parser ─────────────────────────────────────────────────────────
 function parseRSS(xml,opts){
   try{
-    const items=[...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0,opts.limit);
-    return items.flatMap(([,block])=>{
+    let blocks=[...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)];
+    if(!blocks.length) blocks=[...xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)];
+    return blocks.slice(0,opts.limit).flatMap(([,block])=>{
       const get=tag=>(block.match(new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tag}>`))
         ||block.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`))
         ||[])[1]?.trim()||"";
       const title=get("title").replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">");
-      const desc=get("description").replace(/<[^>]+>/g,"").replace(/&amp;/g,"&").trim();
-      const link=get("link")||get("guid")||opts.source_url;
-      const date=get("pubDate")||get("dc:date")||"";
+      const descRaw=get("description")||get("summary")||get("content")||"";
+      const desc=descRaw.replace(/<[^>]+>/g,"").replace(/&amp;/g,"&").trim();
+      const link=get("link")
+        ||block.match(/<link[^>]+href="([^"]+)"/)?.[1]
+        ||get("guid")||get("id")||opts.source_url;
+      const date=get("pubDate")||get("dc:date")||get("updated")||get("published")||"";
       if(!title)return[];
       const cves=[...new Set((title+" "+desc).match(/CVE-\d{4}-\d{4,7}/g)||[])].slice(0,5);
       const lower=(title+" "+desc).toLowerCase();
