@@ -3,5 +3,6 @@
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
 
+# API routes: no browser cache — Worker in-memory cache handles 2-hour refresh
 /api/*
-  Cache-Control: public, max-age=7200, s-maxage=7200, stale-while-revalidate=3600
+  Cache-Control: no-store

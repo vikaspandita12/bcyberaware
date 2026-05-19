@@ -1,6 +1,9 @@
 /** Shared HTTP helpers for Cloudflare Pages Functions */
 
-export const CACHE_CONTROL = "public, max-age=7200, s-maxage=7200, stale-while-revalidate=3600";
+// Browser must NOT cache API responses (stale HTML caused "not valid JSON" errors).
+// The Worker's in-memory cache handles the 2-hour refresh server-side.
+// s-maxage only caches at the CDN edge, not in the browser.
+export const CACHE_CONTROL = "no-store, s-maxage=7200, stale-while-revalidate=3600";
 
 export const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
