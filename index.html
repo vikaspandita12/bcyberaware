@@ -56,7 +56,7 @@ const SEV_ORDER = ["CRITICAL","HIGH","MEDIUM","LOW"];
 
 async function loadFeed(force=false) {
   const url = force ? `${PROXY}?action=feed&bust=1` : `${PROXY}?action=feed`;
-  const r   = await fetch(url);
+  const r   = await fetch(url, { cache: "no-store" });
   if (!r.ok) throw new Error(`Feed error ${r.status}`);
   return r.json();
 }
@@ -374,7 +374,7 @@ function DarkWebView() {
   const load = useCallback(async (force = false) => {
     setLoading(true); setError(null);
     try {
-      const r = await fetch(force ? "/api/darkweb?bust=1" : "/api/darkweb");
+      const r = await fetch(force ? "/api/darkweb?bust=1" : "/api/darkweb", { cache: "no-store" });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       setData(await r.json());
     } catch (e) { setError(e.message); }
