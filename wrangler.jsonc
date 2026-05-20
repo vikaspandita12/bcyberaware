@@ -10,5 +10,9 @@
     "binding": "ASSETS",
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "single-page-application"
-  }
+  },
+  "routes": [
+    { "pattern": "bcyberaware.co.in", "custom_domain": true },
+    { "pattern": "www.bcyberaware.co.in", "custom_domain": true }
+  ]
 }
