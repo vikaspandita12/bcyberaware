@@ -1,8 +1,7 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
   "name": "bcyberaware",
   "main": "worker.js",
-  "compatibility_date": "2026-05-19",
+  "compatibility_date": "2025-09-01",
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
   "assets": {
@@ -10,9 +9,5 @@
     "binding": "ASSETS",
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "single-page-application"
-  },
-  "routes": [
-    { "pattern": "bcyberaware.co.in", "custom_domain": true },
-    { "pattern": "www.bcyberaware.co.in", "custom_domain": true }
-  ]
+  }
 }
