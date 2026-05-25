@@ -1,13 +1,9 @@
-# Auto-deploy BCyberAware to Cloudflare Workers on every push to main.
-# Live: https://advisory.bcyberaware.co.in/ · https://bcyberaware.vikaspandita12.workers.dev/
+# Auto-deploy on push to main → https://advisory.bcyberaware.co.in/
 #
-# Required GitHub secrets (repo → Settings → Secrets and variables → Actions):
-#   CLOUDFLARE_API_TOKEN  — API token with "Edit" on Workers Scripts
-#   CLOUDFLARE_ACCOUNT_ID — Cloudflare dashboard → Workers → Account ID (sidebar)
-#
-# Optional (recommended — clears stale index.html at the edge):
-#   CLOUDFLARE_ZONE_ID    — Zone ID for bcyberaware.co.in (Overview → API → Zone ID)
-#   Token also needs: Zone → Cache Purge → Purge
+# Required GitHub secrets (exact names):
+#   CLOUDFLARE_API_TOKEN
+#   CLOUDFLARE_ACCOUNT_ID
+# Optional: CLOUDFLARE_ZONE_ID (purge CDN cache after deploy)
 
 name: Deploy to Cloudflare
 
@@ -28,32 +24,49 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Deploy Worker (wrangler.jsonc)
-        id: deploy
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          wranglerVersion: "4"
-          command: deploy
+      - name: Validate secrets
+        run: |
+          if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]; then
+            echo "::error::Missing secret CLOUDFLARE_API_TOKEN (Settings → Secrets → Actions)"
+            exit 1
+          fi
+          if [ -z "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" ]; then
+            echo "::error::Missing secret CLOUDFLARE_ACCOUNT_ID"
+            exit 1
+          fi
+          echo "✓ CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are set"
 
-      - name: Purge CDN cache for custom domain
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Wrangler
+        run: npm install wrangler@4 --no-save
+
+      - name: Deploy to Cloudflare Workers
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy
+
+      - name: Purge CDN cache (bcyberaware.co.in)
         env:
           ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
-          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           if [ -z "$ZONE_ID" ]; then
-            echo "CLOUDFLARE_ZONE_ID not set — skip purge (add secret to refresh HTML instantly)"
+            echo "CLOUDFLARE_ZONE_ID not set — skipping cache purge"
             exit 0
           fi
           curl -sf -X POST "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/purge_cache" \
-            -H "Authorization: Bearer ${CF_TOKEN}" \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
             -H "Content-Type: application/json" \
             --data '{"purge_everything":true}'
-          echo "Cache purged for zone ${ZONE_ID}"
+          echo "✓ Cache purged"
 
-      - name: Verify live API
+      - name: Verify live site
         run: |
-          curl -sf "https://advisory.bcyberaware.co.in/api/proxy?action=feed" | head -c 120
+          curl -sf "https://advisory.bcyberaware.co.in/api/proxy?action=feed" | head -c 100
           echo ""
-          echo "Deploy OK — site should reflect commit ${{ github.sha }}"
+          echo "✓ Deploy complete for commit ${{ github.sha }}"
