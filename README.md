@@ -28,6 +28,19 @@ BCyberAware is an AI-powered Threat Intelligence Dashboard designed to help indi
 - Interactive security dashboard
 - Actionable cybersecurity insights
 
+## Development
+
+The dashboard UI lives in `src/app.jsx` and is precompiled to `app.js` (served as a static asset — no in-browser Babel).
+
+```bash
+npm install        # one-time setup
+npm run build      # compile src/app.jsx → app.js (run after editing the UI)
+npm run dev        # build + local server at http://localhost:8787
+npm run deploy     # build + deploy to Cloudflare
+```
+
+> **Note:** after editing `src/app.jsx`, run `npm run build` and commit the regenerated `app.js` — the GitHub Action deploys files as-is.
+
 ---
 
 <p align="center">

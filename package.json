@@ -2,10 +2,14 @@
   "name": "bcyberaware",
   "private": true,
   "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "build": "babel src/app.jsx --presets @babel/preset-react --out-file app.js --no-comments",
+    "dev": "npm run build && wrangler dev",
+    "deploy": "npm run build && wrangler deploy"
   },
   "devDependencies": {
+    "@babel/cli": "^7.29.7",
+    "@babel/core": "^7.29.7",
+    "@babel/preset-react": "^7.29.7",
     "wrangler": "^4.0.0"
   }
 }
