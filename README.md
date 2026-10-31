@@ -28,6 +28,15 @@ BCyberAware is an AI-powered Threat Intelligence Dashboard designed to help indi
 - Interactive security dashboard
 - Actionable cybersecurity insights
 
+## AI Threat Analyst (free)
+
+The floating **🛡️ Ask Threat Analyst** chat runs on [Cloudflare Workers AI](https://developers.cloudflare.com/workers-ai/) — no API key, no third-party account. The free Workers plan includes **10,000 neurons/day** (roughly a few hundred chats with the default model). The assistant is grounded in the live feed snapshot, so it can answer "what's exploited in the wild right now?" from the dashboard's own data.
+
+- Endpoint: `POST /api/chat` (streaming SSE) — see `functions/_shared/chat-core.js`
+- Model: set `AI_MODEL` in `wrangler.jsonc` (default `@cf/meta/llama-3.1-8b-instruct-fast`; `@cf/meta/llama-3.3-70b-instruct-fp8-fast` for higher quality at ~6× the neuron cost)
+- Guards: per-IP rate limit (20 msgs / 10 min), 1,200-char messages, 8-turn history, cybersecurity-only system prompt
+- If the deploy fails on the `ai` binding, make sure the `CLOUDFLARE_API_TOKEN` has **Workers AI → Edit** permission
+
 ## Development
 
 The dashboard UI lives in `src/app.jsx` and is precompiled to `app.js` (served as a static asset — no in-browser Babel).

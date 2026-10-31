@@ -2060,6 +2060,453 @@ function DarkWebView() {
     }
   }, "\xB7 ", data.fetched_at_human)));
 }
+const CHAT_SUGGESTIONS = ["Summarise today's critical threats", "What is being exploited in the wild right now?", "Which advisories matter for GCC / Middle East?", "Explain prompt injection and how to defend against it", "What should a CISO patch first this week?"];
+function renderMd(text) {
+  const inline = (s, k) => s.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((p, i) => p.startsWith("**") ? React.createElement("strong", {
+    key: k + "-" + i,
+    style: {
+      color: "#eef4ff"
+    }
+  }, p.slice(2, -2)) : p.startsWith("`") ? React.createElement("code", {
+    key: k + "-" + i,
+    style: {
+      fontFamily: "monospace",
+      background: "rgba(0,200,255,.08)",
+      padding: "1px 5px",
+      borderRadius: 3,
+      color: ACCENT
+    }
+  }, p.slice(1, -1)) : p);
+  return text.split("\n").map((line, i) => {
+    const t = line.trim();
+    if (!t) return React.createElement("div", {
+      key: i,
+      style: {
+        height: 6
+      }
+    });
+    if (/^#{1,4}\s/.test(t)) return React.createElement("div", {
+      key: i,
+      style: {
+        fontWeight: 800,
+        color: ACCENT,
+        marginTop: 8,
+        marginBottom: 3,
+        fontSize: 13,
+        letterSpacing: .5
+      }
+    }, inline(t.replace(/^#+\s/, ""), i));
+    if (/^(?:[-*•]|\d+[.)])\s/.test(t)) return React.createElement("div", {
+      key: i,
+      style: {
+        display: "flex",
+        gap: 8,
+        paddingLeft: 4,
+        marginBottom: 3
+      }
+    }, React.createElement("span", {
+      style: {
+        color: ACCENT2,
+        flexShrink: 0
+      }
+    }, "\u25B8"), React.createElement("span", null, inline(t.replace(/^(?:[-*•]|\d+[.)])\s/, ""), i)));
+    return React.createElement("div", {
+      key: i,
+      style: {
+        marginBottom: 4
+      }
+    }, inline(t, i));
+  });
+}
+function ThreatAnalystChat() {
+  const [open, setOpen] = useState(false);
+  const [msgs, setMsgs] = useState([{
+    role: "assistant",
+    content: "👋 I'm the **BCyberAware Threat Analyst** — an AI grounded in the live feed on this dashboard.\n\nAsk me about today's advisories, active exploits, threat actors, or any cybersecurity topic."
+  }]);
+  const [input, setInput] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [unread, setUnread] = useState(false);
+  const endRef = React.useRef(null);
+  const abortRef = React.useRef(null);
+  useEffect(() => {
+    if (open) endRef.current?.scrollIntoView({
+      behavior: "smooth"
+    });
+  }, [msgs, open]);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (!open) setUnread(true);
+    }, 6000);
+    return () => clearTimeout(t);
+  }, []);
+  const send = async text => {
+    const q = (text ?? input).trim();
+    if (!q || busy) return;
+    setInput("");
+    const history = [...msgs.filter((m, i) => i > 0), {
+      role: "user",
+      content: q
+    }];
+    setMsgs(m => [...m, {
+      role: "user",
+      content: q
+    }, {
+      role: "assistant",
+      content: "",
+      streaming: true
+    }]);
+    setBusy(true);
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    try {
+      const r = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          messages: history.slice(-8)
+        }),
+        signal: ctrl.signal
+      });
+      if (!r.ok) {
+        let e = "Assistant unavailable";
+        try {
+          e = (await r.json()).error || e;
+        } catch {}
+        throw new Error(e);
+      }
+      const reader = r.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "",
+        acc = "";
+      while (true) {
+        const {
+          done,
+          value
+        } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, {
+          stream: true
+        });
+        const lines = buf.split("\n");
+        buf = lines.pop();
+        for (const ln of lines) {
+          const s = ln.trim();
+          if (!s.startsWith("data:")) continue;
+          const payload = s.slice(5).trim();
+          if (payload === "[DONE]") continue;
+          try {
+            const j = JSON.parse(payload);
+            if (j.response) {
+              acc += j.response;
+              setMsgs(m => {
+                const c = [...m];
+                c[c.length - 1] = {
+                  role: "assistant",
+                  content: acc,
+                  streaming: true
+                };
+                return c;
+              });
+            }
+          } catch {}
+        }
+      }
+      setMsgs(m => {
+        const c = [...m];
+        c[c.length - 1] = {
+          role: "assistant",
+          content: acc || "_(no response)_"
+        };
+        return c;
+      });
+    } catch (e) {
+      if (e.name !== "AbortError") setMsgs(m => {
+        const c = [...m];
+        c[c.length - 1] = {
+          role: "assistant",
+          content: "⚠ " + e.message,
+          error: true
+        };
+        return c;
+      });
+    }
+    setBusy(false);
+  };
+  const stop = () => {
+    abortRef.current?.abort();
+    setBusy(false);
+  };
+  return React.createElement(React.Fragment, null, !open && React.createElement("button", {
+    onClick: () => {
+      setOpen(true);
+      setUnread(false);
+    },
+    "aria-label": "Open AI Threat Analyst",
+    style: {
+      position: "fixed",
+      right: 20,
+      bottom: 20,
+      zIndex: 90,
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "12px 18px",
+      borderRadius: 30,
+      border: `1px solid rgba(0,200,255,.45)`,
+      background: "linear-gradient(135deg,rgba(0,40,70,.95),rgba(40,10,80,.95))",
+      color: "#eef4ff",
+      cursor: "pointer",
+      boxShadow: "0 8px 32px rgba(0,200,255,.25)",
+      fontFamily: "monospace",
+      fontWeight: 700,
+      fontSize: 13,
+      letterSpacing: .5,
+      backdropFilter: "blur(8px)"
+    }
+  }, React.createElement("span", {
+    style: {
+      fontSize: 18
+    }
+  }, "\uD83D\uDEE1\uFE0F"), " Ask Threat Analyst", unread && React.createElement("span", {
+    style: {
+      width: 9,
+      height: 9,
+      borderRadius: "50%",
+      background: "#00e676",
+      boxShadow: "0 0 8px #00e676",
+      animation: "pulse 1.4s infinite"
+    }
+  })), open && React.createElement("div", {
+    className: "chat-panel",
+    role: "dialog",
+    "aria-label": "AI Threat Analyst",
+    style: {
+      position: "fixed",
+      right: 20,
+      bottom: 20,
+      zIndex: 90,
+      width: 400,
+      maxWidth: "calc(100vw - 24px)",
+      height: 600,
+      maxHeight: "calc(100vh - 40px)",
+      display: "flex",
+      flexDirection: "column",
+      background: "rgba(6,10,20,.97)",
+      border: "1px solid rgba(0,200,255,.3)",
+      borderRadius: 14,
+      boxShadow: "0 16px 60px rgba(0,0,0,.6), 0 0 30px rgba(0,200,255,.12)",
+      overflow: "hidden",
+      animation: "fadeIn .25s ease",
+      backdropFilter: "blur(12px)"
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "12px 14px",
+      background: "linear-gradient(90deg,rgba(0,200,255,.12),rgba(123,47,247,.14))",
+      borderBottom: "1px solid rgba(0,200,255,.18)"
+    }
+  }, React.createElement("span", {
+    style: {
+      fontSize: 22
+    }
+  }, "\uD83D\uDEE1\uFE0F"), React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 0
+    }
+  }, React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontWeight: 800,
+      color: "#eef4ff",
+      letterSpacing: .5
+    }
+  }, "Threat Analyst ", React.createElement("span", {
+    style: {
+      fontSize: 9,
+      padding: "2px 6px",
+      marginLeft: 4,
+      borderRadius: 3,
+      background: "rgba(0,230,118,.12)",
+      border: "1px solid rgba(0,230,118,.4)",
+      color: "#00e676",
+      fontFamily: "monospace",
+      letterSpacing: 1,
+      verticalAlign: "middle"
+    }
+  }, "AI")), React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "rgba(200,220,240,.45)",
+      fontFamily: "monospace",
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis"
+    }
+  }, "Grounded in live feed \xB7 Cloudflare Workers AI")), React.createElement("button", {
+    onClick: () => setMsgs(msgs.slice(0, 1)),
+    title: "Clear conversation",
+    "aria-label": "Clear conversation",
+    style: {
+      background: "transparent",
+      border: "1px solid rgba(255,255,255,.1)",
+      color: "rgba(200,220,240,.5)",
+      borderRadius: 6,
+      padding: "4px 8px",
+      cursor: "pointer",
+      fontSize: 12
+    }
+  }, "\u21BA"), React.createElement("button", {
+    onClick: () => setOpen(false),
+    "aria-label": "Close",
+    style: {
+      background: "transparent",
+      border: "1px solid rgba(255,255,255,.1)",
+      color: "rgba(200,220,240,.6)",
+      borderRadius: 6,
+      padding: "4px 9px",
+      cursor: "pointer",
+      fontSize: 14,
+      lineHeight: 1
+    }
+  }, "\u2715")), React.createElement("div", {
+    style: {
+      flex: 1,
+      overflowY: "auto",
+      padding: "14px 14px 6px",
+      display: "flex",
+      flexDirection: "column",
+      gap: 10
+    }
+  }, msgs.map((m, i) => React.createElement("div", {
+    key: i,
+    style: {
+      alignSelf: m.role === "user" ? "flex-end" : "flex-start",
+      maxWidth: "88%"
+    }
+  }, React.createElement("div", {
+    style: {
+      fontSize: 13.5,
+      lineHeight: 1.6,
+      padding: "10px 13px",
+      borderRadius: m.role === "user" ? "14px 14px 4px 14px" : "14px 14px 14px 4px",
+      background: m.role === "user" ? "linear-gradient(135deg,rgba(0,200,255,.18),rgba(0,200,255,.08))" : m.error ? "rgba(200,0,0,.12)" : "rgba(255,255,255,.04)",
+      border: `1px solid ${m.role === "user" ? "rgba(0,200,255,.35)" : m.error ? "rgba(200,0,0,.35)" : "rgba(255,255,255,.08)"}`,
+      color: m.error ? "#ff8a80" : "rgba(220,232,245,.92)",
+      wordBreak: "break-word"
+    }
+  }, m.role === "assistant" ? renderMd(m.content) : m.content, m.streaming && React.createElement("span", {
+    style: {
+      display: "inline-block",
+      width: 7,
+      height: 14,
+      background: ACCENT,
+      marginLeft: 3,
+      verticalAlign: "text-bottom",
+      animation: "pulse .8s infinite"
+    }
+  })))), msgs.length === 1 && React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 6,
+      marginTop: 4
+    }
+  }, React.createElement("div", {
+    style: {
+      fontSize: 10,
+      letterSpacing: 2,
+      color: "rgba(200,220,240,.3)",
+      fontFamily: "monospace"
+    }
+  }, "TRY ASKING"), CHAT_SUGGESTIONS.map(s => React.createElement("button", {
+    key: s,
+    onClick: () => send(s),
+    style: {
+      textAlign: "left",
+      padding: "8px 12px",
+      fontSize: 12.5,
+      background: "rgba(123,47,247,.08)",
+      border: "1px solid rgba(123,47,247,.25)",
+      color: "#d1c4e9",
+      borderRadius: 8,
+      cursor: "pointer"
+    }
+  }, "\u203A ", s))), React.createElement("div", {
+    ref: endRef
+  })), React.createElement("form", {
+    onSubmit: e => {
+      e.preventDefault();
+      send();
+    },
+    style: {
+      display: "flex",
+      gap: 8,
+      padding: "10px 12px",
+      borderTop: "1px solid rgba(255,255,255,.07)",
+      background: "rgba(0,0,0,.3)"
+    }
+  }, React.createElement("input", {
+    value: input,
+    onChange: e => setInput(e.target.value),
+    placeholder: "Ask about a CVE, threat actor, or today's feed\u2026",
+    maxLength: 1200,
+    disabled: busy,
+    "aria-label": "Message",
+    style: {
+      flex: 1,
+      padding: "10px 12px",
+      background: "rgba(255,255,255,.04)",
+      border: "1px solid rgba(0,200,255,.2)",
+      borderRadius: 8,
+      color: "#eef4ff",
+      fontSize: 13.5,
+      outline: "none",
+      fontFamily: "inherit"
+    }
+  }), busy ? React.createElement("button", {
+    type: "button",
+    onClick: stop,
+    style: {
+      padding: "0 14px",
+      background: "rgba(200,0,0,.15)",
+      border: "1px solid rgba(200,0,0,.4)",
+      color: "#ff6666",
+      borderRadius: 8,
+      cursor: "pointer",
+      fontFamily: "monospace",
+      fontWeight: 700,
+      fontSize: 12
+    }
+  }, "\u25A0") : React.createElement("button", {
+    type: "submit",
+    disabled: !input.trim(),
+    style: {
+      padding: "0 16px",
+      background: input.trim() ? "linear-gradient(135deg,#00c8ff,#7b2ff7)" : "rgba(255,255,255,.05)",
+      border: "none",
+      color: input.trim() ? "#fff" : "rgba(255,255,255,.25)",
+      borderRadius: 8,
+      cursor: input.trim() ? "pointer" : "not-allowed",
+      fontWeight: 800,
+      fontSize: 14
+    }
+  }, "\u27A4")), React.createElement("div", {
+    style: {
+      padding: "5px 12px 8px",
+      fontSize: 10,
+      color: "rgba(200,220,240,.28)",
+      textAlign: "center",
+      fontFamily: "monospace"
+    }
+  }, "AI can make mistakes \u2014 verify against the linked sources.")));
+}
 function BCyberAwareDashboard() {
   const [advisories, setAdvisories] = useState([]);
   const [exploits, setExploits] = useState([]);
@@ -2402,6 +2849,7 @@ function BCyberAwareDashboard() {
         @keyframes glow{0%,100%{opacity:.7}50%{opacity:1}}
         @keyframes tickerScroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
         .ticker-track:hover{animation-play-state:paused}
+        @media(max-width:520px){.chat-panel{right:0 !important;bottom:0 !important;width:100vw !important;max-width:100vw !important;height:100vh !important;max-height:100vh !important;border-radius:0 !important}}
         button:hover{opacity:.85}
       `), React.createElement("div", {
     style: {
@@ -3583,7 +4031,7 @@ function BCyberAwareDashboard() {
       fontFamily: "monospace",
       fontWeight: 700
     }
-  }, "PLATFORM CAPABILITIES"), ["30+ live intelligence sources with real-time health telemetry", "🔴 Breaking-news ticker — incident-grade stories from the last 48 hours", "ZDI 0-Day Pipeline — vulnerabilities awaiting vendor disclosure", "GenAI tab — OWASP LLM Top 10, Standards & Tools (Awesome AI Security)", "CISO Brief — AI governance links (NIST AI RMF, MITRE ATLAS, AI Incident Database)", "CISA KEV · NVD · CERT-In · NCSC UK · CERT-EU · Microsoft Security", "The Record · Unit 42 · Check Point Research · Talos · Project Zero · Krebs", "GCC / Middle East relevance scoring per advisory", "Global threat heatmap — country-level risk visualisation", "Source verification link on every advisory card · auto-refresh every 2 hours"].map((f, i) => React.createElement("div", {
+  }, "PLATFORM CAPABILITIES"), ["🛡️ AI Threat Analyst — chat assistant grounded in the live feed (Cloudflare Workers AI)", "30+ live intelligence sources with real-time health telemetry", "🔴 Breaking-news ticker — incident-grade stories from the last 48 hours", "ZDI 0-Day Pipeline — vulnerabilities awaiting vendor disclosure", "GenAI tab — OWASP LLM Top 10, Standards & Tools (Awesome AI Security)", "CISO Brief — AI governance links (NIST AI RMF, MITRE ATLAS, AI Incident Database)", "CISA KEV · NVD · CERT-In · NCSC UK · CERT-EU · Microsoft Security", "The Record · Unit 42 · Check Point Research · Talos · Project Zero · Krebs", "GCC / Middle East relevance scoring per advisory", "Global threat heatmap — country-level risk visualisation", "Source verification link on every advisory card · auto-refresh every 2 hours"].map((f, i) => React.createElement("div", {
     key: i,
     style: {
       fontSize: 14,
@@ -3614,7 +4062,7 @@ function BCyberAwareDashboard() {
     advisories: advisories,
     exploits: exploits,
     news: news
-  }), view === "darkweb" && React.createElement(DarkWebView, null)), React.createElement("div", {
+  }), view === "darkweb" && React.createElement(DarkWebView, null)), React.createElement(ThreatAnalystChat, null), React.createElement("div", {
     style: {
       borderTop: "1px solid rgba(255,255,255,.05)",
       marginTop: 32,

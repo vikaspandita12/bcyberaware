@@ -71,6 +71,27 @@ const SOURCES = [
   { key: "econtimes",    name: "Economic Times IT",      flag: "🇮🇳", cat: "news", filtered: true, fn: fetchEconomicTimes },
 ];
 
+// ── Live context for the AI Threat Analyst (compact, token-budgeted) ──────────
+export function getFeedContext(maxChars = 6000) {
+  const d = CACHE.feed?.data;
+  if (!d) return null;
+  const line = a => `- [${a.severity}] ${a.title}${a.cve_ids?.length ? " (" + a.cve_ids.slice(0, 2).join(", ") + ")" : ""} — ${a.source}, ${a.date}${a.exploit_in_wild ? " · EXPLOITED IN WILD" : ""}${a.threat_actor ? " · " + a.threat_actor : ""}`;
+  const sections = [
+    ["BREAKING (last 48h)", (d.breaking || []).slice(0, 8).map(b => `- ${b.title} — ${b.source}`)],
+    ["TOP ADVISORIES", (d.advisories || []).slice(0, 14).map(line)],
+    ["EXPLOITS / 0-DAY PIPELINE", (d.exploits || []).slice(0, 8).map(line)],
+    ["SECURITY NEWS", (d.news || []).slice(0, 14).map(a => `- ${a.title} — ${a.source}, ${a.date}`)],
+    ["THREAT HEATMAP (top countries)", [(d.heatmap || []).slice(0, 6).map(h => `${h.name} ${h.score}pts/${h.level}`).join(" · ")]],
+  ];
+  let out = `Feed snapshot: ${d.fetched_at_human} · ${d.sources_live}/${d.sources_total} sources live\n`;
+  for (const [title, lines] of sections) {
+    const block = `\n## ${title}\n${lines.join("\n")}\n`;
+    if (out.length + block.length > maxChars) break;
+    out += block;
+  }
+  return out;
+}
+
 // ── Main handler ──────────────────────────────────────────────────────────────
 export async function handleFeedRequest(request) {
   const url    = new URL(request.url);
