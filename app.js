@@ -39,6 +39,104 @@ async function loadFeed(force = false) {
   if (!r.ok) throw new Error(`Feed error ${r.status}`);
   return r.json();
 }
+function timeAgo(ts) {
+  if (!ts) return "";
+  const s = (Date.now() - ts) / 1000;
+  if (s < 60) return "just now";
+  if (s < 3600) return Math.round(s / 60) + "m ago";
+  if (s < 86400) return Math.round(s / 3600) + "h ago";
+  return Math.round(s / 86400) + "d ago";
+}
+function BreakingTicker({
+  items
+}) {
+  if (!items || items.length === 0) return null;
+  const doubled = [...items, ...items];
+  return React.createElement("div", {
+    style: {
+      background: "linear-gradient(90deg,rgba(80,0,0,.55),rgba(40,0,10,.4))",
+      borderBottom: "1px solid rgba(255,23,68,.25)",
+      display: "flex",
+      alignItems: "stretch",
+      overflow: "hidden",
+      height: 38
+    }
+  }, React.createElement("div", {
+    style: {
+      flexShrink: 0,
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      padding: "0 16px",
+      background: "rgba(200,0,0,.3)",
+      borderRight: "1px solid rgba(255,23,68,.35)",
+      zIndex: 2
+    }
+  }, React.createElement("span", {
+    style: {
+      width: 8,
+      height: 8,
+      borderRadius: "50%",
+      background: "#ff1744",
+      boxShadow: "0 0 8px #ff1744",
+      animation: "pulse 1.1s infinite",
+      display: "inline-block"
+    }
+  }), React.createElement("span", {
+    style: {
+      fontSize: 11,
+      fontWeight: 900,
+      color: "#ff6e6e",
+      fontFamily: "monospace",
+      letterSpacing: 2.5,
+      whiteSpace: "nowrap"
+    }
+  }, "BREAKING")), React.createElement("div", {
+    style: {
+      flex: 1,
+      overflow: "hidden",
+      position: "relative"
+    }
+  }, React.createElement("div", {
+    className: "ticker-track",
+    style: {
+      display: "flex",
+      alignItems: "center",
+      height: "100%",
+      width: "max-content",
+      animation: `tickerScroll ${Math.max(40, items.length * 11)}s linear infinite`
+    }
+  }, doubled.map((b, i) => React.createElement("a", {
+    key: i,
+    href: b.source_url,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 9,
+      padding: "0 28px",
+      whiteSpace: "nowrap",
+      fontSize: 13
+    }
+  }, React.createElement("span", {
+    style: {
+      color: "#ff7961",
+      fontFamily: "monospace",
+      fontSize: 11,
+      letterSpacing: .5
+    }
+  }, b.source_flag, " ", b.source, " \xB7 ", timeAgo(b.ts)), React.createElement("span", {
+    style: {
+      fontWeight: 600,
+      color: "#ffe3e3"
+    }
+  }, b.title), React.createElement("span", {
+    style: {
+      color: "rgba(255,100,100,.3)"
+    }
+  }, "\u25C6"))))));
+}
 function SevBadge({
   sev
 }) {
@@ -106,6 +204,7 @@ function AdvisoryCard({
   const isNews = adv.category === "news";
   const isExploit = adv.category === "exploit";
   const borderCol = isNews ? "#1976d2" : isExploit ? "#c00000" : s.border;
+  const isFresh = adv.ts && Date.now() - adv.ts < 24 * 60 * 60 * 1000;
   return React.createElement("div", {
     style: {
       background: "rgba(5,8,15,0.92)",
@@ -170,12 +269,24 @@ function AdvisoryCard({
       fontFamily: "monospace",
       borderRadius: 3
     }
-  }, "\uD83C\uDF0D GCC RISK"), React.createElement("span", {
+  }, "\uD83C\uDF0D GCC RISK"), isFresh && React.createElement("span", {
+    style: {
+      fontSize: 11,
+      padding: "4px 10px",
+      background: "rgba(0,200,255,0.1)",
+      border: "1px solid rgba(0,200,255,.4)",
+      color: "#00c8ff",
+      letterSpacing: 1,
+      fontFamily: "monospace",
+      borderRadius: 3,
+      fontWeight: 800
+    }
+  }, "\u25CF FRESH"), React.createElement("span", {
     style: {
       fontSize: 12,
       color: "rgba(200,220,240,0.4)"
     }
-  }, adv.source_flag, " ", adv.source, " \xB7 ", adv.date)), React.createElement("div", {
+  }, adv.source_flag, " ", adv.source, " \xB7 ", adv.ts ? timeAgo(adv.ts) : adv.date)), React.createElement("div", {
     style: {
       fontSize: 17,
       fontWeight: 700,
@@ -1953,6 +2064,7 @@ function BCyberAwareDashboard() {
   const [advisories, setAdvisories] = useState([]);
   const [exploits, setExploits] = useState([]);
   const [news, setNews] = useState([]);
+  const [breaking, setBreaking] = useState([]);
   const [heatmap, setHeatmap] = useState([]);
   const [feedMeta, setFeedMeta] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1970,6 +2082,7 @@ function BCyberAwareDashboard() {
       setAdvisories(data.advisories || []);
       setExploits(data.exploits || []);
       setNews(data.news || []);
+      setBreaking(data.breaking || []);
       setHeatmap(data.heatmap || []);
       setFeedMeta(data);
     } catch (e) {
@@ -2048,234 +2161,235 @@ function BCyberAwareDashboard() {
     name: "CISA KEV",
     cat: "Advisory",
     flag: "🇺🇸",
-    status: "live",
     url: "https://www.cisa.gov/known-exploited-vulnerabilities-catalog",
     desc: "Actively exploited vulnerabilities — updated continuously by US CISA."
   }, {
     name: "CISA Alerts",
     cat: "Advisory",
     flag: "🇺🇸",
-    status: "live",
     url: "https://www.cisa.gov/news-events/cybersecurity-advisories",
     desc: "Full US-CERT security alerts and advisories from the US government."
   }, {
     name: "NVD / CVE.org",
     cat: "Advisory",
     flag: "🌐",
-    status: "live",
     url: "https://nvd.nist.gov",
-    desc: "NIST National Vulnerability Database — all published CVEs with CVSS scoring."
+    desc: "NIST National Vulnerability Database — critical CVEs published in the last 30 days."
   }, {
-    name: "CERT-In India",
+    name: "CERT-In (India)",
     cat: "Advisory",
     flag: "🇮🇳",
-    status: "live",
     url: "https://www.cert-in.org.in",
     desc: "India's national CERT — enterprise software advisories."
   }, {
     name: "NCSC UK",
     cat: "Advisory",
     flag: "🇬🇧",
-    status: "live",
     url: "https://www.ncsc.gov.uk",
-    desc: "UK National Cyber Security Centre — official threat reports and guidance."
+    desc: "UK National Cyber Security Centre — official news, guidance and threat reports."
   }, {
-    name: "Microsoft MSRC",
+    name: "CERT-EU",
+    cat: "Advisory",
+    flag: "🇪🇺",
+    url: "https://cert.europa.eu",
+    desc: "EU institutions' CERT — security advisories for European enterprise software."
+  }, {
+    name: "Microsoft Security",
     cat: "Advisory",
     flag: "🇺🇸",
-    status: "live",
-    url: "https://msrc.microsoft.com/blog/",
-    desc: "Microsoft Security Response Center — patches, advisories, and vulnerability disclosures."
+    url: "https://www.microsoft.com/en-us/security/blog/",
+    desc: "Microsoft Security blog — threat research, patches and nation-state tracking."
   }, {
     name: "Exploit-DB",
     cat: "Exploit",
     flag: "⚡",
-    status: "live",
     url: "https://www.exploit-db.com",
     desc: "Public exploit database — proof-of-concept exploits for known vulnerabilities."
   }, {
-    name: "Packet Storm",
+    name: "ZDI 0-Day Pipeline",
     cat: "Exploit",
-    flag: "⚡",
-    status: "live",
-    url: "https://packetstormsecurity.com",
-    desc: "Security tools, exploits and advisories from the security research community."
+    flag: "🧨",
+    url: "https://www.zerodayinitiative.com/advisories/upcoming/",
+    desc: "Trend Micro Zero Day Initiative — vulnerabilities awaiting vendor disclosure (pre-patch 0-days)."
   }, {
     name: "The Hacker News",
     cat: "News",
     flag: "📰",
-    status: "live",
     url: "https://thehackernews.com",
     desc: "Leading cybersecurity news — APTs, data breaches, and vulnerabilities."
   }, {
     name: "Bleeping Computer",
     cat: "News",
     flag: "📰",
-    status: "live",
     url: "https://www.bleepingcomputer.com",
     desc: "Breaking security news — ransomware, malware, and incident reports."
+  }, {
+    name: "The Record",
+    cat: "News",
+    flag: "🎙️",
+    url: "https://therecord.media",
+    desc: "Recorded Future News — nation-state operations, ransomware and policy."
+  }, {
+    name: "CyberScoop",
+    cat: "News",
+    flag: "📰",
+    url: "https://cyberscoop.com",
+    desc: "US government and enterprise cybersecurity journalism."
+  }, {
+    name: "Security Affairs",
+    cat: "News",
+    flag: "📰",
+    url: "https://securityaffairs.com",
+    desc: "High-frequency global breach, APT and hacktivism coverage by Pierluigi Paganini."
+  }, {
+    name: "HackRead",
+    cat: "News",
+    flag: "📰",
+    url: "https://hackread.com",
+    desc: "Global hacking news — breaches, dark web and cybercrime."
+  }, {
+    name: "The Register Security",
+    cat: "News",
+    flag: "🇬🇧",
+    url: "https://www.theregister.com/security/",
+    desc: "UK tech press security desk — incidents, patches and industry analysis."
   }, {
     name: "SANS ISC",
     cat: "News",
     flag: "🔍",
-    status: "live",
     url: "https://isc.sans.edu",
     desc: "SANS Internet Storm Center — daily threat intelligence and handler diaries."
   }, {
     name: "SecurityWeek",
     cat: "News",
     flag: "📰",
-    status: "live",
     url: "https://www.securityweek.com",
     desc: "Enterprise security news covering vulnerabilities, threats and industry trends."
   }, {
     name: "Krebs on Security",
     cat: "News",
     flag: "📰",
-    status: "live",
     url: "https://krebsonsecurity.com",
     desc: "In-depth security news and investigation by Brian Krebs."
   }, {
     name: "Cisco Talos",
     cat: "News",
     flag: "🛡️",
-    status: "live",
     url: "https://blog.talosintelligence.com",
-    desc: "Cisco Talos threat research — malware, campaigns, and enterprise threats (GCC-relevant vendors)."
+    desc: "Cisco Talos threat research — malware, campaigns, and enterprise threats."
+  }, {
+    name: "Unit 42 (Palo Alto)",
+    cat: "News",
+    flag: "🔬",
+    url: "https://unit42.paloaltonetworks.com",
+    desc: "Palo Alto Networks threat research — APTs, ransomware gangs and cloud threats."
+  }, {
+    name: "Check Point Research",
+    cat: "News",
+    flag: "🔬",
+    url: "https://research.checkpoint.com",
+    desc: "Check Point threat research — malware reverse engineering and campaign tracking."
   }, {
     name: "Dark Reading",
     cat: "News",
     flag: "📰",
-    status: "live",
     url: "https://www.darkreading.com",
     desc: "Enterprise security news — vulnerabilities, cloud, and risk for global SOCs."
+  }, {
+    name: "GBHackers",
+    cat: "News",
+    flag: "📰",
+    url: "https://gbhackers.com",
+    desc: "Daily hacking news — exploits, tools and vulnerability write-ups."
   }, {
     name: "Google Project Zero",
     cat: "News",
     flag: "🔬",
-    status: "live",
     url: "https://googleprojectzero.blogspot.com",
     desc: "Elite vulnerability research — zero-days and exploit analysis."
   }, {
     name: "Malwarebytes Labs",
     cat: "News",
     flag: "📰",
-    status: "live",
     url: "https://www.malwarebytes.com/blog",
     desc: "Malware trends, ransomware families, and threat actor activity."
   }, {
     name: "Help Net Security",
     cat: "News",
     flag: "📰",
-    status: "live",
     url: "https://www.helpnetsecurity.com",
     desc: "Daily cybersecurity news for practitioners and CISOs."
-  }, {
-    name: "Threatpost",
-    cat: "News",
-    flag: "📰",
-    status: "live",
-    url: "https://threatpost.com",
-    desc: "Breaking news on vulnerabilities, breaches, and nation-state activity."
   }, {
     name: "Infosecurity Magazine",
     cat: "News",
     flag: "📰",
-    status: "live",
     url: "https://www.infosecurity-magazine.com",
     desc: "European and global infosec news — regulations, breaches, and defence."
   }, {
-    name: "IBM Security Intelligence",
+    name: "Schneier on Security",
     cat: "News",
-    flag: "🌐",
-    status: "live",
-    url: "https://securityintelligence.com",
-    desc: "IBM X-Force insights — APTs, fraud, and enterprise threat trends."
+    flag: "📰",
+    url: "https://www.schneier.com",
+    desc: "Bruce Schneier — security analysis, cryptography and policy commentary."
   }, {
     name: "Ars Technica Security",
     cat: "News",
     flag: "📰",
-    status: "live",
     url: "https://arstechnica.com/security/",
     desc: "In-depth technical security coverage (filtered from Ars feed)."
-  }, {
-    name: "AlienVault OTX",
-    cat: "News",
-    flag: "🛸",
-    status: "live",
-    url: "https://otx.alienvault.com",
-    desc: "Open Threat Exchange — community-powered threat intelligence and indicators."
   }, {
     name: "Telegram: DarkFeed",
     cat: "News",
     flag: "📡",
-    status: "live",
     url: "https://t.me/secharvester",
     desc: "Public Telegram threat intelligence channel — no login required."
   }, {
     name: "The Hindu Tech",
     cat: "News",
     flag: "🇮🇳",
-    status: "live",
     url: "https://www.thehindu.com/sci-tech/technology/",
     desc: "India's most credible newspaper — cybersecurity filtered feed."
   }, {
     name: "Economic Times IT",
     cat: "News",
     flag: "🇮🇳",
-    status: "live",
     url: "https://economictimes.indiatimes.com/tech",
     desc: "India's leading business newspaper — covers RBI cyber alerts, DPDP Act, MeitY."
-  }, {
-    name: "UAE CERT",
-    cat: "Advisory",
-    flag: "🇦🇪",
-    status: "no_api",
-    url: "https://www.tra.gov.ae",
-    desc: "UAE CERT — no public machine-readable API available."
-  }, {
-    name: "Saudi CERT",
-    cat: "Advisory",
-    flag: "🇸🇦",
-    status: "no_api",
-    url: "https://www.ncsc.gov.sa",
-    desc: "Saudi CERT — no public API. Covered via CISA KEV and NVD."
   }, {
     name: "Awesome AI Security",
     cat: "AI Security",
     flag: "⭐",
-    status: "live",
     url: "https://github.com/restuhaqza/awesome-ai-security",
     desc: "Curated master index — frameworks, LLM tools, papers, benchmarks, and AI incident research."
   }, {
     name: "AI Incident Database",
     cat: "AI Security",
     flag: "📊",
-    status: "live",
     url: "https://incidentdatabase.ai/",
     desc: "Real-world AI system failures and misuse cases for executive briefings."
   }, {
     name: "MITRE ATLAS",
     cat: "AI Security",
     flag: "🎯",
-    status: "live",
     url: "https://atlas.mitre.org/",
     desc: "Adversarial threat landscape for AI — tactics and techniques knowledge base."
   }, {
     name: "NIST AI RMF",
     cat: "AI Security",
     flag: "🇺🇸",
-    status: "live",
     url: "https://www.nist.gov/itl/ai-risk-management-framework",
     desc: "US AI risk management framework for governance and compliance."
   }, {
     name: "OWASP LLM Top 10",
     cat: "AI Security",
     flag: "🔟",
-    status: "live",
     url: "https://owasp.org/www-project-top-10-for-large-language-model-applications/",
     desc: "Top 10 critical risks for LLM applications — also built into GenAI tab."
   }];
+  const healthByName = {};
+  (feedMeta?.source_health || []).forEach(h => {
+    healthByName[h.name] = h;
+  });
   return React.createElement("div", {
     style: {
       minHeight: "100vh",
@@ -2286,6 +2400,8 @@ function BCyberAwareDashboard() {
         @keyframes fadeIn{from{opacity:0}to{opacity:1}}
         @keyframes shimmer{0%{left:-60%}100%{left:120%}}
         @keyframes glow{0%,100%{opacity:.7}50%{opacity:1}}
+        @keyframes tickerScroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+        .ticker-track:hover{animation-play-state:paused}
         button:hover{opacity:.85}
       `), React.createElement("div", {
     style: {
@@ -2406,7 +2522,9 @@ function BCyberAwareDashboard() {
       fontWeight: 600,
       whiteSpace: "nowrap"
     }
-  }, "\u26A1 Force Latest")))), React.createElement("div", {
+  }, "\u26A1 Force Latest")))), React.createElement(BreakingTicker, {
+    items: breaking
+  }), React.createElement("div", {
     style: {
       maxWidth: 1150,
       margin: "0 auto",
@@ -2428,9 +2546,10 @@ function BCyberAwareDashboard() {
     value: allItems.length,
     color: ACCENT
   }), React.createElement(StatCard, {
-    label: "Advisories",
-    value: advisories.length,
-    color: "#00c8ff"
+    label: "Fresh (24h)",
+    value: allItems.filter(a => a.ts && Date.now() - a.ts < 24 * 60 * 60 * 1000).length,
+    color: "#00e5ff",
+    sub: "Last 24 hours"
   }), React.createElement(StatCard, {
     label: "Critical",
     value: counts.CRITICAL,
@@ -2439,7 +2558,7 @@ function BCyberAwareDashboard() {
     label: "Exploits",
     value: exploits.length,
     color: "#ff4444",
-    sub: "Public"
+    sub: "Incl. 0-day pipeline"
   }), React.createElement(StatCard, {
     label: "Security News",
     value: news.length,
@@ -2449,6 +2568,11 @@ function BCyberAwareDashboard() {
     value: [...advisories, ...exploits].filter(a => a.middle_east_relevance === "HIGH").length,
     color: "#00e676",
     sub: "Middle East"
+  }), feedMeta?.sources_live != null && React.createElement(StatCard, {
+    label: "Sources Live",
+    value: `${feedMeta.sources_live}/${feedMeta.sources_total}`,
+    color: "#00e676",
+    sub: "Real telemetry"
   })), loading && React.createElement("div", {
     style: {
       height: 3,
@@ -3137,12 +3261,20 @@ function BCyberAwareDashboard() {
       marginBottom: 8,
       fontFamily: "monospace"
     }
-  }, "INTELLIGENCE SOURCES"), React.createElement("div", {
+  }, "INTELLIGENCE SOURCES \xB7 LIVE TELEMETRY"), React.createElement("div", {
     style: {
       fontSize: 15,
       color: "rgba(200,220,240,.4)"
     }
-  }, "26 live RSS feeds \xB7 AI Security references \xB7 refreshed every 2 hours")), ["Advisory", "Exploit", "News", "AI Security"].map(cat => React.createElement("div", {
+  }, feedMeta?.sources_live != null ? React.createElement(React.Fragment, null, React.createElement("strong", {
+    style: {
+      color: "#00e676"
+    }
+  }, feedMeta.sources_live), " of ", React.createElement("strong", {
+    style: {
+      color: ACCENT
+    }
+  }, feedMeta.sources_total), " feeds responding this cycle \xB7 per-source latency measured on every refresh") : "Live RSS feeds · AI Security references · refreshed every 2 hours")), ["Advisory", "Exploit", "News", "AI Security"].map(cat => React.createElement("div", {
     key: cat,
     style: {
       marginBottom: 28
@@ -3158,77 +3290,110 @@ function BCyberAwareDashboard() {
       borderBottom: "1px solid rgba(255,255,255,.06)",
       paddingBottom: 8
     }
-  }, cat === "Advisory" ? "🏛️" : cat === "Exploit" ? "⚡" : cat === "AI Security" ? "🤖" : "📰", " ", cat.toUpperCase(), " SOURCES"), SOURCES_DATA.filter(s => s.cat === cat).map(src => React.createElement("div", {
-    key: src.name,
-    style: {
-      background: "rgba(255,255,255,.025)",
-      border: "1px solid rgba(255,255,255,.07)",
-      borderRadius: 6,
-      padding: "16px 18px",
-      marginBottom: 10
-    }
-  }, React.createElement("div", {
-    style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "flex-start",
-      gap: 14
-    }
-  }, React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }, React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 10,
-      alignItems: "center",
-      marginBottom: 7
-    }
-  }, React.createElement("span", {
-    style: {
-      fontSize: 20
-    }
-  }, src.flag), React.createElement("span", {
-    style: {
-      fontSize: 15,
-      fontWeight: 700,
-      color: "#ddeeff"
-    }
-  }, src.name), React.createElement("span", {
-    style: {
-      fontSize: 11,
-      padding: "3px 10px",
-      letterSpacing: 1,
-      fontFamily: "monospace",
-      borderRadius: 3,
-      background: src.status === "live" ? "rgba(0,150,70,.12)" : "rgba(200,170,0,.1)",
-      border: `1px solid ${src.status === "live" ? "#008c46" : "#c8a000"}`,
-      color: src.status === "live" ? "#00e676" : "#ffd700",
-      fontWeight: 700
-    }
-  }, src.status === "live" ? "● LIVE" : "◌ NO API")), React.createElement("div", {
-    style: {
-      fontSize: 13,
-      color: "rgba(200,220,240,.5)",
-      lineHeight: 1.75
-    }
-  }, src.desc)), React.createElement("a", {
-    href: src.url,
-    target: "_blank",
-    rel: "noopener noreferrer",
-    style: {
-      fontSize: 13,
-      color: ACCENT,
-      fontFamily: "monospace",
-      border: `1px solid rgba(0,200,255,.25)`,
-      padding: "7px 14px",
-      borderRadius: 4,
-      whiteSpace: "nowrap",
-      flexShrink: 0,
-      fontWeight: 600
-    }
-  }, "VISIT \u2197"))))))), view === "demo" && React.createElement("div", {
+  }, cat === "Advisory" ? "🏛️" : cat === "Exploit" ? "⚡" : cat === "AI Security" ? "🤖" : "📰", " ", cat.toUpperCase(), " SOURCES"), SOURCES_DATA.filter(s => s.cat === cat).map(src => {
+    const h = healthByName[src.name];
+    const isRef = src.cat === "AI Security";
+    const status = isRef ? "ref" : h ? h.ok ? "live" : "down" : "unknown";
+    const badge = status === "live" ? {
+      bg: "rgba(0,150,70,.12)",
+      border: "#008c46",
+      color: "#00e676",
+      label: "● LIVE"
+    } : status === "down" ? {
+      bg: "rgba(200,0,0,.12)",
+      border: "#c00000",
+      color: "#ff4444",
+      label: "● DOWN"
+    } : status === "ref" ? {
+      bg: "rgba(123,47,247,.1)",
+      border: "#7b2ff7",
+      color: "#c084fc",
+      label: "◆ REFERENCE"
+    } : {
+      bg: "rgba(200,170,0,.1)",
+      border: "#c8a000",
+      color: "#ffd700",
+      label: "◌ PENDING"
+    };
+    return React.createElement("div", {
+      key: src.name,
+      style: {
+        background: "rgba(255,255,255,.025)",
+        border: `1px solid ${status === "down" ? "rgba(200,0,0,.2)" : "rgba(255,255,255,.07)"}`,
+        borderRadius: 6,
+        padding: "16px 18px",
+        marginBottom: 10
+      }
+    }, React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        gap: 14
+      }
+    }, React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 10,
+        alignItems: "center",
+        marginBottom: 7,
+        flexWrap: "wrap"
+      }
+    }, React.createElement("span", {
+      style: {
+        fontSize: 20
+      }
+    }, src.flag), React.createElement("span", {
+      style: {
+        fontSize: 15,
+        fontWeight: 700,
+        color: "#ddeeff"
+      }
+    }, src.name), React.createElement("span", {
+      style: {
+        fontSize: 11,
+        padding: "3px 10px",
+        letterSpacing: 1,
+        fontFamily: "monospace",
+        borderRadius: 3,
+        background: badge.bg,
+        border: `1px solid ${badge.border}`,
+        color: badge.color,
+        fontWeight: 700
+      }
+    }, badge.label), h && h.ok && React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: "rgba(200,220,240,.35)",
+        fontFamily: "monospace"
+      }
+    }, h.items, " items \xB7 ", h.ms, "ms")), React.createElement("div", {
+      style: {
+        fontSize: 13,
+        color: "rgba(200,220,240,.5)",
+        lineHeight: 1.75
+      }
+    }, src.desc)), React.createElement("a", {
+      href: src.url,
+      target: "_blank",
+      rel: "noopener noreferrer",
+      style: {
+        fontSize: 13,
+        color: ACCENT,
+        fontFamily: "monospace",
+        border: `1px solid rgba(0,200,255,.25)`,
+        padding: "7px 14px",
+        borderRadius: 4,
+        whiteSpace: "nowrap",
+        flexShrink: 0,
+        fontWeight: 600
+      }
+    }, "VISIT \u2197")));
+  })))), view === "demo" && React.createElement("div", {
     style: {
       maxWidth: 820,
       margin: "0 auto",
@@ -3418,7 +3583,7 @@ function BCyberAwareDashboard() {
       fontFamily: "monospace",
       fontWeight: 700
     }
-  }, "PLATFORM CAPABILITIES"), ["26 live intelligence sources — advisories, exploits, security news", "GenAI tab — OWASP LLM Top 10, Standards & Tools (Awesome AI Security)", "CISO Brief — AI governance links (NIST AI RMF, MITRE ATLAS, AI Incident Database)", "CISA KEV · Microsoft MSRC · NVD · CERT-In · NCSC UK", "Cisco Talos · Dark Reading · Project Zero · Threatpost · IBM Security Intelligence", "Exploit-DB + Packet Storm — public proof-of-concept exploits", "GCC / Middle East relevance scoring per advisory", "Global threat heatmap — country-level risk visualisation", "Source verification link on every advisory card", "Auto-refresh every 2 hours — always current"].map((f, i) => React.createElement("div", {
+  }, "PLATFORM CAPABILITIES"), ["30+ live intelligence sources with real-time health telemetry", "🔴 Breaking-news ticker — incident-grade stories from the last 48 hours", "ZDI 0-Day Pipeline — vulnerabilities awaiting vendor disclosure", "GenAI tab — OWASP LLM Top 10, Standards & Tools (Awesome AI Security)", "CISO Brief — AI governance links (NIST AI RMF, MITRE ATLAS, AI Incident Database)", "CISA KEV · NVD · CERT-In · NCSC UK · CERT-EU · Microsoft Security", "The Record · Unit 42 · Check Point Research · Talos · Project Zero · Krebs", "GCC / Middle East relevance scoring per advisory", "Global threat heatmap — country-level risk visualisation", "Source verification link on every advisory card · auto-refresh every 2 hours"].map((f, i) => React.createElement("div", {
     key: i,
     style: {
       fontSize: 14,
@@ -3463,6 +3628,6 @@ function BCyberAwareDashboard() {
       letterSpacing: 1,
       marginBottom: 10
     }
-  }, "BCyberAware \xB7 Vikas Pandita \xB7 ", new Date().getFullYear(), " \xB7 MIT Licence \xB7 26 live sources \xB7 CISA \xB7 MSRC \xB7 NVD \xB7 Talos \xB7 Dark Reading \xB7 Project Zero \xB7 Threatpost \xB7 IBM Security Intelligence \xB7 +16 more")));
+  }, "BCyberAware \xB7 Vikas Pandita \xB7 ", new Date().getFullYear(), " \xB7 MIT Licence \xB7 30+ live sources \xB7 CISA \xB7 NVD \xB7 ZDI \xB7 The Record \xB7 Unit 42 \xB7 Check Point \xB7 Talos \xB7 Project Zero \xB7 Krebs \xB7 +20 more")));
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(BCyberAwareDashboard, null));
