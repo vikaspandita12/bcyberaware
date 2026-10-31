@@ -37,9 +37,15 @@ const SOURCES = [
   { key: "cisa_kev",     name: "CISA KEV",               flag: "🇺🇸", cat: "advisory", fn: fetchCISAKEV },
   { key: "cisa_alerts",  name: "CISA Alerts",            flag: "🇺🇸", cat: "advisory", fn: fetchCISAAlerts },
   { key: "nvd",          name: "NVD / CVE.org",          flag: "🌐", cat: "advisory", fn: fetchNVDCritical },
-  { key: "certin",       name: "CERT-In (India)",        flag: "🇮🇳", cat: "advisory", fn: () => rss("https://www.cert-in.org.in/RSS/CertIn_Security_Advisories.xml", { id_prefix: "CERTIN", source: "CERT-In (India)", source_url: "https://www.cert-in.org.in", source_color: "#ff6b00", source_flag: "🇮🇳", category: "advisory", default_sev: "HIGH", patch_avail: true, limit: 15, countries: ["IN"] }) },
+  { key: "ghsa",         name: "GitHub Advisory (GHSA)", flag: "🐙", cat: "advisory", fn: fetchGitHubAdvisories },
+  { key: "certin",       name: "CERT-In (India)",        flag: "🇮🇳", cat: "advisory", fn: fetchCERTIn },
   { key: "ncsc_uk",      name: "NCSC UK",                flag: "🇬🇧", cat: "advisory", fn: () => rss("https://www.ncsc.gov.uk/api/1/services/v1/news-rss-feed.xml", { id_prefix: "NCSC-UK", source: "NCSC UK", source_url: "https://www.ncsc.gov.uk", source_color: "#003078", source_flag: "🇬🇧", category: "advisory", default_sev: "HIGH", patch_avail: true, limit: 12, countries: ["GB"] }) },
   { key: "cert_eu",      name: "CERT-EU",                flag: "🇪🇺", cat: "advisory", fn: () => rss("https://cert.europa.eu/publications/security-advisories-rss", { id_prefix: "CERTEU", source: "CERT-EU", source_url: "https://cert.europa.eu", source_color: "#003399", source_flag: "🇪🇺", category: "advisory", default_sev: "HIGH", patch_avail: true, limit: 12, countries: ["DE", "FR", "NL", "IT", "ES"] }) },
+  { key: "jpcert",       name: "JPCERT/CC (Japan)",      flag: "🇯🇵", cat: "advisory", fn: () => rss("https://www.jpcert.or.jp/english/rss/jpcert-en.rdf", { id_prefix: "JPCERT", source: "JPCERT/CC", source_url: "https://www.jpcert.or.jp/english/", source_color: "#bc002d", source_flag: "🇯🇵", category: "advisory", default_sev: "HIGH", patch_avail: true, limit: 10, countries: ["JP", "SG", "KR"] }) },
+  { key: "cis_adv",      name: "CIS Security Advisories",flag: "🛡️", cat: "advisory", fn: () => rss("https://www.cisecurity.org/feed/advisories", { id_prefix: "CIS", source: "CIS Advisories", source_url: "https://www.cisecurity.org/advisory", source_color: "#005a9c", source_flag: "🛡️", category: "advisory", default_sev: "HIGH", patch_avail: true, limit: 12, countries: ["US", "CA", "GB", "AE"] }) },
+  { key: "cisco_psirt",  name: "Cisco PSIRT",            flag: "🛡️", cat: "advisory", fn: () => rss("https://sec.cloudapps.cisco.com/security/center/psirtrss20/CiscoSecurityAdvisory.xml", { id_prefix: "CISCO", source: "Cisco PSIRT", source_url: "https://sec.cloudapps.cisco.com/security/center/publicationListing.x", source_color: "#049fd9", source_flag: "🛡️", category: "advisory", default_sev: "HIGH", patch_avail: true, limit: 12, countries: ["US", "GB", "DE", "AE", "SA", "IN"] }) },
+  { key: "pan_psirt",    name: "Palo Alto PSIRT",        flag: "🔥", cat: "advisory", fn: () => rss("https://security.paloaltonetworks.com/rss.xml", { id_prefix: "PANSA", source: "Palo Alto PSIRT", source_url: "https://security.paloaltonetworks.com", source_color: "#fa582d", source_flag: "🔥", category: "advisory", default_sev: "HIGH", patch_avail: true, limit: 12, countries: ["US", "GB", "AE", "SA", "IN"] }) },
+  { key: "forti_psirt",  name: "FortiGuard PSIRT",       flag: "🧱", cat: "advisory", fn: () => rss("https://www.fortiguard.com/rss/ir.xml", { id_prefix: "FGIR", source: "FortiGuard PSIRT", source_url: "https://www.fortiguard.com/psirt", source_color: "#ee3124", source_flag: "🧱", category: "advisory", default_sev: "HIGH", patch_avail: true, limit: 12, countries: ["US", "GB", "DE", "AE", "SA", "IN"] }) },
   { key: "ms_security",  name: "Microsoft Security",     flag: "🇺🇸", cat: "advisory", fn: () => rss("https://www.microsoft.com/en-us/security/blog/feed/", { id_prefix: "MSSEC", source: "Microsoft Security", source_url: "https://www.microsoft.com/en-us/security/blog/", source_color: "#0078d4", source_flag: "🇺🇸", category: "advisory", default_sev: "HIGH", patch_avail: true, limit: 10, countries: ["US", "GB", "DE", "AE", "SA", "IN"] }) },
 
   { key: "exploitdb",    name: "Exploit-DB",             flag: "⚡", cat: "exploit", fn: () => rss("https://www.exploit-db.com/rss.xml", { id_prefix: "EDBID", source: "Exploit-DB", source_url: "https://www.exploit-db.com", source_color: "#cc0000", source_flag: "⚡", category: "exploit", default_sev: "HIGH", exploit_wild: true, limit: 20, countries: ["US", "RU", "CN"] }) },
@@ -58,6 +64,10 @@ const SOURCES = [
   { key: "talos",        name: "Cisco Talos",            flag: "🛡️", cat: "news", fn: () => rss("https://blog.talosintelligence.com/rss/", { id_prefix: "TALOS", source: "Cisco Talos", source_url: "https://blog.talosintelligence.com", source_color: "#049fd9", source_flag: "🛡️", category: "news", default_sev: "HIGH", limit: 12, countries: ["US", "GB", "DE", "AE", "SA"] }) },
   { key: "unit42",       name: "Unit 42 (Palo Alto)",    flag: "🔬", cat: "news", fn: () => rss("https://unit42.paloaltonetworks.com/feed/", { id_prefix: "UNIT42", source: "Unit 42", source_url: "https://unit42.paloaltonetworks.com", source_color: "#fa582d", source_flag: "🔬", category: "news", default_sev: "HIGH", limit: 10, countries: ["US", "GB", "AE", "SA"] }) },
   { key: "checkpoint",   name: "Check Point Research",   flag: "🔬", cat: "news", fn: () => rss("https://research.checkpoint.com/feed/", { id_prefix: "CPR", source: "Check Point Research", source_url: "https://research.checkpoint.com", source_color: "#e8308a", source_flag: "🔬", category: "news", default_sev: "HIGH", limit: 10, countries: ["US", "IL", "GB", "AE"] }) },
+  { key: "crowdstrike",  name: "CrowdStrike Threat Intel",flag: "🦅", cat: "news", fn: () => rss("https://www.crowdstrike.com/en-us/blog/feed", { id_prefix: "CRWD", source: "CrowdStrike", source_url: "https://www.crowdstrike.com/en-us/blog/", source_color: "#e01f27", source_flag: "🦅", category: "news", default_sev: "HIGH", limit: 10, countries: ["US", "GB", "DE", "AE", "IN"] }) },
+  { key: "mandiant",     name: "Mandiant (Google Cloud)",flag: "🔥", cat: "news", fn: () => rss("https://cloudblog.withgoogle.com/topics/threat-intelligence/rss/", { id_prefix: "MNDT", source: "Mandiant", source_url: "https://cloud.google.com/blog/topics/threat-intelligence", source_color: "#ea4335", source_flag: "🔥", category: "news", default_sev: "HIGH", limit: 10, countries: ["US", "CN", "RU", "IR", "KP"] }) },
+  { key: "sophos",       name: "Sophos X-Ops",           flag: "🛡️", cat: "news", fn: () => rss("https://news.sophos.com/en-us/category/threat-research/feed/", { id_prefix: "SOPHOS", source: "Sophos X-Ops", source_url: "https://news.sophos.com/en-us/category/threat-research/", source_color: "#005bc8", source_flag: "🛡️", category: "news", default_sev: "HIGH", limit: 10, countries: ["US", "GB", "IN", "AE"] }) },
+  { key: "rapid7",       name: "Rapid7 Emergent Threats",flag: "🚀", cat: "news", fn: () => rss("https://blog.rapid7.com/rss/", { id_prefix: "R7", source: "Rapid7", source_url: "https://www.rapid7.com/blog/", source_color: "#e85d00", source_flag: "🚀", category: "news", default_sev: "HIGH", limit: 10, countries: ["US", "GB", "DE"] }) },
   { key: "darkreading",  name: "Dark Reading",           flag: "📰", cat: "news", fn: () => rss("https://www.darkreading.com/rss.xml", { id_prefix: "DARKRD", source: "Dark Reading", source_url: "https://www.darkreading.com", source_color: "#c62828", source_flag: "📰", category: "news", default_sev: "HIGH", limit: 12, countries: ["US", "GB", "DE"] }) },
   { key: "gbhackers",    name: "GBHackers",              flag: "📰", cat: "news", fn: () => rss("https://gbhackers.com/feed/", { id_prefix: "GBH", source: "GBHackers", source_url: "https://gbhackers.com", source_color: "#1b5e20", source_flag: "📰", category: "news", default_sev: "MEDIUM", limit: 10, countries: ["US", "IN"] }) },
   { key: "p0",           name: "Google Project Zero",    flag: "🔬", cat: "news", fn: () => rss("https://googleprojectzero.blogspot.com/feeds/posts/default", { id_prefix: "P0", source: "Google Project Zero", source_url: "https://googleprojectzero.blogspot.com", source_color: "#4285f4", source_flag: "🔬", category: "news", default_sev: "HIGH", exploit_wild: true, limit: 8, countries: ["US", "GB"] }) },
@@ -145,10 +155,13 @@ export async function handleFeedRequest(request, env) {
       return dedup(arr);
     };
 
-    const advisories = sortAndDedup(byCat.advisory).slice(0, 60);
-    const exploits   = sortAndDedup(byCat.exploit).slice(0, 30);
-    const news       = sortAndDedup(byCat.news).slice(0, 90);
+    const advisories = sortAndDedup(byCat.advisory).slice(0, 80);
+    const exploits   = sortAndDedup(byCat.exploit).slice(0, 40);
+    const news       = sortAndDedup(byCat.news).slice(0, 110);
     const social     = sortAndDedup(byCat.social).slice(0, 60);
+
+    // Enrich all CVE-bearing items with FIRST.org EPSS (Exploit Prediction Scoring System)
+    await enrichWithEPSS([...advisories, ...exploits, ...news, ...social]);
 
     const payload = {
       advisories, exploits, news, social,
@@ -260,9 +273,111 @@ async function fetchNVDCritical() {
     const desc = (cve.descriptions || []).find(d => d.lang === "en")?.value || "";
     if (!desc || desc.includes("** RESERVED **")) return [];
     const sev = cve.metrics?.cvssMetricV31?.[0]?.cvssData?.baseSeverity || cve.metrics?.cvssMetricV30?.[0]?.cvssData?.baseSeverity || "CRITICAL";
+    const cvss = cve.metrics?.cvssMetricV31?.[0]?.cvssData?.baseScore || cve.metrics?.cvssMetricV30?.[0]?.cvssData?.baseScore || 9.8;
     const products = [...new Set((cve.configurations || []).flatMap(c => (c.nodes || []).flatMap(n => (n.cpeMatch || []).map(cpe => { const p = (cpe.criteria || "").split(":"); const v = (p[3] || "").replace(/_/g, " "); const pr = (p[4] || "").replace(/_/g, " "); return v && v !== "*" && pr && pr !== "*" ? `${v} ${pr}` : null }).filter(Boolean))))].slice(0, 4);
-    return [{ id: "NVD-" + cve.id, title: desc.length > 100 ? desc.slice(0, 97) + "…" : desc, severity: sev, category: "advisory", date: fmtDate(cve.published), ts: new Date(cve.published).getTime(), source: "NVD / CVE.org", source_url: `https://nvd.nist.gov/vuln/detail/${cve.id}`, source_color: "#8b0000", source_flag: "🌐", cve_ids: [cve.id], affected_products: products.length ? products : ["Multiple Products"], summary: desc, threat_actor: null, countries: ["US", "GB", "DE", "CN", "RU"], middle_east_relevance: getMERelevance(products, desc, ""), patch_available: (cve.references || []).length > 0, exploit_in_wild: false }];
+    return [{ id: "NVD-" + cve.id, title: desc.length > 100 ? desc.slice(0, 97) + "…" : desc, severity: sev, cvss, category: "advisory", date: fmtDate(cve.published), ts: new Date(cve.published).getTime(), source: "NVD / CVE.org", source_url: `https://nvd.nist.gov/vuln/detail/${cve.id}`, source_color: "#8b0000", source_flag: "🌐", cve_ids: [cve.id], affected_products: products.length ? products : ["Multiple Products"], summary: desc, threat_actor: null, countries: ["US", "GB", "DE", "CN", "RU"], middle_east_relevance: getMERelevance(products, desc, ""), patch_available: (cve.references || []).length > 0, exploit_in_wild: false }];
   });
+}
+
+// ── 4. GitHub Security Advisories (GHSA — reviewed critical/high CVEs) ────────
+async function fetchGitHubAdvisories() {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort("timeout"), FETCH_TIMEOUT_MS);
+  try {
+    const r = await fetch("https://api.github.com/advisories?per_page=20&severity=critical", {
+      headers: { ...UA, "Accept": "application/vnd.github+json" },
+      signal: ctrl.signal,
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    return (Array.isArray(data) ? data : []).flatMap(a => {
+      if (a.withdrawn_at) return [];
+      const title = (a.summary || "").trim();
+      if (!title) return [];
+      const desc = decodeEntities(String(a.description || title).replace(/<[^>]+>/g, " ").replace(/[#*`>_~]/g, "").replace(/\s{2,}/g, " ").trim());
+      const cves = [a.cve_id, ...(a.identifiers || []).filter(i => i.type === "CVE").map(i => i.value)].filter(Boolean);
+      const uniqCves = [...new Set(cves)].slice(0, 4);
+      const pkgs = [...new Set((a.vulnerabilities || []).map(v => v.package?.name ? `${v.package.ecosystem || ""} ${v.package.name}`.trim() : null).filter(Boolean))].slice(0, 4);
+      const patched = (a.vulnerabilities || []).some(v => v.first_patched_version);
+      const ts = new Date(a.published_at || Date.now()).getTime();
+      const cvss = a.cvss?.score || 9.0;
+      return [{
+        id: "GHSA-" + a.ghsa_id,
+        title: title.length > 125 ? title.slice(0, 122) + "…" : title,
+        severity: (a.severity || "CRITICAL").toUpperCase(),
+        cvss,
+        category: "advisory",
+        date: fmtDate(new Date(ts).toISOString()),
+        ts,
+        source: "GitHub Advisory (GHSA)",
+        source_url: a.html_url || `https://github.com/advisories/${a.ghsa_id}`,
+        source_color: "#8b5cf6",
+        source_flag: "🐙",
+        cve_ids: uniqCves,
+        affected_products: pkgs.length ? pkgs : ["Open Source / Enterprise Package"],
+        summary: desc.length > 320 ? desc.slice(0, 317) + "…" : desc,
+        threat_actor: null,
+        countries: ["US", "GB", "DE", "IN"],
+        middle_east_relevance: getMERelevance(pkgs, title, desc),
+        patch_available: patched,
+        exploit_in_wild: /exploit in the wild|actively exploited|ransomware/i.test(desc),
+      }];
+    });
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+// ── 5. CERT-In (India) — official RSS with syndication fallback when WAF-blocked
+async function fetchCERTIn() {
+  try {
+    const direct = await rss("https://www.cert-in.org.in/RSS/CertIn_Security_Advisories.xml", { id_prefix: "CERTIN", source: "CERT-In (India)", source_url: "https://www.cert-in.org.in", source_color: "#ff6b00", source_flag: "🇮🇳", category: "advisory", default_sev: "HIGH", patch_avail: true, limit: 15, countries: ["IN"] });
+    if (direct && direct.length > 0) return direct;
+  } catch {}
+  const items = await rss("https://news.google.com/rss/search?q=%22CERT-In%22+advisory+OR+vulnerability+OR+warning+OR+alert&hl=en-IN&gl=IN&ceid=IN:en", {
+    id_prefix: "CERTIN",
+    source: "CERT-In (India)",
+    source_url: "https://www.cert-in.org.in",
+    source_color: "#ff6b00",
+    source_flag: "🇮🇳",
+    category: "advisory",
+    default_sev: "HIGH",
+    patch_avail: true,
+    limit: 12,
+    countries: ["IN", "AE"],
+  });
+  return items.filter(a => /cert-in|indian computer emergency/i.test(a.title + " " + a.summary));
+}
+
+// ── FIRST.org EPSS batch enrichment (30-day exploitation probability) ─────────
+async function enrichWithEPSS(items) {
+  try {
+    const cves = [...new Set(items.flatMap(a => a.cve_ids || []).filter(c => /^CVE-\d{4}-\d{4,7}$/.test(c)))].slice(0, 90);
+    if (!cves.length) return;
+    const r = await fetchWithTimeout(`https://api.first.org/data/v1/epss?cve=${cves.join(",")}`, 5500);
+    if (!r.ok) return;
+    const data = await r.json();
+    const map = {};
+    (data.data || []).forEach(row => {
+      if (row.cve && row.epss != null) {
+        map[row.cve] = {
+          epss: Math.round(parseFloat(row.epss) * 1000) / 10, // percentage 0.0 - 100.0
+          percentile: Math.round(parseFloat(row.percentile || 0) * 100),
+        };
+      }
+    });
+    items.forEach(item => {
+      if (!item.cve_ids?.length) return;
+      let best = null;
+      for (const c of item.cve_ids) {
+        if (map[c] && (!best || map[c].epss > best.epss)) best = { cve: c, ...map[c] };
+      }
+      if (best) {
+        item.epss = best.epss;
+        item.epss_percentile = best.percentile;
+      }
+    });
+  } catch {}
 }
 
 // ── Telegram (HTML scrape) ────────────────────────────────────────────────────
@@ -325,17 +440,40 @@ async function fetchInfosecExchange() {
     .map(({ p, text }) => socialItem({ id: "IEX-" + p.id, text, url: p.url, author: "@" + p.account.acct, ts: new Date(p.created_at).getTime(), source: "infosec.exchange", source_color: "#6364ff", source_flag: "🐘", countries: ["US", "GB", "DE"] }));
 }
 
-// Bluesky — public AppView API, no auth
+// Bluesky — public AppView API (getAuthorFeed across verified security feeds, no auth required)
 async function fetchBluesky() {
-  const r = await fetchWithTimeout("https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts?q=cybersecurity&sort=latest&limit=25");
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  const data = await r.json();
-  return (data.posts || [])
-    .filter(p => p.record?.text && p.record.text.length >= 40 && !p.record.reply)
+  const actors = [
+    "bleepingcomputer.com",
+    "malwrhunterteam.bsky.social",
+    "troyhunt.com",
+    "schneier.com",
+    "infosec.skyfleet.blue",
+  ];
+  const settled = await Promise.allSettled(
+    actors.map(actor =>
+      fetchWithTimeout(`https://public.api.bsky.app/xrpc/app.bsky.feed.getAuthorFeed?actor=${encodeURIComponent(actor)}&limit=5&filter=posts_no_replies`, 6500)
+        .then(r => (r.ok ? r.json() : { feed: [] }))
+    )
+  );
+  const posts = settled.flatMap(s => (s.status === "fulfilled" ? (s.value.feed || []).map(f => f.post).filter(Boolean) : []));
+  if (!posts.length) throw new Error("No Bluesky posts fetched");
+  return posts
+    .filter(p => p.record?.text && p.record.text.length >= 35 && !p.record.reply && isSecurityText(p.record.text))
+    .sort((a, b) => new Date(b.indexedAt || b.record?.createdAt || 0) - new Date(a.indexedAt || a.record?.createdAt || 0))
     .slice(0, 15)
     .map(p => {
       const rkey = (p.uri || "").split("/").pop();
-      return socialItem({ id: "BSKY-" + rkey, text: p.record.text, url: `https://bsky.app/profile/${p.author.handle}/post/${rkey}`, author: "@" + p.author.handle, ts: new Date(p.indexedAt || p.record.createdAt).getTime(), source: "Bluesky", source_color: "#0085ff", source_flag: "🦋", countries: ["US"] });
+      return socialItem({
+        id: "BSKY-" + rkey,
+        text: p.record.text,
+        url: `https://bsky.app/profile/${p.author.handle}/post/${rkey}`,
+        author: "@" + p.author.handle,
+        ts: new Date(p.indexedAt || p.record.createdAt).getTime(),
+        source: "Bluesky",
+        source_color: "#0085ff",
+        source_flag: "🦋",
+        countries: ["US", "GB"],
+      });
     });
 }
 

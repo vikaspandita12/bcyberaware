@@ -197,14 +197,99 @@ function StatCard({
     }
   }, sub));
 }
+function mapMitreTactics(adv) {
+  const txt = `${adv.title || ""} ${adv.summary || ""} ${(adv.affected_products || []).join(" ")}`.toLowerCase();
+  const out = [];
+  if (/\brce\b|remote code|command injection|deseriali|arbitrary code|execute code|buffer overflow|sql injection|\bsqli\b/.test(txt)) out.push({
+    id: "T1190",
+    tactic: "Initial Access",
+    name: "Exploit Public-Facing App",
+    color: "#ff5252"
+  });
+  if (/phish|spearphish|lure|social engineering|credential harvest|malicious attachment/.test(txt)) out.push({
+    id: "T1566",
+    tactic: "Initial Access",
+    name: "Phishing",
+    color: "#ff7043"
+  });
+  if (/privilege escalation|local privilege|\blpe\b|root access|admin access|elevation of privilege|bypass auth|authentication bypass/.test(txt)) out.push({
+    id: "T1068",
+    tactic: "Privilege Escalation",
+    name: "Exploitation for PrivEsc",
+    color: "#ffa726"
+  });
+  if (/ransomware|encrypt|extortion|wiper|locker|shadow copy/.test(txt)) out.push({
+    id: "T1486",
+    tactic: "Impact",
+    name: "Data Encrypted for Impact",
+    color: "#ff1744"
+  });
+  if (/credential|password|token|session hijack|cookie|kerberos|ntlm|active directory|lsass|infostealer|stealer/.test(txt)) out.push({
+    id: "T1555",
+    tactic: "Credential Access",
+    name: "Credential Dumping / Theft",
+    color: "#ab47bc"
+  });
+  if (/supply[- ]chain|npm|pypi|extension|plugin|package|backdoor|trojan|loader/.test(txt)) out.push({
+    id: "T1195",
+    tactic: "Initial Access",
+    name: "Supply Chain Compromise",
+    color: "#ec407a"
+  });
+  if (/exfiltrat|data leak|stolen|breach|exposed database|s3 bucket/.test(txt)) out.push({
+    id: "T1041",
+    tactic: "Exfiltration",
+    name: "Exfiltration Over C2 / Web",
+    color: "#26c6da"
+  });
+  if (/ddos|denial of service|\bdos\b|botnet/.test(txt)) out.push({
+    id: "T1498",
+    tactic: "Impact",
+    name: "Network Denial of Service",
+    color: "#ffca28"
+  });
+  return out.slice(0, 2);
+}
+function computeDefcon(advisories, exploits) {
+  const all = [...advisories, ...exploits];
+  const wild24 = all.filter(a => a.exploit_in_wild && a.ts && Date.now() - a.ts < 48 * 3600 * 1000).length;
+  const critCount = advisories.filter(a => a.severity === "CRITICAL").length;
+  const hiEpss = all.filter(a => (a.epss || 0) >= 50).length;
+  if (wild24 >= 8 || critCount >= 35 || hiEpss >= 8) return {
+    level: 2,
+    label: "DEFCON 2 · SEVERE",
+    color: "#ff1744",
+    bg: "rgba(255,23,68,0.14)",
+    desc: "High volume of active 0-day / KEV exploitation in last 48h"
+  };
+  if (wild24 >= 3 || critCount >= 15 || hiEpss >= 3) return {
+    level: 3,
+    label: "DEFCON 3 · ELEVATED",
+    color: "#ff9100",
+    bg: "rgba(255,145,0,0.13)",
+    desc: "Active exploitation & critical advisories require priority patching"
+  };
+  return {
+    level: 4,
+    label: "DEFCON 4 · GUARDED",
+    color: "#00e676",
+    bg: "rgba(0,230,118,0.12)",
+    desc: "Baseline global threat activity — standard patch cadence"
+  };
+}
 function AdvisoryCard({
-  adv
+  adv,
+  onAskAI,
+  onToggleWatch,
+  isWatched
 }) {
   const s = SEV_S[adv.severity] || SEV_S.LOW;
   const isNews = adv.category === "news";
   const isExploit = adv.category === "exploit";
   const borderCol = isNews ? "#1976d2" : isExploit ? "#c00000" : s.border;
   const isFresh = adv.ts && Date.now() - adv.ts < 24 * 60 * 60 * 1000;
+  const mitre = mapMitreTactics(adv);
+  const epssColor = (adv.epss || 0) >= 50 ? "#ff1744" : (adv.epss || 0) >= 15 ? "#ff9100" : "#00e5ff";
   return React.createElement("div", {
     className: "card",
     style: {
@@ -226,7 +311,31 @@ function AdvisoryCard({
     }
   }, !isNews && React.createElement(SevBadge, {
     sev: adv.severity
-  }), isNews && React.createElement("span", {
+  }), adv.cvss && React.createElement("span", {
+    style: {
+      fontSize: 11,
+      padding: "4px 9px",
+      background: "rgba(255,255,255,0.05)",
+      border: "1px solid rgba(255,255,255,0.15)",
+      color: "#eef4ff",
+      fontFamily: "var(--mono)",
+      borderRadius: 3,
+      fontWeight: 700
+    }
+  }, "CVSS ", adv.cvss), adv.epss != null && React.createElement("span", {
+    title: `FIRST.org EPSS: ${adv.epss}% probability of exploitation in the next 30 days (${adv.epss_percentile || 0}th percentile)`,
+    style: {
+      fontSize: 11,
+      padding: "4px 10px",
+      background: `${epssColor}18`,
+      border: `1px solid ${epssColor}66`,
+      color: epssColor,
+      letterSpacing: .8,
+      fontFamily: "var(--mono)",
+      borderRadius: 3,
+      fontWeight: 800
+    }
+  }, "\uD83C\uDFAF EPSS ", adv.epss, "%", adv.epss_percentile >= 90 ? ` (P${adv.epss_percentile})` : ""), isNews && React.createElement("span", {
     style: {
       fontSize: 12,
       padding: "4px 12px",
@@ -287,7 +396,22 @@ function AdvisoryCard({
       fontSize: 12,
       color: "rgba(200,220,240,0.4)"
     }
-  }, adv.source_flag, " ", adv.source, " \xB7 ", adv.ts ? timeAgo(adv.ts) : adv.date)), React.createElement("div", {
+  }, adv.source_flag, " ", adv.source, " \xB7 ", adv.ts ? timeAgo(adv.ts) : adv.date), onToggleWatch && React.createElement("button", {
+    onClick: () => onToggleWatch(adv),
+    title: isWatched ? "Remove from Watchlist" : "Save to Watchlist",
+    style: {
+      marginLeft: "auto",
+      background: isWatched ? "rgba(255,215,0,0.15)" : "rgba(255,255,255,0.03)",
+      border: `1px solid ${isWatched ? "#ffd700" : "rgba(255,255,255,0.12)"}`,
+      color: isWatched ? "#ffd700" : "rgba(200,220,240,0.45)",
+      padding: "3px 10px",
+      borderRadius: 4,
+      cursor: "pointer",
+      fontSize: 12,
+      fontFamily: "var(--mono)",
+      fontWeight: 700
+    }
+  }, isWatched ? "★ SAVED" : "☆ SAVE")), React.createElement("div", {
     style: {
       fontSize: 17,
       fontWeight: 700,
@@ -323,7 +447,34 @@ function AdvisoryCard({
       border: `1px solid rgba(0,200,255,0.22)`,
       borderRadius: 3
     }
-  }, c, " \u2197")), adv.threat_actor && React.createElement("span", {
+  }, c, " \u2197")), adv.affected_products?.slice(0, 3).map(p => React.createElement("span", {
+    key: p,
+    style: {
+      fontSize: 11,
+      color: "rgba(200,220,240,0.7)",
+      fontFamily: "var(--mono)",
+      background: "rgba(255,255,255,0.04)",
+      padding: "4px 10px",
+      border: "1px solid rgba(255,255,255,0.1)",
+      borderRadius: 3
+    }
+  }, "\uD83D\uDCE6 ", p)), mitre.map(m => React.createElement("a", {
+    key: m.id,
+    href: `https://attack.mitre.org/techniques/${m.id}/`,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    title: `MITRE ATT&CK ${m.tactic}: ${m.name}`,
+    style: {
+      fontSize: 11,
+      color: m.color,
+      fontFamily: "var(--mono)",
+      background: `${m.color}14`,
+      padding: "4px 10px",
+      border: `1px solid ${m.color}44`,
+      borderRadius: 3,
+      fontWeight: 600
+    }
+  }, "\u2694\uFE0F ", m.id, " \xB7 ", m.name)), adv.threat_actor && React.createElement("span", {
     style: {
       fontSize: 12,
       color: "#c084fc",
@@ -360,7 +511,29 @@ function AdvisoryCard({
       fontFamily: "var(--mono)",
       letterSpacing: 1
     }
-  }, "\uD83D\uDD17 VERIFY SOURCE"), React.createElement("a", {
+  }, "\uD83D\uDD17 VERIFY & TRIAGE"), React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap"
+    }
+  }, onAskAI && React.createElement("button", {
+    onClick: () => onAskAI(adv),
+    style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 6,
+      fontSize: 12,
+      color: "#d8b4fe",
+      fontFamily: "var(--mono)",
+      background: "rgba(123,47,247,0.12)",
+      border: "1px solid rgba(123,47,247,0.4)",
+      padding: "7px 14px",
+      borderRadius: 4,
+      cursor: "pointer",
+      fontWeight: 700
+    }
+  }, "\uD83D\uDEE1\uFE0F AI Triage"), React.createElement("a", {
     href: adv.source_url || "#",
     target: "_blank",
     rel: "noopener noreferrer",
@@ -378,7 +551,7 @@ function AdvisoryCard({
       whiteSpace: "nowrap",
       fontWeight: 600
     }
-  }, adv.source_flag, " View on ", adv.source, " \u2197")));
+  }, adv.source_flag, " View on ", adv.source, " \u2197"))));
 }
 function SocialCard({
   post
@@ -479,6 +652,218 @@ function SocialCard({
       borderRadius: 3
     }
   }, c))));
+}
+function ThreatVelocityPanel({
+  advisories,
+  exploits,
+  news,
+  activeSearch,
+  onSelectKeyword
+}) {
+  const all = [...advisories, ...exploits, ...news];
+  if (!all.length) return null;
+  const now = Date.now();
+  const days = [6, 5, 4, 3, 2, 1, 0].map(offset => {
+    const start = now - (offset + 1) * 86400000;
+    const end = now - offset * 86400000;
+    const d = new Date(end);
+    const label = offset === 0 ? "Today" : d.toLocaleDateString("en-GB", {
+      weekday: "short"
+    });
+    const slice = all.filter(a => a.ts && a.ts >= start && a.ts < end);
+    const crit = slice.filter(a => a.severity === "CRITICAL" || a.exploit_in_wild).length;
+    return {
+      label,
+      total: slice.length,
+      crit
+    };
+  });
+  const maxDay = Math.max(1, ...days.map(d => d.total));
+  const VENDORS = [["Microsoft", /microsoft|windows|exchange|sharepoint|azure|defender|office 365/i], ["Linux / Kernel", /\blinux\b|kernel|ubuntu|debian|redhat/i], ["Cisco", /\bcisco\b|ios xe|asa|anyconnect/i], ["Fortinet", /fortinet|fortigate|fortios|fortiguard/i], ["Ivanti", /\bivanti\b|connect secure/i], ["Palo Alto", /palo alto|pan-os|globalprotect/i], ["WordPress", /wordpress|wp-content|plugin/i], ["Google / Android", /\bandroid\b|\bchrome\b|chromium|google cloud/i], ["Apple / iOS", /\bapple\b|\bios\b|macos|webkit/i], ["VMware / ESXi", /vmware|esxi|vcenter/i], ["GitLab / GitHub", /gitlab|github/i], ["AI / LLM", /\bllm\b|openai|anthropic|claude|chatgpt|genai|ai agent|mcp/i]];
+  const vendorCounts = VENDORS.map(([name, re]) => ({
+    name,
+    keyword: name.split(" ")[0],
+    count: all.filter(a => re.test(`${a.title} ${a.summary} ${(a.affected_products || []).join(" ")}`)).length
+  })).filter(v => v.count > 0).sort((a, b) => b.count - a.count).slice(0, 7);
+  const topEpss = [...advisories, ...exploits].filter(a => a.epss != null && a.cve_ids?.length).sort((a, b) => (b.epss || 0) - (a.epss || 0)).slice(0, 4);
+  return React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fit,minmax(290px,1fr))",
+      gap: 12,
+      marginBottom: 18
+    }
+  }, React.createElement("div", {
+    style: {
+      background: "rgba(255,255,255,0.02)",
+      border: "1px solid rgba(0,200,255,0.12)",
+      borderRadius: 8,
+      padding: "14px 16px"
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 10
+    }
+  }, React.createElement("span", {
+    style: {
+      fontSize: 11,
+      letterSpacing: 2,
+      color: "rgba(0,200,255,0.7)",
+      fontFamily: "var(--mono)",
+      fontWeight: 700
+    }
+  }, "\uD83D\uDCC8 7-DAY THREAT VELOCITY"), React.createElement("span", {
+    style: {
+      fontSize: 10,
+      color: "rgba(200,220,240,0.35)",
+      fontFamily: "var(--mono)"
+    }
+  }, "\uD83D\uDD34 Critical/Wild \xB7 \uD83D\uDD35 Total")), React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "flex-end",
+      gap: 8,
+      height: 64,
+      paddingTop: 6
+    }
+  }, days.map((d, i) => {
+    const h = Math.max(6, Math.round(d.total / maxDay * 52));
+    const ch = d.total ? Math.round(d.crit / d.total * h) : 0;
+    return React.createElement("div", {
+      key: i,
+      title: `${d.label}: ${d.total} items (${d.crit} critical/wild)`,
+      style: {
+        flex: 1,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 4
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 9,
+        color: "rgba(200,220,240,0.45)",
+        fontFamily: "var(--mono)"
+      }
+    }, d.total), React.createElement("div", {
+      style: {
+        width: "100%",
+        maxWidth: 28,
+        height: h,
+        background: "rgba(0,200,255,0.22)",
+        border: "1px solid rgba(0,200,255,0.4)",
+        borderRadius: 3,
+        position: "relative",
+        overflow: "hidden"
+      }
+    }, ch > 0 && React.createElement("div", {
+      style: {
+        position: "absolute",
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: ch,
+        background: "rgba(255,23,68,0.75)"
+      }
+    })), React.createElement("div", {
+      style: {
+        fontSize: 9,
+        color: i === 6 ? ACCENT : "rgba(200,220,240,0.35)",
+        fontFamily: "var(--mono)",
+        fontWeight: i === 6 ? 700 : 400
+      }
+    }, d.label));
+  }))), React.createElement("div", {
+    style: {
+      background: "rgba(255,255,255,0.02)",
+      border: "1px solid rgba(123,47,247,0.18)",
+      borderRadius: 8,
+      padding: "14px 16px"
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 10
+    }
+  }, React.createElement("span", {
+    style: {
+      fontSize: 11,
+      letterSpacing: 2,
+      color: "rgba(192,132,252,0.8)",
+      fontFamily: "var(--mono)",
+      fontWeight: 700
+    }
+  }, "\uD83C\uDFAF TOP TARGETED ECOSYSTEMS"), React.createElement("span", {
+    style: {
+      fontSize: 10,
+      color: "rgba(200,220,240,0.35)",
+      fontFamily: "var(--mono)"
+    }
+  }, "Click to filter")), React.createElement("div", {
+    style: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 6
+    }
+  }, vendorCounts.map(v => {
+    const active = activeSearch && activeSearch.toLowerCase() === v.keyword.toLowerCase();
+    return React.createElement("button", {
+      key: v.name,
+      onClick: () => onSelectKeyword(active ? "" : v.keyword),
+      style: {
+        padding: "5px 10px",
+        fontSize: 11.5,
+        fontFamily: "var(--mono)",
+        borderRadius: 4,
+        cursor: "pointer",
+        background: active ? "rgba(0,200,255,0.18)" : "rgba(255,255,255,0.03)",
+        border: `1px solid ${active ? ACCENT : "rgba(255,255,255,0.1)"}`,
+        color: active ? ACCENT : "#ddeeff",
+        fontWeight: active ? 700 : 500
+      }
+    }, v.name, " ", React.createElement("span", {
+      style: {
+        color: ACCENT2,
+        fontWeight: 800
+      }
+    }, "(", v.count, ")"));
+  })), topEpss.length > 0 && React.createElement("div", {
+    style: {
+      marginTop: 10,
+      paddingTop: 8,
+      borderTop: "1px solid rgba(255,255,255,0.06)",
+      display: "flex",
+      gap: 6,
+      flexWrap: "wrap",
+      alignItems: "center"
+    }
+  }, React.createElement("span", {
+    style: {
+      fontSize: 10,
+      color: "rgba(255,145,0,0.8)",
+      fontFamily: "var(--mono)",
+      letterSpacing: 1
+    }
+  }, "\uD83D\uDD25 HIGHEST EPSS:"), topEpss.map(item => React.createElement("button", {
+    key: item.id,
+    onClick: () => onSelectKeyword(item.cve_ids[0]),
+    style: {
+      fontSize: 10.5,
+      fontFamily: "var(--mono)",
+      padding: "2px 7px",
+      borderRadius: 3,
+      background: "rgba(255,23,68,0.12)",
+      border: "1px solid rgba(255,23,68,0.35)",
+      color: "#ff6e6e",
+      cursor: "pointer",
+      fontWeight: 700
+    }
+  }, item.cve_ids[0], " (", item.epss, "%)")))));
 }
 function AIBriefCard({
   brief
@@ -1971,7 +2356,10 @@ function DarkWebView() {
       paddingTop: 10,
       borderTop: "1px solid rgba(255,255,255,.05)"
     }
-  }, React.createElement("span", {
+  }, React.createElement("a", {
+    href: v.website.startsWith("http") ? v.website : `https://${v.website}`,
+    target: "_blank",
+    rel: "noopener noreferrer",
     style: {
       fontSize: 12,
       color: ACCENT,
@@ -1979,9 +2367,10 @@ function DarkWebView() {
       background: "rgba(0,200,255,.07)",
       padding: "4px 12px",
       border: "1px solid rgba(0,200,255,.22)",
-      borderRadius: 3
+      borderRadius: 3,
+      display: "inline-block"
     }
-  }, "\uD83C\uDF10 ", v.website))))), tab === "groups" && (groups.length === 0 ? React.createElement("div", {
+  }, "\uD83C\uDF10 ", v.website.replace(/^https?:\/\//, "").slice(0, 55), " \u2197"))))), tab === "groups" && (groups.length === 0 ? React.createElement("div", {
     style: {
       textAlign: "center",
       padding: "40px",
@@ -2201,12 +2590,23 @@ function DarkWebView() {
     day: "2-digit",
     month: "short",
     year: "numeric"
-  }) : "")), React.createElement("div", {
+  }) : ""), c.url && React.createElement("a", {
+    href: c.url,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    style: {
+      marginLeft: "auto",
+      fontSize: 11,
+      color: ACCENT,
+      fontFamily: "var(--mono)"
+    }
+  }, "Inspect \u2197")), React.createElement("div", {
     style: {
       fontSize: 15,
       fontWeight: 700,
       color: "#eef4ff",
-      marginBottom: c.description ? 6 : 0
+      marginBottom: c.description ? 6 : 0,
+      fontFamily: "var(--mono)"
     }
   }, c.title), c.description && React.createElement("div", {
     style: {
@@ -2301,11 +2701,14 @@ function renderMd(text) {
     }, inline(t, i));
   });
 }
-function ThreatAnalystChat() {
+function ThreatAnalystChat({
+  externalPrompt,
+  onConsumedPrompt
+}) {
   const [open, setOpen] = useState(false);
   const [msgs, setMsgs] = useState([{
     role: "assistant",
-    content: "👋 I'm the **BCyberAware Threat Analyst** — an AI grounded in the live feed on this dashboard.\n\nAsk me about today's advisories, active exploits, threat actors, or any cybersecurity topic."
+    content: "👋 I'm the **BCyberAware Threat Analyst** — an AI grounded in the live feed on this dashboard.\n\nAsk me about today's advisories, active exploits, threat actors, or click **🛡️ AI Triage** on any advisory card."
   }]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -2422,6 +2825,14 @@ function ThreatAnalystChat() {
     abortRef.current?.abort();
     setBusy(false);
   };
+  useEffect(() => {
+    if (externalPrompt) {
+      setOpen(true);
+      setUnread(false);
+      send(externalPrompt);
+      onConsumedPrompt?.();
+    }
+  }, [externalPrompt]);
   return React.createElement(React.Fragment, null, !open && React.createElement("button", {
     onClick: () => {
       setOpen(true);
@@ -2704,8 +3115,77 @@ function BCyberAwareDashboard() {
   const [filterSev, setFilterSev] = useState("All");
   const [filterME, setFilterME] = useState(false);
   const [filterExp, setFilterExp] = useState(false);
+  const [filterEpss, setFilterEpss] = useState(false);
+  const [searchQ, setSearchQ] = useState("");
+  const [sortBy, setSortBy] = useState("sev");
+  const [watchlist, setWatchlist] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("bca_watchlist") || "[]");
+    } catch {
+      return [];
+    }
+  });
+  const [aiPrompt, setAiPrompt] = useState(null);
   const [view, setView] = useState("feed");
   const [feedTab, setFeedTab] = useState("advisories");
+  const searchInputRef = React.useRef(null);
+  useEffect(() => {
+    const onKey = e => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setView("feed");
+        setTimeout(() => searchInputRef.current?.focus(), 40);
+      } else if (e.key === "/" && !["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName)) {
+        e.preventDefault();
+        setView("feed");
+        setTimeout(() => searchInputRef.current?.focus(), 40);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  const toggleWatch = useCallback(item => {
+    setWatchlist(prev => {
+      const exists = prev.some(w => w.id === item.id);
+      const next = exists ? prev.filter(w => w.id !== item.id) : [item, ...prev].slice(0, 100);
+      try {
+        localStorage.setItem("bca_watchlist", JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }, []);
+  const askAIAboutItem = useCallback(item => {
+    const cvePart = item.cve_ids?.length ? ` (${item.cve_ids.join(", ")})` : "";
+    const epssPart = item.epss != null ? ` [EPSS: ${item.epss}%]` : "";
+    setAiPrompt(`Triage this ${item.severity || ""} item from ${item.source}: "${item.title}"${cvePart}${epssPart}. Explain: 1) What is vulnerable & impact, 2) Detection / IOCs to hunt, 3) Immediate remediation steps for enterprise / GCC SOC teams.`);
+  }, []);
+  const exportIntel = useCallback((items, fmt) => {
+    const stamp = new Date().toISOString().slice(0, 10);
+    if (fmt === "json") {
+      const blob = new Blob([JSON.stringify(items, null, 2)], {
+        type: "application/json"
+      });
+      const u = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = u;
+      a.download = `bcyberaware-intel-${stamp}.json`;
+      a.click();
+      URL.revokeObjectURL(u);
+    } else {
+      const header = ["ID", "Severity", "CVSS", "EPSS_%", "Exploit_In_Wild", "GCC_Relevance", "Date", "Source", "CVEs", "Title", "URL"];
+      const esc = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+      const rows = items.map(x => [x.id, x.severity, x.cvss || "", x.epss ?? "", x.exploit_in_wild ? "YES" : "NO", x.middle_east_relevance || "", x.date || "", x.source || "", (x.cve_ids || []).join(";"), x.title || "", x.source_url || ""].map(esc).join(","));
+      const blob = new Blob([[header.join(","), ...rows].join("\n")], {
+        type: "text/csv;charset=utf-8"
+      });
+      const u = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = u;
+      a.download = `bcyberaware-intel-${stamp}.csv`;
+      a.click();
+      URL.revokeObjectURL(u);
+    }
+  }, []);
   const refreshFeed = useCallback(async (force = false) => {
     setLoading(true);
     setFeedError(null);
@@ -2743,14 +3223,30 @@ function BCyberAwareDashboard() {
       cancelled = true;
     };
   }, [feedMeta?.fetched_at]);
+  const matchesSearch = a => {
+    if (!searchQ.trim()) return true;
+    const q = searchQ.trim().toLowerCase();
+    const hay = `${a.title || ""} ${a.summary || ""} ${a.source || ""} ${a.author || ""} ${(a.cve_ids || []).join(" ")} ${(a.affected_products || []).join(" ")} ${a.threat_actor || ""}`.toLowerCase();
+    return hay.includes(q);
+  };
   const applyFilters = arr => arr.filter(a => {
+    if (!matchesSearch(a)) return false;
     if (filterSev !== "All" && a.severity !== filterSev) return false;
     if (filterME && a.middle_east_relevance !== "HIGH") return false;
     if (filterExp && !a.exploit_in_wild) return false;
+    if (filterEpss && (a.epss || 0) < 10) return false;
     return true;
-  }).sort((a, b) => SEV_ORDER.indexOf(a.severity) - SEV_ORDER.indexOf(b.severity));
+  }).sort((a, b) => {
+    if (sortBy === "epss") return (b.epss || 0) - (a.epss || 0) || (b.ts || 0) - (a.ts || 0);
+    if (sortBy === "recent") return (b.ts || 0) - (a.ts || 0);
+    return SEV_ORDER.indexOf(a.severity) - SEV_ORDER.indexOf(b.severity) || (b.epss || 0) - (a.epss || 0);
+  });
   const fAdvisories = applyFilters(advisories);
   const fExploits = applyFilters(exploits);
+  const fNews = news.filter(matchesSearch);
+  const fSocial = social.filter(matchesSearch);
+  const watchIds = new Set(watchlist.map(w => w.id));
+  const defcon = computeDefcon(advisories, exploits);
   const allItems = [...advisories, ...exploits, ...news, ...social];
   const counts = {
     CRITICAL: 0,
@@ -2824,13 +3320,19 @@ function BCyberAwareDashboard() {
     cat: "Advisory",
     flag: "🌐",
     url: "https://nvd.nist.gov",
-    desc: "NIST National Vulnerability Database — critical CVEs published in the last 30 days."
+    desc: "NIST National Vulnerability Database — critical CVEs published in the last 30 days, enriched with FIRST.org EPSS."
+  }, {
+    name: "GitHub Advisory (GHSA)",
+    cat: "Advisory",
+    flag: "🐙",
+    url: "https://github.com/advisories",
+    desc: "GitHub Security Lab reviewed critical advisories across enterprise & open-source ecosystems."
   }, {
     name: "CERT-In (India)",
     cat: "Advisory",
     flag: "🇮🇳",
     url: "https://www.cert-in.org.in",
-    desc: "India's national CERT — enterprise software advisories."
+    desc: "India's national CERT — enterprise and national infrastructure security advisories."
   }, {
     name: "NCSC UK",
     cat: "Advisory",
@@ -2843,6 +3345,36 @@ function BCyberAwareDashboard() {
     flag: "🇪🇺",
     url: "https://cert.europa.eu",
     desc: "EU institutions' CERT — security advisories for European enterprise software."
+  }, {
+    name: "JPCERT/CC (Japan)",
+    cat: "Advisory",
+    flag: "🇯🇵",
+    url: "https://www.jpcert.or.jp/english/",
+    desc: "Japan Computer Emergency Response Team — APAC zero-day and enterprise alerts."
+  }, {
+    name: "CIS Security Advisories",
+    cat: "Advisory",
+    flag: "🛡️",
+    url: "https://www.cisecurity.org/advisory",
+    desc: "Center for Internet Security / MS-ISAC advisories for government and enterprise."
+  }, {
+    name: "Cisco PSIRT",
+    cat: "Advisory",
+    flag: "🛡️",
+    url: "https://sec.cloudapps.cisco.com/security/center/publicationListing.x",
+    desc: "Official Cisco Product Security Incident Response Team advisories (IOS XE, ASA, Firepower)."
+  }, {
+    name: "Palo Alto PSIRT",
+    cat: "Advisory",
+    flag: "🔥",
+    url: "https://security.paloaltonetworks.com",
+    desc: "Palo Alto Networks PAN-OS, GlobalProtect and Prisma security advisories."
+  }, {
+    name: "FortiGuard PSIRT",
+    cat: "Advisory",
+    flag: "🧱",
+    url: "https://www.fortiguard.com/psirt",
+    desc: "Fortinet FortiOS, FortiGate, FortiManager and VPN PSIRT advisories."
   }, {
     name: "Microsoft Security",
     cat: "Advisory",
@@ -2939,6 +3471,30 @@ function BCyberAwareDashboard() {
     flag: "🔬",
     url: "https://research.checkpoint.com",
     desc: "Check Point threat research — malware reverse engineering and campaign tracking."
+  }, {
+    name: "CrowdStrike Threat Intel",
+    cat: "News",
+    flag: "🦅",
+    url: "https://www.crowdstrike.com/en-us/blog/",
+    desc: "CrowdStrike adversary intelligence, eCrime and intrusion analysis."
+  }, {
+    name: "Mandiant (Google Cloud)",
+    cat: "News",
+    flag: "🔥",
+    url: "https://cloud.google.com/blog/topics/threat-intelligence",
+    desc: "Mandiant frontline incident response and zero-day espionage investigations."
+  }, {
+    name: "Sophos X-Ops",
+    cat: "News",
+    flag: "🛡️",
+    url: "https://news.sophos.com/en-us/category/threat-research/",
+    desc: "Sophos X-Ops active adversary, ransomware and firewall exploit telemetry."
+  }, {
+    name: "Rapid7 Emergent Threats",
+    cat: "News",
+    flag: "🚀",
+    url: "https://www.rapid7.com/blog/",
+    desc: "Rapid7 AttackerKB & emergent vulnerability exploitation analysis."
   }, {
     name: "Dark Reading",
     cat: "News",
@@ -3163,7 +3719,21 @@ function BCyberAwareDashboard() {
       fontFamily: "var(--mono)",
       whiteSpace: "nowrap"
     }
-  }, "\u27F3 Fetching\u2026") : feedMeta && React.createElement("span", {
+  }, "\u27F3 Fetching\u2026") : React.createElement(React.Fragment, null, React.createElement("span", {
+    title: defcon.desc,
+    style: {
+      fontSize: 10.5,
+      padding: "4px 9px",
+      background: defcon.bg,
+      border: `1px solid ${defcon.color}88`,
+      color: defcon.color,
+      fontFamily: "var(--mono)",
+      borderRadius: 4,
+      fontWeight: 800,
+      letterSpacing: .8,
+      whiteSpace: "nowrap"
+    }
+  }, "\u25CF ", defcon.label), feedMeta && React.createElement("span", {
     className: "feed-meta",
     style: {
       fontSize: 10,
@@ -3171,7 +3741,7 @@ function BCyberAwareDashboard() {
       fontFamily: "var(--mono)",
       whiteSpace: "nowrap"
     }
-  }, feedMeta.from_cache ? "⚡" : "🔄", " ", feedMeta.fetched_at_human), React.createElement("button", {
+  }, feedMeta.from_cache ? "⚡" : "🔄", " ", feedMeta.fetched_at_human)), React.createElement("button", {
     onClick: () => refreshFeed(false),
     disabled: loading,
     style: {
@@ -3286,13 +3856,97 @@ function BCyberAwareDashboard() {
   }), React.createElement("div", {
     style: {
       display: "flex",
+      gap: 8,
+      flexWrap: "wrap",
+      alignItems: "center",
+      marginBottom: 14,
+      background: "rgba(255,255,255,0.02)",
+      border: "1px solid rgba(0,200,255,0.18)",
+      borderRadius: 8,
+      padding: "10px 14px"
+    }
+  }, React.createElement("span", {
+    style: {
+      fontSize: 14,
+      color: ACCENT
+    }
+  }, "\uD83D\uDD0E"), React.createElement("input", {
+    ref: searchInputRef,
+    value: searchQ,
+    onChange: e => setSearchQ(e.target.value),
+    placeholder: "Search CVE (e.g. CVE-2026-), vendor (Fortinet, Ivanti, Cisco, Microsoft), MITRE tactic, or keyword\u2026 (Press / or \u2318K)",
+    "aria-label": "Global threat search",
+    style: {
+      flex: "1 1 260px",
+      background: "transparent",
+      border: "none",
+      color: "#eef4ff",
+      fontSize: 13.5,
+      outline: "none",
+      fontFamily: "var(--mono)"
+    }
+  }), searchQ && React.createElement("button", {
+    onClick: () => setSearchQ(""),
+    style: {
+      padding: "3px 9px",
+      fontSize: 11,
+      fontFamily: "var(--mono)",
+      background: "rgba(255,255,255,0.06)",
+      border: "1px solid rgba(255,255,255,0.15)",
+      color: "#ddeeff",
+      borderRadius: 4,
+      cursor: "pointer"
+    }
+  }, "\u2715 Clear"), React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      marginLeft: "auto"
+    }
+  }, React.createElement("button", {
+    onClick: () => exportIntel(feedTab === "advisories" ? fAdvisories : feedTab === "exploits" ? fExploits : feedTab === "news" ? fNews : feedTab === "watchlist" ? watchlist : fSocial, "csv"),
+    title: "Export current view to CSV",
+    style: {
+      padding: "5px 10px",
+      fontSize: 11,
+      fontFamily: "var(--mono)",
+      background: "rgba(0,200,255,0.07)",
+      border: "1px solid rgba(0,200,255,0.25)",
+      color: ACCENT,
+      borderRadius: 4,
+      cursor: "pointer",
+      fontWeight: 600
+    }
+  }, "\u2B07 CSV"), React.createElement("button", {
+    onClick: () => exportIntel(feedTab === "advisories" ? fAdvisories : feedTab === "exploits" ? fExploits : feedTab === "news" ? fNews : feedTab === "watchlist" ? watchlist : fSocial, "json"),
+    title: "Export current view to JSON",
+    style: {
+      padding: "5px 10px",
+      fontSize: 11,
+      fontFamily: "var(--mono)",
+      background: "rgba(123,47,247,0.1)",
+      border: "1px solid rgba(123,47,247,0.3)",
+      color: "#d8b4fe",
+      borderRadius: 4,
+      cursor: "pointer",
+      fontWeight: 600
+    }
+  }, "\u2B07 JSON"))), React.createElement(ThreatVelocityPanel, {
+    advisories: advisories,
+    exploits: exploits,
+    news: news,
+    activeSearch: searchQ,
+    onSelectKeyword: q => setSearchQ(q)
+  }), React.createElement("div", {
+    style: {
+      display: "flex",
       gap: 4,
       marginBottom: 16,
       borderBottom: "1px solid rgba(255,255,255,.07)",
       overflowX: "auto",
       WebkitOverflowScrolling: "touch"
     }
-  }, [["advisories", `🏛️ Advisories (${advisories.length})`], ["exploits", `⚡ Exploits (${exploits.length})`], ["news", `📰 Security News (${news.length})`], ["social", `💬 Social Intel (${social.length})`]].map(([id, lbl]) => React.createElement("button", {
+  }, [["advisories", `🏛️ Advisories (${fAdvisories.length})`], ["exploits", `⚡ Exploits (${fExploits.length})`], ["news", `📰 Security News (${fNews.length})`], ["social", `💬 Social Intel (${fSocial.length})`], ["watchlist", `★ Watchlist (${watchlist.length})`]].map(([id, lbl]) => React.createElement("button", {
     key: id,
     onClick: () => setFeedTab(id),
     style: {
@@ -3308,7 +3962,7 @@ function BCyberAwareDashboard() {
       fontWeight: feedTab === id ? 700 : 400,
       whiteSpace: "nowrap"
     }
-  }, lbl))), feedTab !== "news" && feedTab !== "social" && React.createElement("div", {
+  }, lbl))), feedTab !== "news" && feedTab !== "social" && feedTab !== "watchlist" && React.createElement("div", {
     style: {
       display: "flex",
       gap: 7,
@@ -3372,16 +4026,86 @@ function BCyberAwareDashboard() {
       borderRadius: 4,
       fontWeight: filterExp ? 700 : 400
     }
-  }, "\u26A1 Exploit in Wild")), feedTab === "advisories" && fAdvisories.map(a => React.createElement(AdvisoryCard, {
+  }, "\u26A1 Exploit in Wild"), React.createElement("button", {
+    onClick: () => setFilterEpss(!filterEpss),
+    style: {
+      padding: "5px 14px",
+      fontSize: 13,
+      cursor: "pointer",
+      fontFamily: "var(--mono)",
+      background: filterEpss ? "rgba(255,145,0,.14)" : "transparent",
+      border: `1px solid ${filterEpss ? "#ff9100" : "rgba(255,255,255,.1)"}`,
+      color: filterEpss ? "#ff9100" : "rgba(200,220,240,.45)",
+      borderRadius: 4,
+      fontWeight: filterEpss ? 700 : 400
+    }
+  }, "\uD83C\uDFAF EPSS \u2265 10%"), React.createElement("div", {
+    style: {
+      marginLeft: "auto",
+      display: "flex",
+      gap: 5,
+      alignItems: "center"
+    }
+  }, React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "rgba(200,220,240,.3)",
+      fontFamily: "var(--mono)"
+    }
+  }, "SORT:"), [["sev", "Severity"], ["epss", "EPSS Risk"], ["recent", "Newest"]].map(([k, lbl]) => React.createElement("button", {
+    key: k,
+    onClick: () => setSortBy(k),
+    style: {
+      padding: "4px 10px",
+      fontSize: 11.5,
+      cursor: "pointer",
+      fontFamily: "var(--mono)",
+      background: sortBy === k ? "rgba(0,200,255,.12)" : "transparent",
+      border: `1px solid ${sortBy === k ? ACCENT : "rgba(255,255,255,.1)"}`,
+      color: sortBy === k ? ACCENT : "rgba(200,220,240,.45)",
+      borderRadius: 4,
+      fontWeight: sortBy === k ? 700 : 400
+    }
+  }, lbl)))), feedTab === "advisories" && (fAdvisories.length === 0 ? React.createElement("div", {
+    style: {
+      textAlign: "center",
+      padding: "40px",
+      color: "rgba(200,220,240,.35)",
+      fontSize: 14
+    }
+  }, "No advisories match your current filter/search.") : fAdvisories.map(a => React.createElement(AdvisoryCard, {
     key: a.id,
-    adv: a
-  })), feedTab === "exploits" && fExploits.map(a => React.createElement(AdvisoryCard, {
+    adv: a,
+    onAskAI: askAIAboutItem,
+    onToggleWatch: toggleWatch,
+    isWatched: watchIds.has(a.id)
+  }))), feedTab === "exploits" && (fExploits.length === 0 ? React.createElement("div", {
+    style: {
+      textAlign: "center",
+      padding: "40px",
+      color: "rgba(200,220,240,.35)",
+      fontSize: 14
+    }
+  }, "No exploits match your current filter/search.") : fExploits.map(a => React.createElement(AdvisoryCard, {
     key: a.id,
-    adv: a
-  })), feedTab === "news" && news.map(a => React.createElement(AdvisoryCard, {
+    adv: a,
+    onAskAI: askAIAboutItem,
+    onToggleWatch: toggleWatch,
+    isWatched: watchIds.has(a.id)
+  }))), feedTab === "news" && (fNews.length === 0 ? React.createElement("div", {
+    style: {
+      textAlign: "center",
+      padding: "40px",
+      color: "rgba(200,220,240,.35)",
+      fontSize: 14
+    }
+  }, "No news items match \"", searchQ, "\".") : fNews.map(a => React.createElement(AdvisoryCard, {
     key: a.id,
-    adv: a
-  })), feedTab === "social" && React.createElement(React.Fragment, null, React.createElement("div", {
+    adv: a,
+    onAskAI: askAIAboutItem,
+    onToggleWatch: toggleWatch,
+    isWatched: watchIds.has(a.id)
+  }))), feedTab === "social" && React.createElement(React.Fragment, null, React.createElement("div", {
     style: {
       padding: "12px 16px",
       background: "rgba(99,100,255,.06)",
@@ -3392,16 +4116,32 @@ function BCyberAwareDashboard() {
       color: "rgba(200,220,240,.55)",
       lineHeight: 1.7
     }
-  }, "\uD83D\uDCAC What the security community is talking about right now \u2014 infosec.exchange (Mastodon), Bluesky, Hacker News and r/netsec. Keyword-filtered for security relevance \xB7 community posts, not verified intelligence."), social.length === 0 ? React.createElement("div", {
+  }, "\uD83D\uDCAC What the security community is talking about right now \u2014 infosec.exchange (Mastodon), Bluesky, Hacker News and r/netsec. Keyword-filtered for security relevance \xB7 community posts, not verified intelligence."), fSocial.length === 0 ? React.createElement("div", {
     style: {
       textAlign: "center",
       padding: "40px",
       color: "rgba(200,220,240,.3)",
       fontSize: 14
     }
-  }, "No social posts loaded yet.") : social.map(p => React.createElement(SocialCard, {
+  }, "No social posts match your filter.") : fSocial.map(p => React.createElement(SocialCard, {
     key: p.id,
     post: p
+  }))), feedTab === "watchlist" && (watchlist.length === 0 ? React.createElement("div", {
+    style: {
+      textAlign: "center",
+      padding: "45px 20px",
+      color: "rgba(200,220,240,.4)",
+      fontSize: 14,
+      background: "rgba(255,255,255,.015)",
+      border: "1px dashed rgba(255,255,255,.1)",
+      borderRadius: 8
+    }
+  }, "\u2605 Your analyst watchlist is empty. Click ", React.createElement("strong", null, "\u2606 SAVE"), " on any advisory, exploit, or news card to pin items here for triage or export (saved in your browser).") : watchlist.map(a => React.createElement(AdvisoryCard, {
+    key: a.id,
+    adv: a,
+    onAskAI: askAIAboutItem,
+    onToggleWatch: toggleWatch,
+    isWatched: true
   })))), view === "heatmap" && React.createElement("div", {
     style: {
       animation: "fadeIn .3s ease"
@@ -4318,7 +5058,10 @@ function BCyberAwareDashboard() {
     advisories: advisories,
     exploits: exploits,
     news: news
-  }), view === "darkweb" && React.createElement(DarkWebView, null)), React.createElement(ThreatAnalystChat, null), React.createElement("div", {
+  }), view === "darkweb" && React.createElement(DarkWebView, null)), React.createElement(ThreatAnalystChat, {
+    externalPrompt: aiPrompt,
+    onConsumedPrompt: () => setAiPrompt(null)
+  }), React.createElement("div", {
     style: {
       borderTop: "1px solid rgba(255,255,255,.05)",
       marginTop: 32,
