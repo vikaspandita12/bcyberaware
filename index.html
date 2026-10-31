@@ -20,6 +20,9 @@
   <meta name="twitter:description" content="Real-time cybersecurity advisories from CISA, NVD, NCSC UK, CERT-In, Exploit-DB, The Hacker News and more." />
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
   <link rel="preconnect" href="https://www.googletagmanager.com" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;700;800&display=swap" rel="stylesheet" />
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -42,12 +45,24 @@
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
   <script defer src="app.js"></script>
   <style>
+    :root{
+      --mono:'JetBrains Mono','SFMono-Regular',Menlo,Consolas,monospace;
+      --display:'Inter','Segoe UI',Arial,sans-serif;
+    }
     *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-    html{font-size:16px}
-    body{background:#05080f;color:#c8d8e8;font-family:'Segoe UI',Arial,sans-serif;font-size:15px;line-height:1.6}
-    ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-thumb{background:rgba(0,200,255,0.2)}
+    html{font-size:16px;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+    body{
+      background:#05080f;
+      background-image:radial-gradient(1200px 500px at 50% -10%,rgba(0,200,255,.08),transparent 60%),radial-gradient(800px 400px at 100% 30%,rgba(123,47,247,.06),transparent 60%);
+      background-attachment:fixed;
+      color:#c8d8e8;font-family:'Inter','Segoe UI',Arial,sans-serif;font-size:15px;line-height:1.6;
+    }
+    button,input{font-family:inherit}
+    ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-thumb{background:rgba(0,200,255,0.2);border-radius:3px}::-webkit-scrollbar-thumb:hover{background:rgba(0,200,255,0.4)}
     a{color:inherit;text-decoration:none}
     button:focus-visible,a:focus-visible{outline:2px solid #00c8ff;outline-offset:2px}
+    .card{transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+    .card:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(0,0,0,.45),0 0 0 1px rgba(0,200,255,.18)}
     .topnav{scrollbar-width:thin}
     @media(max-width:860px){
       .topbar{justify-content:center}

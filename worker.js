@@ -21,7 +21,7 @@ export default {
     if (pathname === "/api/proxy" || pathname === "/api/proxy/") {
       if (request.method === "OPTIONS") return corsPreflightResponse();
       if (request.method !== "GET") return methodNotAllowed();
-      return handleFeedRequest(request);
+      return handleFeedRequest(request, env);
     }
 
     if (pathname === "/api/darkweb" || pathname === "/api/darkweb/") {

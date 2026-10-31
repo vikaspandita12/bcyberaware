@@ -87,7 +87,7 @@ function BreakingTicker({
       fontSize: 11,
       fontWeight: 900,
       color: "#ff6e6e",
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       letterSpacing: 2.5,
       whiteSpace: "nowrap"
     }
@@ -122,7 +122,7 @@ function BreakingTicker({
   }, React.createElement("span", {
     style: {
       color: "#ff7961",
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       fontSize: 11,
       letterSpacing: .5
     }
@@ -152,7 +152,7 @@ function SevBadge({
       color: s.text,
       borderRadius: 3,
       whiteSpace: "nowrap",
-      fontFamily: "monospace"
+      fontFamily: "var(--mono)"
     }
   }, sev);
 }
@@ -177,7 +177,7 @@ function StatCard({
       fontSize: 34,
       fontWeight: 900,
       color: color || ACCENT,
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       lineHeight: 1
     }
   }, value), React.createElement("div", {
@@ -206,6 +206,7 @@ function AdvisoryCard({
   const borderCol = isNews ? "#1976d2" : isExploit ? "#c00000" : s.border;
   const isFresh = adv.ts && Date.now() - adv.ts < 24 * 60 * 60 * 1000;
   return React.createElement("div", {
+    className: "card",
     style: {
       background: "rgba(5,8,15,0.92)",
       border: `1px solid ${borderCol}33`,
@@ -233,7 +234,7 @@ function AdvisoryCard({
       border: "1px solid #1976d255",
       color: "#64b5f6",
       letterSpacing: 1,
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       borderRadius: 3
     }
   }, "\uD83D\uDCF0 NEWS"), isExploit && React.createElement("span", {
@@ -244,7 +245,7 @@ function AdvisoryCard({
       border: "1px solid #c0000055",
       color: "#ff4444",
       letterSpacing: 1,
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       borderRadius: 3
     }
   }, "\u26A1 PUBLIC EXPLOIT"), adv.exploit_in_wild && !isExploit && React.createElement("span", {
@@ -255,7 +256,7 @@ function AdvisoryCard({
       border: "1px solid #c0000055",
       color: "#ff4444",
       letterSpacing: 1,
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       borderRadius: 3
     }
   }, "\u26A1 EXPLOIT IN WILD"), adv.middle_east_relevance === "HIGH" && React.createElement("span", {
@@ -266,7 +267,7 @@ function AdvisoryCard({
       border: "1px solid #00a65155",
       color: "#00e676",
       letterSpacing: 1,
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       borderRadius: 3
     }
   }, "\uD83C\uDF0D GCC RISK"), isFresh && React.createElement("span", {
@@ -277,7 +278,7 @@ function AdvisoryCard({
       border: "1px solid rgba(0,200,255,.4)",
       color: "#00c8ff",
       letterSpacing: 1,
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       borderRadius: 3,
       fontWeight: 800
     }
@@ -316,7 +317,7 @@ function AdvisoryCard({
     style: {
       fontSize: 12,
       color: ACCENT,
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       background: "rgba(0,200,255,0.07)",
       padding: "4px 11px",
       border: `1px solid rgba(0,200,255,0.22)`,
@@ -326,7 +327,7 @@ function AdvisoryCard({
     style: {
       fontSize: 12,
       color: "#c084fc",
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       background: "rgba(123,47,247,0.09)",
       padding: "4px 11px",
       border: "1px solid rgba(123,47,247,0.25)",
@@ -336,7 +337,7 @@ function AdvisoryCard({
     style: {
       fontSize: 12,
       color: "#00e676",
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       background: "rgba(0,200,100,0.07)",
       padding: "4px 11px",
       border: "1px solid rgba(0,200,100,0.22)",
@@ -356,7 +357,7 @@ function AdvisoryCard({
     style: {
       fontSize: 12,
       color: "rgba(200,220,240,0.3)",
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       letterSpacing: 1
     }
   }, "\uD83D\uDD17 VERIFY SOURCE"), React.createElement("a", {
@@ -369,7 +370,7 @@ function AdvisoryCard({
       gap: 7,
       fontSize: 13,
       color: ACCENT,
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       background: "rgba(0,200,255,0.07)",
       border: `1px solid rgba(0,200,255,0.28)`,
       padding: "7px 16px",
@@ -378,6 +379,188 @@ function AdvisoryCard({
       fontWeight: 600
     }
   }, adv.source_flag, " View on ", adv.source, " \u2197")));
+}
+function SocialCard({
+  post
+}) {
+  const col = post.source_color || "#6364ff";
+  const isFresh = post.ts && Date.now() - post.ts < 24 * 60 * 60 * 1000;
+  return React.createElement("a", {
+    href: post.source_url,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    className: "card",
+    style: {
+      display: "block",
+      background: "rgba(5,8,15,0.92)",
+      border: `1px solid ${col}33`,
+      borderLeft: `4px solid ${col}`,
+      borderRadius: 6,
+      padding: "14px 18px",
+      marginBottom: 10
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap",
+      alignItems: "center",
+      marginBottom: 8
+    }
+  }, React.createElement("span", {
+    style: {
+      fontSize: 11,
+      padding: "3px 10px",
+      background: `${col}1f`,
+      border: `1px solid ${col}66`,
+      color: col,
+      letterSpacing: 1,
+      fontFamily: "var(--mono)",
+      borderRadius: 3,
+      fontWeight: 700
+    }
+  }, post.source_flag, " ", post.source.toUpperCase()), post.author && React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "rgba(200,220,240,.55)",
+      fontFamily: "var(--mono)"
+    }
+  }, post.author), post.exploit_in_wild && React.createElement("span", {
+    style: {
+      fontSize: 11,
+      padding: "3px 8px",
+      background: "rgba(200,0,0,.15)",
+      border: "1px solid #c0000055",
+      color: "#ff4444",
+      borderRadius: 3,
+      fontFamily: "var(--mono)"
+    }
+  }, "\u26A1"), isFresh && React.createElement("span", {
+    style: {
+      fontSize: 10,
+      padding: "3px 8px",
+      background: "rgba(0,200,255,0.1)",
+      border: "1px solid rgba(0,200,255,.4)",
+      color: "#00c8ff",
+      letterSpacing: 1,
+      fontFamily: "var(--mono)",
+      borderRadius: 3,
+      fontWeight: 800
+    }
+  }, "\u25CF FRESH"), React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "rgba(200,220,240,.35)",
+      marginLeft: "auto",
+      fontFamily: "var(--mono)"
+    }
+  }, timeAgo(post.ts))), React.createElement("div", {
+    style: {
+      fontSize: 14,
+      color: "rgba(220,232,245,.85)",
+      lineHeight: 1.65
+    }
+  }, post.summary), post.cve_ids?.length > 0 && React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      flexWrap: "wrap",
+      marginTop: 10
+    }
+  }, post.cve_ids.map(c => React.createElement("span", {
+    key: c,
+    style: {
+      fontSize: 11,
+      color: ACCENT,
+      fontFamily: "var(--mono)",
+      background: "rgba(0,200,255,.07)",
+      padding: "3px 9px",
+      border: "1px solid rgba(0,200,255,.22)",
+      borderRadius: 3
+    }
+  }, c))));
+}
+function AIBriefCard({
+  brief
+}) {
+  if (!brief) return null;
+  if (brief.loading) return React.createElement("div", {
+    style: {
+      background: "linear-gradient(135deg,rgba(123,47,247,.10),rgba(0,200,255,.06))",
+      border: "1px solid rgba(123,47,247,.3)",
+      borderRadius: 10,
+      padding: "18px 22px",
+      marginBottom: 20
+    }
+  }, React.createElement("div", {
+    style: {
+      fontSize: 11,
+      letterSpacing: 3,
+      color: "rgba(192,132,252,.8)",
+      fontFamily: "var(--mono)",
+      marginBottom: 10
+    }
+  }, "\uD83E\uDD16 AI SITUATION SUMMARY"), [92, 100, 78].map((w, i) => React.createElement("div", {
+    key: i,
+    style: {
+      height: 12,
+      width: `${w}%`,
+      borderRadius: 6,
+      background: "rgba(255,255,255,.06)",
+      marginBottom: 9,
+      position: "relative",
+      overflow: "hidden"
+    }
+  }, React.createElement("div", {
+    style: {
+      position: "absolute",
+      inset: 0,
+      width: "50%",
+      background: "linear-gradient(90deg,transparent,rgba(192,132,252,.25),transparent)",
+      animation: "shimmer 1.4s infinite"
+    }
+  }))));
+  if (!brief.brief) return null;
+  return React.createElement("div", {
+    style: {
+      background: "linear-gradient(135deg,rgba(123,47,247,.12),rgba(0,200,255,.06))",
+      border: "1px solid rgba(123,47,247,.35)",
+      borderRadius: 10,
+      padding: "18px 22px",
+      marginBottom: 20,
+      boxShadow: "0 0 30px rgba(123,47,247,.08)",
+      animation: "fadeIn .4s ease"
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      flexWrap: "wrap",
+      gap: 8,
+      marginBottom: 10
+    }
+  }, React.createElement("div", {
+    style: {
+      fontSize: 11,
+      letterSpacing: 3,
+      color: "rgba(192,132,252,.85)",
+      fontFamily: "var(--mono)"
+    }
+  }, "\uD83E\uDD16 AI SITUATION SUMMARY"), React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "rgba(200,220,240,.35)",
+      fontFamily: "var(--mono)"
+    }
+  }, "Generated from ", brief.items, " items \xB7 ", brief.sources, " sources \xB7 Workers AI", brief.stale ? " · cached" : "")), React.createElement("div", {
+    style: {
+      fontSize: 15,
+      color: "rgba(230,238,250,.9)",
+      lineHeight: 1.8,
+      fontWeight: 400
+    }
+  }, brief.brief));
 }
 const AI_KW = ["artificial intelligence", "machine learning", " llm ", "large language", "chatgpt", "openai", "copilot", "gemini", "claude ", "anthropic", "genai", "generative ai", "prompt injection", "jailbreak", "model theft", "training data poisoning", "deepfake", "foundation model", "ai-powered", "ai vulnerability", "agentic ai", "gpt-", "ai agent", "chatbot security", "voice cloning", "ai fraud", "ai phishing", "ai scam", "ai attack", "owasp llm", "llm security", "stable diffusion", "midjourney", "dall-e", "synthetic media", "vector database", "rag attack", "mitre atlas", "ai red team", "model inversion", "data poisoning", "hallucination", "llm guard", "ai safety", "ai governance", "samsung chatgpt", "indirect prompt"];
 const OWASP_LLM = [{
@@ -577,7 +760,7 @@ function CISOBriefView({
       border: `1px solid ${labelColor}`,
       color: labelColor,
       borderRadius: 3,
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       letterSpacing: 1
     }
   }, label), React.createElement(SevBadge, {
@@ -590,7 +773,7 @@ function CISOBriefView({
       border: "1px solid #c00000",
       color: "#ff4444",
       borderRadius: 3,
-      fontFamily: "monospace"
+      fontFamily: "var(--mono)"
     }
   }, "\u26A1 WILD"), React.createElement("span", {
     style: {
@@ -620,7 +803,7 @@ function CISOBriefView({
     style: {
       fontSize: 11,
       color: ACCENT,
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       background: "rgba(0,200,255,.07)",
       padding: "3px 9px",
       border: "1px solid rgba(0,200,255,.22)",
@@ -658,7 +841,7 @@ function CISOBriefView({
       letterSpacing: 3,
       color: "rgba(0,200,255,.6)",
       marginBottom: 6,
-      fontFamily: "monospace"
+      fontFamily: "var(--mono)"
     }
   }, "\uD83D\uDCCB CISO WEEKLY THREAT BRIEF"), React.createElement("div", {
     style: {
@@ -681,7 +864,7 @@ function CISOBriefView({
       fontSize: 11,
       letterSpacing: 2,
       color: "rgba(200,220,240,.35)",
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       marginBottom: 4
     }
   }, "OVERALL RISK LEVEL"), React.createElement("div", {
@@ -689,7 +872,7 @@ function CISOBriefView({
       fontSize: 26,
       fontWeight: 900,
       color: riskColor,
-      fontFamily: "monospace"
+      fontFamily: "var(--mono)"
     }
   }, riskLevel), React.createElement("div", {
     style: {
@@ -710,7 +893,7 @@ function CISOBriefView({
       letterSpacing: 3,
       color: "rgba(123,47,247,.8)",
       marginBottom: 10,
-      fontFamily: "monospace"
+      fontFamily: "var(--mono)"
     }
   }, "SITUATION OVERVIEW"), React.createElement("div", {
     style: {
@@ -756,7 +939,7 @@ function CISOBriefView({
       letterSpacing: 3,
       color: "rgba(123,47,247,.85)",
       marginBottom: 10,
-      fontFamily: "monospace"
+      fontFamily: "var(--mono)"
     }
   }, "\uD83E\uDD16 AI SECURITY & GOVERNANCE"), React.createElement("div", {
     style: {
@@ -805,7 +988,7 @@ function CISOBriefView({
       letterSpacing: 3,
       color: "rgba(200,0,0,.7)",
       marginBottom: 10,
-      fontFamily: "monospace"
+      fontFamily: "var(--mono)"
     }
   }, "\uD83D\uDD34 PATCH NOW \u2014 CRITICAL & ACTIVELY EXPLOITED"), patchNow.length === 0 ? React.createElement("div", {
     style: {
@@ -828,7 +1011,7 @@ function CISOBriefView({
       letterSpacing: 3,
       color: "rgba(220,100,0,.7)",
       marginBottom: 10,
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       marginTop: 20
     }
   }, "\uD83D\uDFE1 MONITOR \u2014 HIGH SEVERITY"), monitor.length === 0 ? React.createElement("div", {
@@ -852,7 +1035,7 @@ function CISOBriefView({
       letterSpacing: 3,
       color: "rgba(0,200,255,.6)",
       marginBottom: 10,
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       marginTop: 20
     }
   }, "\uD83C\uDFED SECTOR EXPOSURE THIS WEEK"), React.createElement("div", {
@@ -900,7 +1083,7 @@ function CISOBriefView({
       style: {
         fontSize: 11,
         color: "rgba(200,220,240,.4)",
-        fontFamily: "monospace"
+        fontFamily: "var(--mono)"
       }
     }, count, " advisories"));
   }))), threatActors.length > 0 && React.createElement(React.Fragment, null, React.createElement("div", {
@@ -909,7 +1092,7 @@ function CISOBriefView({
       letterSpacing: 3,
       color: "rgba(192,132,252,.7)",
       marginBottom: 10,
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       marginTop: 4
     }
   }, "\uD83C\uDFAF ACTIVE THREAT ACTORS"), React.createElement("div", {
@@ -924,7 +1107,7 @@ function CISOBriefView({
     style: {
       fontSize: 13,
       color: "#c084fc",
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       background: "rgba(123,47,247,.09)",
       padding: "7px 14px",
       border: "1px solid rgba(123,47,247,.25)",
@@ -936,7 +1119,7 @@ function CISOBriefView({
       letterSpacing: 3,
       color: "rgba(0,200,100,.6)",
       marginBottom: 10,
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       marginTop: 4
     }
   }, "\uD83C\uDF0D GCC / MIDDLE EAST ALERT"), meItems.map(a => React.createElement(ActionRow, {
@@ -951,7 +1134,7 @@ function CISOBriefView({
       letterSpacing: 3,
       color: "rgba(0,200,255,.5)",
       marginBottom: 10,
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       marginTop: 20
     }
   }, "\uD83D\uDCF0 WATCH \u2014 EMERGING INTELLIGENCE"), watchList.map(a => React.createElement(ActionRow, {
@@ -1002,7 +1185,7 @@ function GenAISecurityView({
       letterSpacing: 4,
       color: ACCENT2,
       marginBottom: 8,
-      fontFamily: "monospace"
+      fontFamily: "var(--mono)"
     }
   }, "\uD83E\uDD16 GENAI SECURITY INTELLIGENCE"), React.createElement("div", {
     style: {
@@ -1059,7 +1242,7 @@ function GenAISecurityView({
       color: aiTab === id ? ACCENT2 : "rgba(200,220,240,.45)",
       fontSize: 14,
       cursor: "pointer",
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       fontWeight: aiTab === id ? 700 : 400,
       whiteSpace: "nowrap"
     }
@@ -1069,7 +1252,7 @@ function GenAISecurityView({
       letterSpacing: 3,
       color: "rgba(123,47,247,.7)",
       marginBottom: 12,
-      fontFamily: "monospace"
+      fontFamily: "var(--mono)"
     }
   }, "AI THREAT CATEGORIES"), React.createElement("div", {
     style: {
@@ -1171,7 +1354,7 @@ function GenAISecurityView({
       border: `1px solid ${t.color}`,
       color: t.color,
       borderRadius: 3,
-      fontFamily: "monospace"
+      fontFamily: "var(--mono)"
     }
   }, t.risk)))), React.createElement("div", {
     style: {
@@ -1187,7 +1370,7 @@ function GenAISecurityView({
       letterSpacing: 3,
       color: "rgba(0,200,100,.7)",
       marginBottom: 10,
-      fontFamily: "monospace"
+      fontFamily: "var(--mono)"
     }
   }, "\uD83C\uDF0D AI RISK FOR GCC / MIDDLE EAST ORGANISATIONS"), [{
     threat: "AI-Enhanced BEC & Wire Fraud",
@@ -1271,7 +1454,7 @@ function GenAISecurityView({
         fontSize: 13,
         fontWeight: 900,
         color: ACCENT2,
-        fontFamily: "monospace",
+        fontFamily: "var(--mono)",
         minWidth: 52
       }
     }, item.id), React.createElement("span", {
@@ -1332,7 +1515,7 @@ function GenAISecurityView({
       letterSpacing: 3,
       color: "rgba(123,47,247,.7)",
       marginBottom: 12,
-      fontFamily: "monospace"
+      fontFamily: "var(--mono)"
     }
   }, "FRAMEWORKS & STANDARDS"), React.createElement("div", {
     style: {
@@ -1377,7 +1560,7 @@ function GenAISecurityView({
       fontSize: 11,
       color: ACCENT2,
       marginLeft: "auto",
-      fontFamily: "monospace"
+      fontFamily: "var(--mono)"
     }
   }, "\u2197")), React.createElement("div", {
     style: {
@@ -1391,7 +1574,7 @@ function GenAISecurityView({
       letterSpacing: 3,
       color: "rgba(0,200,255,.6)",
       marginBottom: 12,
-      fontFamily: "monospace"
+      fontFamily: "var(--mono)"
     }
   }, "TOOLS & RESEARCH"), React.createElement("div", {
     style: {
@@ -1435,7 +1618,7 @@ function GenAISecurityView({
       fontSize: 11,
       color: ACCENT,
       marginLeft: "auto",
-      fontFamily: "monospace"
+      fontFamily: "var(--mono)"
     }
   }, "\u2197")), React.createElement("div", {
     style: {
@@ -1456,7 +1639,7 @@ function GenAISecurityView({
       letterSpacing: 2,
       color: "rgba(0,200,255,.5)",
       marginBottom: 10,
-      fontFamily: "monospace"
+      fontFamily: "var(--mono)"
     }
   }, "\uD83C\uDFDB\uFE0F AI-RELATED ADVISORIES (", aiAdvisories.length, ")"), aiAdvisories.map(a => React.createElement(AdvisoryCard, {
     key: a.id,
@@ -1467,7 +1650,7 @@ function GenAISecurityView({
       letterSpacing: 2,
       color: "rgba(200,0,0,.6)",
       marginBottom: 10,
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       marginTop: 16
     }
   }, "\u26A1 AI-RELATED EXPLOITS (", aiExploits.length, ")"), aiExploits.map(a => React.createElement(AdvisoryCard, {
@@ -1479,7 +1662,7 @@ function GenAISecurityView({
       letterSpacing: 2,
       color: "rgba(233,30,99,.6)",
       marginBottom: 10,
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       marginTop: 16
     }
   }, "\uD83D\uDCF0 AI SECURITY NEWS (", aiNews.length, ")"), aiNews.map(a => React.createElement(AdvisoryCard, {
@@ -1544,7 +1727,7 @@ function DarkWebView() {
       border: `1px solid ${border || color}`,
       color,
       borderRadius: 3,
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       letterSpacing: 1
     }
   }, children);
@@ -1558,7 +1741,7 @@ function DarkWebView() {
     style: {
       fontSize: 14,
       color: DW_RED,
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       letterSpacing: 3,
       animation: "pulse 1.5s infinite"
     }
@@ -1588,7 +1771,7 @@ function DarkWebView() {
       color: "#ff6666",
       fontSize: 12,
       cursor: "pointer",
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       borderRadius: 4
     }
   }, "Retry"));
@@ -1626,7 +1809,7 @@ function DarkWebView() {
       color: DW_RED,
       marginBottom: 6,
       letterSpacing: 1.5,
-      fontFamily: "monospace"
+      fontFamily: "var(--mono)"
     }
   }, "DARK WEB EARLY WARNING SYSTEM"), React.createElement("div", {
     style: {
@@ -1657,7 +1840,7 @@ function DarkWebView() {
       color: DW_RED,
       fontSize: 12,
       cursor: "pointer",
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       borderRadius: 4,
       fontWeight: 700,
       whiteSpace: "nowrap"
@@ -1708,7 +1891,7 @@ function DarkWebView() {
       color: tab === id ? DW_RED : "rgba(200,220,240,.45)",
       fontSize: 14,
       cursor: "pointer",
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       fontWeight: tab === id ? 700 : 400,
       whiteSpace: "nowrap"
     }
@@ -1738,7 +1921,7 @@ function DarkWebView() {
     style: {
       fontSize: 12,
       color: "#c084fc",
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       background: "rgba(123,47,247,.09)",
       padding: "3px 10px",
       border: "1px solid rgba(123,47,247,.25)",
@@ -1748,7 +1931,7 @@ function DarkWebView() {
     style: {
       fontSize: 12,
       color: "rgba(200,220,240,.45)",
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       padding: "3px 8px",
       border: "1px solid rgba(255,255,255,.1)",
       borderRadius: 3
@@ -1763,7 +1946,7 @@ function DarkWebView() {
       fontSize: 11,
       color: "rgba(200,220,240,.3)",
       marginLeft: "auto",
-      fontFamily: "monospace"
+      fontFamily: "var(--mono)"
     }
   }, v.date ? new Date(v.date).toLocaleDateString("en-GB", {
     day: "2-digit",
@@ -1792,7 +1975,7 @@ function DarkWebView() {
     style: {
       fontSize: 12,
       color: ACCENT,
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       background: "rgba(0,200,255,.07)",
       padding: "4px 12px",
       border: "1px solid rgba(0,200,255,.22)",
@@ -1845,7 +2028,7 @@ function DarkWebView() {
         border: `1px solid ${isActive ? "#c00000" : "rgba(255,255,255,.1)"}`,
         color: isActive ? "#ff4444" : "rgba(200,220,240,.35)",
         borderRadius: 3,
-        fontFamily: "monospace",
+        fontFamily: "var(--mono)",
         flexShrink: 0,
         whiteSpace: "nowrap"
       }
@@ -1854,7 +2037,7 @@ function DarkWebView() {
         fontSize: 30,
         fontWeight: 900,
         color: isActive ? "#ff4444" : "rgba(200,220,240,.3)",
-        fontFamily: "monospace",
+        fontFamily: "var(--mono)",
         lineHeight: 1
       }
     }, g.victim_count), React.createElement("div", {
@@ -1862,7 +2045,7 @@ function DarkWebView() {
         fontSize: 10,
         color: "rgba(200,220,240,.3)",
         letterSpacing: 2,
-        fontFamily: "monospace",
+        fontFamily: "var(--mono)",
         marginTop: 2,
         marginBottom: 8
       }
@@ -1891,7 +2074,7 @@ function DarkWebView() {
       style: {
         fontSize: 10,
         color: "rgba(200,220,240,.35)",
-        fontFamily: "monospace",
+        fontFamily: "var(--mono)",
         padding: "2px 6px",
         border: "1px solid rgba(255,255,255,.07)",
         borderRadius: 2
@@ -1932,7 +2115,7 @@ function DarkWebView() {
       fontSize: 11,
       color: "rgba(200,220,240,.35)",
       marginLeft: "auto",
-      fontFamily: "monospace"
+      fontFamily: "var(--mono)"
     }
   }, b.breach_date)), React.createElement("div", {
     style: {
@@ -1945,7 +2128,7 @@ function DarkWebView() {
     style: {
       fontSize: 13,
       color: "rgba(0,200,255,.6)",
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       marginBottom: 8
     }
   }, b.domain), b.description && React.createElement("div", {
@@ -1967,7 +2150,7 @@ function DarkWebView() {
     style: {
       fontSize: 11,
       color: "#b39ddb",
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       background: "rgba(124,77,255,.09)",
       padding: "3px 9px",
       border: "1px solid rgba(124,77,255,.2)",
@@ -1977,7 +2160,7 @@ function DarkWebView() {
     style: {
       fontSize: 13,
       color: "rgba(200,220,240,.4)",
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       borderTop: "1px solid rgba(255,255,255,.05)",
       paddingTop: 8
     }
@@ -2012,7 +2195,7 @@ function DarkWebView() {
     style: {
       fontSize: 11,
       color: "rgba(200,220,240,.3)",
-      fontFamily: "monospace"
+      fontFamily: "var(--mono)"
     }
   }, c.date ? new Date(c.date).toLocaleDateString("en-GB", {
     day: "2-digit",
@@ -2070,7 +2253,7 @@ function renderMd(text) {
   }, p.slice(2, -2)) : p.startsWith("`") ? React.createElement("code", {
     key: k + "-" + i,
     style: {
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       background: "rgba(0,200,255,.08)",
       padding: "1px 5px",
       borderRadius: 3,
@@ -2260,7 +2443,7 @@ function ThreatAnalystChat() {
       color: "#eef4ff",
       cursor: "pointer",
       boxShadow: "0 8px 32px rgba(0,200,255,.25)",
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       fontWeight: 700,
       fontSize: 13,
       letterSpacing: .5,
@@ -2336,7 +2519,7 @@ function ThreatAnalystChat() {
       background: "rgba(0,230,118,.12)",
       border: "1px solid rgba(0,230,118,.4)",
       color: "#00e676",
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       letterSpacing: 1,
       verticalAlign: "middle"
     }
@@ -2344,7 +2527,7 @@ function ThreatAnalystChat() {
     style: {
       fontSize: 10,
       color: "rgba(200,220,240,.45)",
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       whiteSpace: "nowrap",
       overflow: "hidden",
       textOverflow: "ellipsis"
@@ -2423,7 +2606,7 @@ function ThreatAnalystChat() {
       fontSize: 10,
       letterSpacing: 2,
       color: "rgba(200,220,240,.3)",
-      fontFamily: "monospace"
+      fontFamily: "var(--mono)"
     }
   }, "TRY ASKING"), CHAT_SUGGESTIONS.map(s => React.createElement("button", {
     key: s,
@@ -2480,7 +2663,7 @@ function ThreatAnalystChat() {
       color: "#ff6666",
       borderRadius: 8,
       cursor: "pointer",
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       fontWeight: 700,
       fontSize: 12
     }
@@ -2503,7 +2686,7 @@ function ThreatAnalystChat() {
       fontSize: 10,
       color: "rgba(200,220,240,.28)",
       textAlign: "center",
-      fontFamily: "monospace"
+      fontFamily: "var(--mono)"
     }
   }, "AI can make mistakes \u2014 verify against the linked sources.")));
 }
@@ -2512,6 +2695,8 @@ function BCyberAwareDashboard() {
   const [exploits, setExploits] = useState([]);
   const [news, setNews] = useState([]);
   const [breaking, setBreaking] = useState([]);
+  const [social, setSocial] = useState([]);
+  const [brief, setBrief] = useState(null);
   const [heatmap, setHeatmap] = useState([]);
   const [feedMeta, setFeedMeta] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -2530,6 +2715,7 @@ function BCyberAwareDashboard() {
       setExploits(data.exploits || []);
       setNews(data.news || []);
       setBreaking(data.breaking || []);
+      setSocial(data.social || []);
       setHeatmap(data.heatmap || []);
       setFeedMeta(data);
     } catch (e) {
@@ -2540,6 +2726,23 @@ function BCyberAwareDashboard() {
   useEffect(() => {
     refreshFeed();
   }, []);
+  useEffect(() => {
+    if (!feedMeta) return;
+    let cancelled = false;
+    setBrief({
+      loading: true
+    });
+    fetch(`${PROXY}?action=brief`, {
+      cache: "no-store"
+    }).then(r => r.json()).then(d => {
+      if (!cancelled) setBrief(d);
+    }).catch(() => {
+      if (!cancelled) setBrief(null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [feedMeta?.fetched_at]);
   const applyFilters = arr => arr.filter(a => {
     if (filterSev !== "All" && a.severity !== filterSev) return false;
     if (filterME && a.middle_east_relevance !== "HIGH") return false;
@@ -2548,7 +2751,7 @@ function BCyberAwareDashboard() {
   }).sort((a, b) => SEV_ORDER.indexOf(a.severity) - SEV_ORDER.indexOf(b.severity));
   const fAdvisories = applyFilters(advisories);
   const fExploits = applyFilters(exploits);
-  const allItems = [...advisories, ...exploits, ...news];
+  const allItems = [...advisories, ...exploits, ...news, ...social];
   const counts = {
     CRITICAL: 0,
     HIGH: 0,
@@ -2599,7 +2802,7 @@ function BCyberAwareDashboard() {
       fontSize: 12,
       letterSpacing: .5,
       cursor: "pointer",
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       borderRadius: 4,
       fontWeight: view === v ? 700 : 400
     }
@@ -2803,6 +3006,36 @@ function BCyberAwareDashboard() {
     url: "https://economictimes.indiatimes.com/tech",
     desc: "India's leading business newspaper — covers RBI cyber alerts, DPDP Act, MeitY."
   }, {
+    name: "infosec.exchange (Mastodon)",
+    cat: "Social",
+    flag: "🐘",
+    url: "https://infosec.exchange",
+    desc: "The infosec community's Mastodon home — public timeline, keyword-filtered for security relevance."
+  }, {
+    name: "Mastodon #cybersecurity",
+    cat: "Social",
+    flag: "🐘",
+    url: "https://mastodon.social/tags/cybersecurity",
+    desc: "Federated #cybersecurity hashtag stream from mastodon.social."
+  }, {
+    name: "Bluesky",
+    cat: "Social",
+    flag: "🦋",
+    url: "https://bsky.app/search?q=cybersecurity",
+    desc: "Latest cybersecurity posts via Bluesky's public AppView API."
+  }, {
+    name: "Hacker News (YC)",
+    cat: "Social",
+    flag: "🟠",
+    url: "https://news.ycombinator.com",
+    desc: "Security stories trending on Hacker News (Algolia API, ≥3 points)."
+  }, {
+    name: "Reddit r/netsec",
+    cat: "Social",
+    flag: "👽",
+    url: "https://www.reddit.com/r/netsec/",
+    desc: "Technical information-security community — research, write-ups and tooling."
+  }, {
     name: "Awesome AI Security",
     cat: "AI Security",
     flag: "⭐",
@@ -2895,7 +3128,7 @@ function BCyberAwareDashboard() {
       color: ACCENT,
       letterSpacing: 1.5,
       lineHeight: 1.1,
-      fontFamily: "Arial Black,sans-serif"
+      fontFamily: "var(--display)"
     }
   }, "BCyberAware"), React.createElement("div", {
     style: {
@@ -2927,7 +3160,7 @@ function BCyberAwareDashboard() {
       fontSize: 11,
       color: ACCENT,
       animation: "pulse 1.5s infinite",
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       whiteSpace: "nowrap"
     }
   }, "\u27F3 Fetching\u2026") : feedMeta && React.createElement("span", {
@@ -2935,7 +3168,7 @@ function BCyberAwareDashboard() {
     style: {
       fontSize: 10,
       color: "rgba(200,220,240,.28)",
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       whiteSpace: "nowrap"
     }
   }, feedMeta.from_cache ? "⚡" : "🔄", " ", feedMeta.fetched_at_human), React.createElement("button", {
@@ -2948,7 +3181,7 @@ function BCyberAwareDashboard() {
       color: ACCENT,
       fontSize: 12,
       cursor: loading ? "not-allowed" : "pointer",
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       opacity: loading ? .4 : 1,
       borderRadius: 4,
       fontWeight: 600,
@@ -2964,7 +3197,7 @@ function BCyberAwareDashboard() {
       color: "#ff9944",
       fontSize: 12,
       cursor: loading ? "not-allowed" : "pointer",
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       opacity: loading ? .4 : 1,
       borderRadius: 4,
       fontWeight: 600,
@@ -3048,7 +3281,9 @@ function BCyberAwareDashboard() {
       fontSize: 14,
       color: "#ff6666"
     }
-  }, "\u26A0 ", feedError), React.createElement("div", {
+  }, "\u26A0 ", feedError), React.createElement(AIBriefCard, {
+    brief: brief
+  }), React.createElement("div", {
     style: {
       display: "flex",
       gap: 4,
@@ -3057,7 +3292,7 @@ function BCyberAwareDashboard() {
       overflowX: "auto",
       WebkitOverflowScrolling: "touch"
     }
-  }, [["advisories", `🏛️ Advisories (${advisories.length})`], ["exploits", `⚡ Exploits (${exploits.length})`], ["news", `📰 Security News (${news.length})`]].map(([id, lbl]) => React.createElement("button", {
+  }, [["advisories", `🏛️ Advisories (${advisories.length})`], ["exploits", `⚡ Exploits (${exploits.length})`], ["news", `📰 Security News (${news.length})`], ["social", `💬 Social Intel (${social.length})`]].map(([id, lbl]) => React.createElement("button", {
     key: id,
     onClick: () => setFeedTab(id),
     style: {
@@ -3069,11 +3304,11 @@ function BCyberAwareDashboard() {
       fontSize: 14,
       letterSpacing: .5,
       cursor: "pointer",
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       fontWeight: feedTab === id ? 700 : 400,
       whiteSpace: "nowrap"
     }
-  }, lbl))), feedTab !== "news" && React.createElement("div", {
+  }, lbl))), feedTab !== "news" && feedTab !== "social" && React.createElement("div", {
     style: {
       display: "flex",
       gap: 7,
@@ -3086,7 +3321,7 @@ function BCyberAwareDashboard() {
       fontSize: 12,
       color: "rgba(200,220,240,.3)",
       letterSpacing: 1.5,
-      fontFamily: "monospace"
+      fontFamily: "var(--mono)"
     }
   }, "FILTER:"), ["All", "CRITICAL", "HIGH", "MEDIUM", "LOW"].map(s => {
     const ss = SEV_S[s];
@@ -3097,7 +3332,7 @@ function BCyberAwareDashboard() {
         padding: "5px 14px",
         fontSize: 13,
         cursor: "pointer",
-        fontFamily: "monospace",
+        fontFamily: "var(--mono)",
         background: filterSev === s ? ss?.bg || "rgba(0,200,255,.09)" : "transparent",
         border: `1px solid ${filterSev === s ? ss?.border || ACCENT : "rgba(255,255,255,.1)"}`,
         color: filterSev === s ? ss?.text || ACCENT : "rgba(200,220,240,.45)",
@@ -3117,7 +3352,7 @@ function BCyberAwareDashboard() {
       padding: "5px 14px",
       fontSize: 13,
       cursor: "pointer",
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       background: filterME ? "rgba(0,166,81,.12)" : "transparent",
       border: `1px solid ${filterME ? "#00a651" : "rgba(255,255,255,.1)"}`,
       color: filterME ? "#00e676" : "rgba(200,220,240,.45)",
@@ -3130,7 +3365,7 @@ function BCyberAwareDashboard() {
       padding: "5px 14px",
       fontSize: 13,
       cursor: "pointer",
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       background: filterExp ? "rgba(200,0,0,.12)" : "transparent",
       border: `1px solid ${filterExp ? "#c00000" : "rgba(255,255,255,.1)"}`,
       color: filterExp ? "#ff4444" : "rgba(200,220,240,.45)",
@@ -3146,7 +3381,28 @@ function BCyberAwareDashboard() {
   })), feedTab === "news" && news.map(a => React.createElement(AdvisoryCard, {
     key: a.id,
     adv: a
-  }))), view === "heatmap" && React.createElement("div", {
+  })), feedTab === "social" && React.createElement(React.Fragment, null, React.createElement("div", {
+    style: {
+      padding: "12px 16px",
+      background: "rgba(99,100,255,.06)",
+      border: "1px solid rgba(99,100,255,.2)",
+      borderRadius: 6,
+      marginBottom: 14,
+      fontSize: 12.5,
+      color: "rgba(200,220,240,.55)",
+      lineHeight: 1.7
+    }
+  }, "\uD83D\uDCAC What the security community is talking about right now \u2014 infosec.exchange (Mastodon), Bluesky, Hacker News and r/netsec. Keyword-filtered for security relevance \xB7 community posts, not verified intelligence."), social.length === 0 ? React.createElement("div", {
+    style: {
+      textAlign: "center",
+      padding: "40px",
+      color: "rgba(200,220,240,.3)",
+      fontSize: 14
+    }
+  }, "No social posts loaded yet.") : social.map(p => React.createElement(SocialCard, {
+    key: p.id,
+    post: p
+  })))), view === "heatmap" && React.createElement("div", {
     style: {
       animation: "fadeIn .3s ease"
     }
@@ -3161,7 +3417,7 @@ function BCyberAwareDashboard() {
       letterSpacing: 4,
       color: ACCENT,
       marginBottom: 8,
-      fontFamily: "monospace"
+      fontFamily: "var(--mono)"
     }
   }, "\uD83C\uDF0D GLOBAL THREAT HEATMAP"), React.createElement("div", {
     style: {
@@ -3189,7 +3445,7 @@ function BCyberAwareDashboard() {
       letterSpacing: 2,
       color: "rgba(0,200,255,.5)",
       marginBottom: 14,
-      fontFamily: "monospace"
+      fontFamily: "var(--mono)"
     }
   }, "WORLD THREAT MAP"), React.createElement("svg", {
     viewBox: "0 0 900 440",
@@ -3502,7 +3758,7 @@ function BCyberAwareDashboard() {
       letterSpacing: 2,
       color: "rgba(0,200,255,.5)",
       marginBottom: 16,
-      fontFamily: "monospace"
+      fontFamily: "var(--mono)"
     }
   }, "TOP 15 COUNTRIES BY THREAT SCORE"), heatmap.length === 0 ? React.createElement("div", {
     style: {
@@ -3530,7 +3786,7 @@ function BCyberAwareDashboard() {
       style: {
         fontSize: 13,
         fontWeight: 900,
-        fontFamily: "monospace",
+        fontFamily: "var(--mono)",
         color: i < 3 ? s.text : "rgba(200,220,240,.35)",
         minWidth: 24,
         textAlign: "right"
@@ -3578,7 +3834,7 @@ function BCyberAwareDashboard() {
         transform: "translateY(-50%)",
         fontSize: 11,
         color: "rgba(200,220,240,.5)",
-        fontFamily: "monospace"
+        fontFamily: "var(--mono)"
       }
     }, c.score, "pts")), React.createElement("span", {
       style: {
@@ -3587,7 +3843,7 @@ function BCyberAwareDashboard() {
         background: s.bg,
         border: `1px solid ${s.border}`,
         color: s.text,
-        fontFamily: "monospace",
+        fontFamily: "var(--mono)",
         borderRadius: 2,
         fontWeight: 700,
         minWidth: 72,
@@ -3600,7 +3856,7 @@ function BCyberAwareDashboard() {
       letterSpacing: 2,
       color: "rgba(0,200,255,.5)",
       marginBottom: 12,
-      fontFamily: "monospace"
+      fontFamily: "var(--mono)"
     }
   }, "REGIONAL THREAT SUMMARY"), React.createElement("div", {
     style: {
@@ -3664,7 +3920,7 @@ function BCyberAwareDashboard() {
         fontSize: 30,
         fontWeight: 900,
         color: r.color,
-        fontFamily: "monospace",
+        fontFamily: "var(--mono)",
         lineHeight: 1,
         marginBottom: 4
       }
@@ -3707,7 +3963,7 @@ function BCyberAwareDashboard() {
       letterSpacing: 4,
       color: ACCENT,
       marginBottom: 8,
-      fontFamily: "monospace"
+      fontFamily: "var(--mono)"
     }
   }, "INTELLIGENCE SOURCES \xB7 LIVE TELEMETRY"), React.createElement("div", {
     style: {
@@ -3722,7 +3978,7 @@ function BCyberAwareDashboard() {
     style: {
       color: ACCENT
     }
-  }, feedMeta.sources_total), " feeds responding this cycle \xB7 per-source latency measured on every refresh") : "Live RSS feeds · AI Security references · refreshed every 2 hours")), ["Advisory", "Exploit", "News", "AI Security"].map(cat => React.createElement("div", {
+  }, feedMeta.sources_total), " feeds responding this cycle \xB7 per-source latency measured on every refresh") : "Live RSS feeds · AI Security references · refreshed every 2 hours")), ["Advisory", "Exploit", "News", "Social", "AI Security"].map(cat => React.createElement("div", {
     key: cat,
     style: {
       marginBottom: 28
@@ -3733,12 +3989,12 @@ function BCyberAwareDashboard() {
       letterSpacing: 2,
       color: "rgba(0,200,255,.6)",
       marginBottom: 12,
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       fontWeight: 700,
       borderBottom: "1px solid rgba(255,255,255,.06)",
       paddingBottom: 8
     }
-  }, cat === "Advisory" ? "🏛️" : cat === "Exploit" ? "⚡" : cat === "AI Security" ? "🤖" : "📰", " ", cat.toUpperCase(), " SOURCES"), SOURCES_DATA.filter(s => s.cat === cat).map(src => {
+  }, cat === "Advisory" ? "🏛️" : cat === "Exploit" ? "⚡" : cat === "AI Security" ? "🤖" : cat === "Social" ? "💬" : "📰", " ", cat.toUpperCase(), " SOURCES"), SOURCES_DATA.filter(s => s.cat === cat).map(src => {
     const h = healthByName[src.name];
     const isRef = src.cat === "AI Security";
     const status = isRef ? "ref" : h ? h.ok ? "live" : "down" : "unknown";
@@ -3806,7 +4062,7 @@ function BCyberAwareDashboard() {
         fontSize: 11,
         padding: "3px 10px",
         letterSpacing: 1,
-        fontFamily: "monospace",
+        fontFamily: "var(--mono)",
         borderRadius: 3,
         background: badge.bg,
         border: `1px solid ${badge.border}`,
@@ -3817,7 +4073,7 @@ function BCyberAwareDashboard() {
       style: {
         fontSize: 11,
         color: "rgba(200,220,240,.35)",
-        fontFamily: "monospace"
+        fontFamily: "var(--mono)"
       }
     }, h.items, " items \xB7 ", h.ms, "ms")), React.createElement("div", {
       style: {
@@ -3832,7 +4088,7 @@ function BCyberAwareDashboard() {
       style: {
         fontSize: 13,
         color: ACCENT,
-        fontFamily: "monospace",
+        fontFamily: "var(--mono)",
         border: `1px solid rgba(0,200,255,.25)`,
         padding: "7px 14px",
         borderRadius: 4,
@@ -3858,7 +4114,7 @@ function BCyberAwareDashboard() {
       letterSpacing: 4,
       color: ACCENT,
       marginBottom: 8,
-      fontFamily: "monospace"
+      fontFamily: "var(--mono)"
     }
   }, "\u25B6 DEMO VIDEO"), React.createElement("div", {
     style: {
@@ -3960,7 +4216,7 @@ function BCyberAwareDashboard() {
       color: "#ddeeff",
       letterSpacing: 2,
       marginBottom: 7,
-      fontFamily: "Arial Black,sans-serif"
+      fontFamily: "var(--display)"
     }
   }, "BCyberAware"), React.createElement("div", {
     style: {
@@ -3982,7 +4238,7 @@ function BCyberAwareDashboard() {
       letterSpacing: 3,
       color: "rgba(0,200,255,.55)",
       marginBottom: 12,
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       fontWeight: 700
     }
   }, "AUTHOR"), React.createElement("div", {
@@ -4009,7 +4265,7 @@ function BCyberAwareDashboard() {
     style: {
       fontSize: 12,
       color: ACCENT,
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       background: "rgba(0,200,255,.07)",
       padding: "5px 12px",
       border: `1px solid rgba(0,200,255,.2)`,
@@ -4028,10 +4284,10 @@ function BCyberAwareDashboard() {
       letterSpacing: 3,
       color: "rgba(0,200,255,.55)",
       marginBottom: 12,
-      fontFamily: "monospace",
+      fontFamily: "var(--mono)",
       fontWeight: 700
     }
-  }, "PLATFORM CAPABILITIES"), ["🛡️ AI Threat Analyst — chat assistant grounded in the live feed (Cloudflare Workers AI)", "30+ live intelligence sources with real-time health telemetry", "🔴 Breaking-news ticker — incident-grade stories from the last 48 hours", "ZDI 0-Day Pipeline — vulnerabilities awaiting vendor disclosure", "GenAI tab — OWASP LLM Top 10, Standards & Tools (Awesome AI Security)", "CISO Brief — AI governance links (NIST AI RMF, MITRE ATLAS, AI Incident Database)", "CISA KEV · NVD · CERT-In · NCSC UK · CERT-EU · Microsoft Security", "The Record · Unit 42 · Check Point Research · Talos · Project Zero · Krebs", "GCC / Middle East relevance scoring per advisory", "Global threat heatmap — country-level risk visualisation", "Source verification link on every advisory card · auto-refresh every 2 hours"].map((f, i) => React.createElement("div", {
+  }, "PLATFORM CAPABILITIES"), ["🛡️ AI Threat Analyst — chat assistant grounded in the live feed (Cloudflare Workers AI)", "🤖 AI Situation Summary — executive brief regenerated with every feed refresh", "💬 Social Intel — infosec.exchange, Bluesky, Hacker News, r/netsec", "35+ live intelligence sources with real-time health telemetry", "🔴 Breaking-news ticker — incident-grade stories from the last 48 hours", "ZDI 0-Day Pipeline — vulnerabilities awaiting vendor disclosure", "GenAI tab — OWASP LLM Top 10, Standards & Tools (Awesome AI Security)", "CISO Brief — AI governance links (NIST AI RMF, MITRE ATLAS, AI Incident Database)", "CISA KEV · NVD · CERT-In · NCSC UK · CERT-EU · Microsoft Security", "The Record · Unit 42 · Check Point Research · Talos · Project Zero · Krebs", "GCC / Middle East relevance scoring per advisory", "Global threat heatmap — country-level risk visualisation", "Source verification link on every advisory card · auto-refresh every 2 hours"].map((f, i) => React.createElement("div", {
     key: i,
     style: {
       fontSize: 14,
@@ -4052,7 +4308,7 @@ function BCyberAwareDashboard() {
       marginTop: 16,
       fontSize: 12,
       color: "rgba(200,220,240,.25)",
-      fontFamily: "monospace"
+      fontFamily: "var(--mono)"
     }
   }, "Open source \xB7 MIT Licence \xB7 Contributions welcome on GitHub"))), view === "ciso" && React.createElement(CISOBriefView, {
     advisories: advisories,

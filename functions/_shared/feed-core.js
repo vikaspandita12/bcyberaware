@@ -69,6 +69,13 @@ const SOURCES = [
   { key: "telegram",     name: "Telegram: DarkFeed",     flag: "📡", cat: "news", fn: fetchTelegramDarkFeed },
   { key: "hindu",        name: "The Hindu Tech",         flag: "🇮🇳", cat: "news", filtered: true, fn: fetchTheHindu },
   { key: "econtimes",    name: "Economic Times IT",      flag: "🇮🇳", cat: "news", filtered: true, fn: fetchEconomicTimes },
+
+  // ── Social / community intelligence (all free public APIs — no keys) ──
+  { key: "infosec_exchange", name: "infosec.exchange (Mastodon)", flag: "🐘", cat: "social", filtered: true, fn: fetchInfosecExchange },
+  { key: "mastodon_tag",     name: "Mastodon #cybersecurity",     flag: "🐘", cat: "social", fn: () => rss("https://mastodon.social/tags/cybersecurity.rss", { id_prefix: "MSTDN", source: "Mastodon #cybersecurity", source_url: "https://mastodon.social/tags/cybersecurity", source_color: "#6364ff", source_flag: "🐘", category: "social", default_sev: "LOW", limit: 15, countries: ["US", "DE", "GB"] }) },
+  { key: "bluesky",          name: "Bluesky",                     flag: "🦋", cat: "social", fn: fetchBluesky },
+  { key: "hn",               name: "Hacker News (YC)",            flag: "🟠", cat: "social", filtered: true, fn: fetchHackerNewsYC },
+  { key: "reddit_netsec",    name: "Reddit r/netsec",             flag: "👽", cat: "social", fn: () => rss("https://www.reddit.com/r/netsec/.rss", { id_prefix: "RNETSEC", source: "Reddit r/netsec", source_url: "https://www.reddit.com/r/netsec/", source_color: "#ff4500", source_flag: "👽", category: "social", default_sev: "LOW", limit: 15, countries: ["US"] }) },
 ];
 
 // ── Live context for the AI Threat Analyst (compact, token-budgeted) ──────────
@@ -81,6 +88,7 @@ export function getFeedContext(maxChars = 6000) {
     ["TOP ADVISORIES", (d.advisories || []).slice(0, 14).map(line)],
     ["EXPLOITS / 0-DAY PIPELINE", (d.exploits || []).slice(0, 8).map(line)],
     ["SECURITY NEWS", (d.news || []).slice(0, 14).map(a => `- ${a.title} — ${a.source}, ${a.date}`)],
+    ["COMMUNITY CHATTER (social, unverified)", (d.social || []).slice(0, 6).map(a => `- ${a.title} — ${a.source}`)],
     ["THREAT HEATMAP (top countries)", [(d.heatmap || []).slice(0, 6).map(h => `${h.name} ${h.score}pts/${h.level}`).join(" · ")]],
   ];
   let out = `Feed snapshot: ${d.fetched_at_human} · ${d.sources_live}/${d.sources_total} sources live\n`;
@@ -93,11 +101,12 @@ export function getFeedContext(maxChars = 6000) {
 }
 
 // ── Main handler ──────────────────────────────────────────────────────────────
-export async function handleFeedRequest(request) {
+export async function handleFeedRequest(request, env) {
   const url    = new URL(request.url);
   const action = url.searchParams.get("action");
   const bust   = url.searchParams.get("bust") === "1";
 
+  if (action === "brief") return handleBrief(env);
   if (action !== "feed") return jsonResponse({ error: "Unknown action" }, 400);
 
   try {
@@ -118,8 +127,18 @@ export async function handleFeedRequest(request) {
       }
     }));
 
-    const byCat = { advisory: [], exploit: [], news: [] };
+    const byCat = { advisory: [], exploit: [], news: [], social: [] };
     runs.forEach(({ src, items }) => byCat[src.cat].push(...items));
+    // Social hygiene: drop job ads/promos, require security relevance in the post body
+    // for hashtag streams (hashtag abusers), and strip Reddit's RSS boilerplate.
+    byCat.social = byCat.social
+      .filter(a => !SOCIAL_SPAM_RE.test(a.title + " " + (a.summary || "")))
+      .filter(a => a.source !== "Mastodon #cybersecurity" || isSecurityText(a.title.replace(/#\w+/g, "")))
+      .map(a => {
+        let s = (a.summary || "").replace(/submitted by\s+\/u\/\S+/gi, "").replace(/\[link\]|\[comments\]/gi, "").replace(/\s{2,}/g, " ").trim();
+        if (s.length < 20) s = a.title;
+        return { ...a, summary: s };
+      });
 
     const sortAndDedup = arr => {
       arr.sort((a, b) => (b.ts || 0) - (a.ts || 0));
@@ -129,9 +148,10 @@ export async function handleFeedRequest(request) {
     const advisories = sortAndDedup(byCat.advisory).slice(0, 60);
     const exploits   = sortAndDedup(byCat.exploit).slice(0, 30);
     const news       = sortAndDedup(byCat.news).slice(0, 90);
+    const social     = sortAndDedup(byCat.social).slice(0, 60);
 
     const payload = {
-      advisories, exploits, news,
+      advisories, exploits, news, social,
       breaking:      detectBreaking([...advisories, ...exploits, ...news], now),
       heatmap:       buildHeatmap([...byCat.advisory, ...byCat.exploit, ...byCat.news]),
       source_health: runs.map(r => r.health),
@@ -153,6 +173,35 @@ export async function handleFeedRequest(request) {
   } catch (e) {
     if (CACHE.feed) return jsonResponse({ ...CACHE.feed.data, from_cache: true, degraded: true });
     return jsonResponse({ error: e.message }, 500);
+  }
+}
+
+// ── AI Situation Summary (Workers AI, cached per feed snapshot) ───────────────
+// Generated at most once per feed refresh (~2h) → negligible neuron usage.
+async function handleBrief(env) {
+  const feed = CACHE.feed;
+  if (!feed) return jsonResponse({ brief: null, pending: true, reason: "feed not loaded yet" });
+  if (CACHE.brief && CACHE.brief.feedTs === feed.ts) return jsonResponse({ ...CACHE.brief.data, from_cache: true });
+  if (!env?.AI) return jsonResponse({ brief: null, pending: false, reason: "AI binding not available" });
+
+  const d = feed.data;
+  const prompt = `You are a senior cyber threat intelligence analyst writing the opening "Situation Summary" for a CISO dashboard.
+Using ONLY the live feed snapshot below, write 3–4 tight sentences (max 110 words) covering: (1) the most important actively-exploited or critical vulnerabilities to patch now (name products and CVEs from the data), (2) the most significant breach/incident headlines, (3) one line on the overall risk posture. Plain prose, no bullet points, no headers, no preamble, no markdown. Do not invent CVEs or facts not in the data.
+
+${getFeedContext(4500)}`;
+
+  try {
+    const res = await env.AI.run(env.AI_MODEL || "@cf/meta/llama-3.1-8b-instruct-fast", {
+      messages: [{ role: "user", content: prompt }], max_tokens: 260, temperature: 0.2,
+    });
+    const brief = String(res?.response || "").replace(/\s+/g, " ").trim();
+    if (!brief) throw new Error("empty response");
+    const data = { brief, generated_at: Date.now(), generated_at_human: new Date().toUTCString(), sources: d.sources_live, items: (d.advisories?.length || 0) + (d.exploits?.length || 0) + (d.news?.length || 0), model: env.AI_MODEL || "@cf/meta/llama-3.1-8b-instruct-fast" };
+    CACHE.brief = { feedTs: feed.ts, data };
+    return jsonResponse({ ...data, from_cache: false });
+  } catch (e) {
+    if (CACHE.brief) return jsonResponse({ ...CACHE.brief.data, from_cache: true, stale: true });
+    return jsonResponse({ brief: null, pending: false, reason: String(e?.message || e).slice(0, 120) });
   }
 }
 
@@ -250,6 +299,57 @@ async function fetchArsTechnica() {
   return all.filter(a => kw.some(k => (a.title + " " + a.summary).toLowerCase().includes(k)));
 }
 
+// ── Social / community sources ────────────────────────────────────────────────
+// Word-boundary regex (plain substring matching let "https" match "ttp", "social" match "soc", etc.)
+const SOCIAL_RE = /\b(cve-\d{4}-\d+|cyber\w*|hack(ed|er|ers|ing)?|breach(ed|es)?|malware|ransomware|ransom|phishing|vulnerab\w*|vuln|exploit\w*|threat\w*|apt\d*|zero[- ]day|0[- ]?day|patch(ed|es|ing)?|infosec|soc|siem|edr|xdr|pentest\w*|red[- ]team\w*|blue[- ]team\w*|incident|botnet|c2|ioc|iocs|ttps?|mitre|att&ck|nist|owasp|data leak|leak(ed|s)?|backdoor\w*|rce|xss|sqli|sql injection|auth(entication)? bypass|credential\w*|mfa|zero trust|dfir|forensic\w*|cisa|cert-in|ncsc|dark ?web|spyware|stalkerware|trojan|rootkit|cryptojack\w*|ddos|deepfake\w*|scam\w*|fraud\w*|security|attack(er|ers|s)?|compromis\w*|intrusion|exfiltrat\w*|encrypt\w*|privacy|gdpr|dpdp|firewall|vpn|identity theft)\b/i;
+const isSecurityText = t => SOCIAL_RE.test(t);
+const SOCIAL_SPAM_RE = /apply (here|now)|we'?re hiring|hiring\b|job (opening|alert|post)|\bjobs?\b.*\b(remote|senior|engineer|analyst)\b|jobicy|careers?\b|\bsalary\b|giveaway|discount code|coupon|% off|buy now|free trial|webinar|register (now|today)|sign up (now|today)|subscribe to|our course|enroll|bootcamp|certification (course|training)/i;
+const stripHtml = s => decodeEntities(String(s || "").replace(/<br\s*\/?>/gi, " ").replace(/<\/p>/gi, " ").replace(/<[^>]+>/g, "")).replace(/\s{2,}/g, " ").trim();
+
+function socialItem({ id, text, url, author, ts, source, source_color, source_flag, countries }) {
+  const title = text.length > 120 ? text.slice(0, 117) + "…" : text;
+  const cves = [...new Set(text.match(/CVE-\d{4}-\d{4,7}/g) || [])].slice(0, 4);
+  return { id, title, severity: "LOW", category: "social", date: fmtDate(new Date(ts).toISOString()), ts, source, source_url: url, source_color, source_flag, author, cve_ids: cves, affected_products: [], summary: text.length > 400 ? text.slice(0, 397) + "…" : text, threat_actor: null, countries: countries || ["US"], middle_east_relevance: getMERelevance([], text, ""), patch_available: false, exploit_in_wild: /exploit|ransomware|in the wild/i.test(text) };
+}
+
+// infosec.exchange — the infosec community's Mastodon home (public local timeline, no auth)
+async function fetchInfosecExchange() {
+  const r = await fetchWithTimeout("https://infosec.exchange/api/v1/timelines/public?local=true&limit=40");
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const posts = await r.json();
+  return posts
+    .filter(p => !p.in_reply_to_id && p.visibility === "public" && !p.sensitive)
+    .map(p => ({ p, text: stripHtml(p.content) }))
+    .filter(({ text }) => text.length >= 40 && isSecurityText(text))
+    .slice(0, 15)
+    .map(({ p, text }) => socialItem({ id: "IEX-" + p.id, text, url: p.url, author: "@" + p.account.acct, ts: new Date(p.created_at).getTime(), source: "infosec.exchange", source_color: "#6364ff", source_flag: "🐘", countries: ["US", "GB", "DE"] }));
+}
+
+// Bluesky — public AppView API, no auth
+async function fetchBluesky() {
+  const r = await fetchWithTimeout("https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts?q=cybersecurity&sort=latest&limit=25");
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const data = await r.json();
+  return (data.posts || [])
+    .filter(p => p.record?.text && p.record.text.length >= 40 && !p.record.reply)
+    .slice(0, 15)
+    .map(p => {
+      const rkey = (p.uri || "").split("/").pop();
+      return socialItem({ id: "BSKY-" + rkey, text: p.record.text, url: `https://bsky.app/profile/${p.author.handle}/post/${rkey}`, author: "@" + p.author.handle, ts: new Date(p.indexedAt || p.record.createdAt).getTime(), source: "Bluesky", source_color: "#0085ff", source_flag: "🦋", countries: ["US"] });
+    });
+}
+
+// Hacker News — Algolia public API, security stories only
+async function fetchHackerNewsYC() {
+  const r = await fetchWithTimeout("https://hn.algolia.com/api/v1/search_by_date?query=security&tags=story&hitsPerPage=40");
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const data = await r.json();
+  return (data.hits || [])
+    .filter(h => h.title && isSecurityText(h.title) && (h.points || 0) >= 3)
+    .slice(0, 15)
+    .map(h => ({ ...socialItem({ id: "HN-" + h.objectID, text: h.title, url: h.url || `https://news.ycombinator.com/item?id=${h.objectID}`, author: `${h.points} pts · ${h.num_comments || 0} comments`, ts: new Date(h.created_at).getTime(), source: "Hacker News", source_color: "#ff6600", source_flag: "🟠", countries: ["US"] }), summary: `${h.title} — discussion on Hacker News (${h.points} points, ${h.num_comments || 0} comments)`, source_url: `https://news.ycombinator.com/item?id=${h.objectID}` }));
+}
+
 // ── Generic RSS/Atom fetch + parse ────────────────────────────────────────────
 async function rss(url, opts) {
   const r = await fetchWithTimeout(url);
@@ -266,10 +366,11 @@ function parseRSS(xml, opts) {
     const get = tag => (block.match(new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tag}>`))
       || block.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`))
       || [])[1]?.trim() || "";
-    const title = decodeEntities(get("title")).replace(/<[^>]+>/g, "").trim();
     const descRaw = get("description") || get("summary") || get("content") || "";
     // decode entities FIRST so escaped markup (&lt;br&gt;) is stripped as real tags
-    const desc = decodeEntities(descRaw).replace(/<[^>]+>/g, " ").replace(/\s{2,}/g, " ").trim();
+    const desc = decodeEntities(decodeEntities(descRaw).replace(/<[^>]+>/g, " ")).replace(/\s{2,}/g, " ").trim(); // twice: feeds often double-encode
+    let title = decodeEntities(decodeEntities(get("title"))).replace(/<[^>]+>/g, "").trim();
+    if (!title && desc) title = desc.length > 120 ? desc.slice(0, 117) + "…" : desc; // Mastodon RSS has no <title>
     const link = get("link")
       || block.match(/<link[^>]+href="([^"]+)"/)?.[1]
       || get("guid") || get("id") || opts.source_url;
@@ -282,9 +383,13 @@ function parseRSS(xml, opts) {
     const sev = lower.includes("critical") ? "CRITICAL" : lower.includes("high") ? "HIGH" : opts.default_sev;
     const hashId = Math.abs([...title].reduce((h, c) => Math.imul(31, h) + c.charCodeAt(0) | 0, 0)).toString(16).slice(0, 8).toUpperCase();
     const pm = title.match(/(?:for|in|affecting)\s+(.+?)(?:\s*$|\s*[-–(])/i);
+    // Social posts: derive author from Mastodon (/@user/) or Reddit (<author><name>) markup
+    const author = opts.category === "social"
+      ? (link.match(/https?:\/\/[^/]+\/(@[\w.-]+)/)?.[1] || get("name").replace(/^\/?u\//, "@") || null)
+      : undefined;
     return [{
       id: `${opts.id_prefix}-${hashId}`, title, severity: sev, category: opts.category,
-      date: fmtDate(new Date(ts).toISOString()), ts,
+      date: fmtDate(new Date(ts).toISOString()), ts, ...(author ? { author } : {}),
       source: opts.source, source_url: link, source_color: opts.source_color, source_flag: opts.source_flag,
       cve_ids: cves, affected_products: pm ? [pm[1].trim()] : [],
       summary: desc.length > 300 ? desc.slice(0, 297) + "…" : (desc || title),
@@ -307,7 +412,10 @@ function parseFeedDate(s) {
 }
 
 function decodeEntities(s) {
-  return s.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&#8217;/g, "'").replace(/&#8216;/g, "'").replace(/&#8220;|&#8221;/g, '"').replace(/&nbsp;/g, " ");
+  return s
+    .replace(/&#(\d+);/g, (m, n) => { const c = +n; return c > 31 && c < 1114112 ? String.fromCodePoint(c) : " "; })
+    .replace(/&#x([0-9a-f]+);/gi, (m, h) => { const c = parseInt(h, 16); return c > 31 && c < 1114112 ? String.fromCodePoint(c) : " "; })
+    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&#8217;/g, "'").replace(/&#8216;/g, "'").replace(/&#8220;|&#8221;/g, '"').replace(/&nbsp;/g, " ");
 }
 
 // ── Heatmap ───────────────────────────────────────────────────────────────────
