@@ -152,11 +152,12 @@ async function fetchHIBPBreaches() {
   } catch { return []; }
 }
 
-// ── 4. Botnet & Malware C2 Servers (abuse.ch Feodo Tracker + Cybercrime Tracker)
+// ── 4. Botnet & Malware C2 Servers (abuse.ch Feodo + C2IntelFeeds + Cybercrime Tracker)
 async function fetchC2Servers() {
   const out = [];
-  const [feodoRes, ccRes] = await Promise.allSettled([
+  const [feodoRes, c2IntelRes, ccRes] = await Promise.allSettled([
     fetchWithTimeout("https://feodotracker.abuse.ch/downloads/ipblocklist_recommended.json", 8000, { "Accept": "application/json" }),
+    fetchWithTimeout("https://raw.githubusercontent.com/drb-ra/C2IntelFeeds/master/feeds/IPC2s-30day.csv", 8000),
     fetchWithTimeout("https://cybercrime-tracker.net/rss.xml", 8000),
   ]);
 
@@ -164,8 +165,13 @@ async function fetchC2Servers() {
     try {
       const list = await feodoRes.value.json();
       if (Array.isArray(list)) {
-        list.slice(0, 15).forEach(item => {
+        list.slice(0, 12).forEach(item => {
           out.push({
+            ip: item.ip_address,
+            port: item.port,
+            malware: item.malware || "Botnet C2",
+            country: item.country || "",
+            asn: item.as_number ? `AS${item.as_number} ${item.as_name || ""}`.trim() : "",
             title: `${item.malware || "Botnet C2"} · ${item.ip_address}:${item.port} (${item.status || "online"})`,
             description: `Active ${item.malware || "botnet"} command-and-control server hosted on AS${item.as_number || "?"} (${item.as_name || "Unknown ASN"}, ${item.country || "??"}). First seen: ${item.first_seen || "N/A"} · Last online: ${item.last_online || "today"}.`,
             url: `https://feodotracker.abuse.ch/browse/host/${item.ip_address}/`,
@@ -176,10 +182,32 @@ async function fetchC2Servers() {
     } catch {}
   }
 
+  if (c2IntelRes.status === "fulfilled" && c2IntelRes.value.ok) {
+    try {
+      const csv = await c2IntelRes.value.text();
+      const lines = csv.split(/\r?\n/).filter(l => l && !l.startsWith("#")).slice(0, 12);
+      lines.forEach(line => {
+        const [ip, label] = line.split(",");
+        if (ip && /^\d+\.\d+\.\d+\.\d+$/.test(ip.trim())) {
+          const cleanIp = ip.trim();
+          const tag = (label || "Cobalt Strike C2").trim();
+          out.push({
+            ip: cleanIp,
+            malware: tag,
+            title: `${tag} · ${cleanIp}`,
+            description: `STIX Indicator [ipv4-addr:value = '${cleanIp}'] — observed active C2 infrastructure in 30-day C2IntelFeeds telemetry.`,
+            url: `https://www.shodan.io/host/${cleanIp}`,
+            date: new Date().toISOString(),
+          });
+        }
+      });
+    } catch {}
+  }
+
   if (ccRes.status === "fulfilled" && ccRes.value.ok) {
     try {
       const xml = await ccRes.value.text();
-      const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0, 15);
+      const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0, 12);
       items.forEach(([, block]) => {
         const get = tag => (
           block.match(new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tag}>`))

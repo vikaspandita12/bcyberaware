@@ -531,12 +531,42 @@ function parseRSS(xml, opts) {
       source: opts.source, source_url: link, source_color: opts.source_color, source_flag: opts.source_flag,
       cve_ids: cves, affected_products: pm ? [pm[1].trim()] : [],
       summary: desc.length > 300 ? desc.slice(0, 297) + "…" : (desc || title),
-      threat_actor: null, countries: opts.countries || ["US"],
+      threat_actor: detectThreatActor(title + " " + desc), countries: opts.countries || ["US"],
       middle_east_relevance: getMERelevance(pm ? [pm[1]] : [], title, desc),
       patch_available: !!opts.patch_avail,
       exploit_in_wild: !!opts.exploit_wild || lower.includes("exploit") || lower.includes("ransomware"),
     }];
   });
+}
+
+// ── OpenCTI-style Intrusion Set / Threat Actor resolver ──────────────────────
+const INTRUSION_SETS = [
+  ["Lazarus Group (APT38 · DPRK)", /\blazarus\b|apt38|bluenoroff|andariel|kimsuky|north korea[n]? (hacker|threat|group|apt)/i],
+  ["Fancy Bear (APT28 · Russia GRU)", /\bapt28\b|fancy bear|sofacy|forest blizzard|strontium|sednit/i],
+  ["Midnight Blizzard (APT29 · Russia SVR)", /\bapt29\b|cozy bear|midnight blizzard|nobelium|yttrium|the dukes/i],
+  ["Sandworm (APT44 · Russia GRU)", /\bsandworm\b|apt44|seashell blizzard|voodoo bear|iridium/i],
+  ["Volt Typhoon (China PLA)", /volt typhoon|bronze silhouette|vanguard panda/i],
+  ["Salt Typhoon (China MSS)", /salt typhoon|famous sparrow|ghostemperor/i],
+  ["APT41 (Double Dragon · China)", /\bapt41\b|winnti|barium|wicked panda|double dragon/i],
+  ["Charming Kitten (APT35 · Iran IRGC)", /\bapt35\b|charming kitten|mint sandstorm|phosphorus|educache/i],
+  ["MuddyWater (Iran MOIS)", /muddywater|mango sandstorm|mercury|static kitten/i],
+  ["OilRig (APT34 · Iran)", /oilrig|\bapt34\b|hazel sandstorm|helix kitten/i],
+  ["Scattered Spider (UNC3944)", /scattered spider|octo tempest|unc3944|0ktapus|\blapsus\$?\b/i],
+  ["LockBit Ransomware", /\blockbit\b/i],
+  ["Qilin Ransomware", /\bqilin\b/i],
+  ["Akira Ransomware", /\bakira\b.*ransom|ransom.*\bakira\b/i],
+  ["Cl0p Ransomware (TA505)", /\bcl0p\b|\bclop\b|\bta505\b|\bfin11\b/i],
+  ["BlackBasta Ransomware", /black\s*basta/i],
+  ["RansomHub", /ransomhub/i],
+  ["Play Ransomware", /\bplay ransomware\b/i],
+  ["Medusa Ransomware", /medusa ransomware/i],
+  ["FIN7 (Carbanak)", /\bfin7\b|carbanak|sangria tempest/i],
+];
+function detectThreatActor(text) {
+  for (const [label, re] of INTRUSION_SETS) {
+    if (re.test(text)) return label;
+  }
+  return null;
 }
 
 // JS Date can't parse European tz abbreviations (CEST/CET etc.) — map to offsets

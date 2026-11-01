@@ -71,27 +71,241 @@ function StatCard({ label, value, color, sub }) {
   );
 }
 
-// ── MITRE ATT&CK Auto-Mapper (zero-latency tactical tagging) ─────────────────
+// ── MITRE ATT&CK Enterprise Matrix & Auto-Mapper (OpenCTI-compatible) ────────
+const MITRE_MATRIX = [
+  { tactic: "Initial Access", code: "TA0001", techniques: [
+    { id: "T1190", name: "Exploit Public-Facing App", color: "#ff5252", re: /\brce\b|remote code|command injection|deseriali|arbitrary code|execute code|buffer overflow|sql injection|\bsqli\b|unauthenticated|path traversal|ssrf/i },
+    { id: "T1566", name: "Phishing / Spearphishing", color: "#ff7043", re: /phish|spearphish|lure|social engineering|credential harvest|malicious attachment|bec\b/i },
+    { id: "T1195", name: "Supply Chain Compromise", color: "#ec407a", re: /supply[- ]chain|npm|pypi|extension|marketplace|plugin|package|dependency|composer|maven/i },
+    { id: "T1133", name: "External Remote Services", color: "#ff8a65", re: /\bvpn\b|ssl[- ]vpn|rdp|citrix|fortigate|globalprotect|ivanti|connect secure|sonicwall|anyconnect/i },
+  ]},
+  { tactic: "Execution", code: "TA0002", techniques: [
+    { id: "T1059", name: "Command & Scripting", color: "#ffab40", re: /powershell|bash|shell script|javascript|python|cmd\.exe|vbscript|macro|applescript/i },
+    { id: "T1203", name: "Exploitation for Client Exec", color: "#ffa726", re: /browser|chromium|chrome|webkit|safari|firefox|pdf|office|word|excel|zero[- ]click/i },
+    { id: "T1204", name: "User Execution (Malicious File)", color: "#ffb74d", re: /trojan|loader|dropper|fake update|malicious installer|iso file|lnk file/i },
+  ]},
+  { tactic: "Persistence", code: "TA0003", techniques: [
+    { id: "T1505", name: "Server Software (Web Shell)", color: "#ffd54f", re: /webshell|web shell|backdoor|implant|rootkit|persistence|cron|scheduled task/i },
+    { id: "T1098", name: "Account Manipulation", color: "#ffca28", re: /admin account|rogue account|oauth|api key|ssh key|iam role|service principal/i },
+    { id: "T1547", name: "Boot / Logon Autostart", color: "#ffe082", re: /registry|startup|uefi|firmware|bootkit|kernel module|driver/i },
+  ]},
+  { tactic: "Privilege Escalation", code: "TA0004", techniques: [
+    { id: "T1068", name: "Exploitation for PrivEsc", color: "#ffa726", re: /privilege escalation|local privilege|\blpe\b|root access|admin access|elevation of privilege|kernel flaw/i },
+    { id: "T1078", name: "Valid Accounts / Auth Bypass", color: "#fb8c00", re: /bypass auth|authentication bypass|hardcoded credential|default password|stolen credential/i },
+    { id: "T1611", name: "Escape to Host (Container/VM)", color: "#f57c00", re: /container escape|vm escape|hypervisor|esxi|vmware|docker|kubernetes|sandbox escape/i },
+  ]},
+  { tactic: "Defense Evasion", code: "TA0005", techniques: [
+    { id: "T1562", name: "Impair Defenses / Kill EDR", color: "#ab47bc", re: /\bedr\b|antivirus|byovd|vulnerable driver|disable security|firewall bypass|tamper/i },
+    { id: "T1027", name: "Obfuscated / Packed Payload", color: "#ba68c8", re: /obfuscat|packed|encrypted payload|fileless|in-memory|steganograph|living off the land|lolbin/i },
+    { id: "T1553", name: "Subvert Trust Controls", color: "#ce93d8", re: /certificate|code sign|signed binary|rogue ca|tls|ssl/i },
+  ]},
+  { tactic: "Credential Access", code: "TA0006", techniques: [
+    { id: "T1555", name: "Credentials from Password Stores", color: "#ab47bc", re: /credential|password|infostealer|stealer|lumma|redline|vidar|keychain|browser data/i },
+    { id: "T1003", name: "OS Credential Dumping", color: "#9c27b0", re: /lsass|mimikatz|ntds|kerberos|ntlm|active directory|hash dump|sam database/i },
+    { id: "T1539", name: "Steal Web Session Cookie / Token", color: "#8e24aa", re: /session hijack|cookie|token theft|aitm|mfa bypass|oauth token|jwt/i },
+  ]},
+  { tactic: "Lateral Movement", code: "TA0008", techniques: [
+    { id: "T1021", name: "Remote Services (SMB/SSH/RDP)", color: "#42a5f5", re: /lateral movement|\bsmb\b|wmi|winrm|ssh|rdp|psexec|internal network/i },
+    { id: "T1210", name: "Exploitation of Remote Services", color: "#29b6f6", re: /wormable|east-west|domain controller|sharepoint|exchange server/i },
+  ]},
+  { tactic: "Command & Control", code: "TA0011", techniques: [
+    { id: "T1071", name: "App Layer Protocol (C2)", color: "#26c6da", re: /\bc2\b|command and control|command-and-control|cobalt strike|sliver|brute ratel|beacon|botnet/i },
+    { id: "T1105", name: "Ingress Tool Transfer", color: "#00acc1", re: /download payload|second[- ]stage|c2 server|telegram bot|discord webhook/i },
+  ]},
+  { tactic: "Exfiltration", code: "TA0010", techniques: [
+    { id: "T1041", name: "Exfiltration Over C2 / Web", color: "#26c6da", re: /exfiltrat|data leak|stolen|breach|exposed database|s3 bucket|cloud bucket|pii|records leaked/i },
+    { id: "T1567", name: "Exfiltration to Cloud Storage", color: "#00bcd4", re: /mega\.nz|rclone|cloud storage|dropbox|onedrive|google drive|s3|blob storage/i },
+  ]},
+  { tactic: "Impact", code: "TA0040", techniques: [
+    { id: "T1486", name: "Data Encrypted for Impact", color: "#ff1744", re: /ransomware|encrypt|extortion|double extortion|lockbit|qilin|akira|cl0p|blackbasta/i },
+    { id: "T1485", name: "Data Destruction / Wiper", color: "#f50057", re: /wiper|destructive|destroy|sabotage|erase|corrupt/i },
+    { id: "T1498", name: "Network Denial of Service", color: "#ffca28", re: /\bddos\b|denial of service|\bdos\b|amplification|carpet bomb/i },
+  ]},
+];
+const ALL_MITRE_TECHNIQUES = MITRE_MATRIX.flatMap(col => col.techniques.map(t => ({ ...t, tactic: col.tactic, tacticCode: col.code })));
+
 function mapMitreTactics(adv) {
   const txt = `${adv.title || ""} ${adv.summary || ""} ${(adv.affected_products || []).join(" ")}`.toLowerCase();
   const out = [];
-  if (/\brce\b|remote code|command injection|deseriali|arbitrary code|execute code|buffer overflow|sql injection|\bsqli\b/.test(txt))
-    out.push({ id: "T1190", tactic: "Initial Access", name: "Exploit Public-Facing App", color: "#ff5252" });
-  if (/phish|spearphish|lure|social engineering|credential harvest|malicious attachment/.test(txt))
-    out.push({ id: "T1566", tactic: "Initial Access", name: "Phishing", color: "#ff7043" });
-  if (/privilege escalation|local privilege|\blpe\b|root access|admin access|elevation of privilege|bypass auth|authentication bypass/.test(txt))
-    out.push({ id: "T1068", tactic: "Privilege Escalation", name: "Exploitation for PrivEsc", color: "#ffa726" });
-  if (/ransomware|encrypt|extortion|wiper|locker|shadow copy/.test(txt))
-    out.push({ id: "T1486", tactic: "Impact", name: "Data Encrypted for Impact", color: "#ff1744" });
-  if (/credential|password|token|session hijack|cookie|kerberos|ntlm|active directory|lsass|infostealer|stealer/.test(txt))
-    out.push({ id: "T1555", tactic: "Credential Access", name: "Credential Dumping / Theft", color: "#ab47bc" });
-  if (/supply[- ]chain|npm|pypi|extension|plugin|package|backdoor|trojan|loader/.test(txt))
-    out.push({ id: "T1195", tactic: "Initial Access", name: "Supply Chain Compromise", color: "#ec407a" });
-  if (/exfiltrat|data leak|stolen|breach|exposed database|s3 bucket/.test(txt))
-    out.push({ id: "T1041", tactic: "Exfiltration", name: "Exfiltration Over C2 / Web", color: "#26c6da" });
-  if (/ddos|denial of service|\bdos\b|botnet/.test(txt))
-    out.push({ id: "T1498", tactic: "Impact", name: "Network Denial of Service", color: "#ffca28" });
-  return out.slice(0, 2);
+  for (const t of ALL_MITRE_TECHNIQUES) {
+    if (t.re.test(txt)) out.push(t);
+    if (out.length >= 3) break;
+  }
+  return out;
+}
+
+// ── OpenCTI Confidence & TLP Calculator ──────────────────────────────────────
+const HIGH_AUTH_SOURCES = new Set(["CISA KEV","CISA Alerts","NVD / CVE.org","GitHub Advisory (GHSA)","CERT-In (India)","NCSC UK","CERT-EU","JPCERT/CC","CIS Advisories","Cisco PSIRT","Palo Alto PSIRT","FortiGuard PSIRT","Microsoft Security"]);
+const LAB_SOURCES = new Set(["Unit 42","Cisco Talos","Check Point Research","CrowdStrike","Mandiant","Sophos X-Ops","Rapid7","Google Project Zero","ZDI 0-Day Pipeline","Exploit-DB","SANS ISC"]);
+
+function computeOpenCTIMeta(adv) {
+  const confidence = HIGH_AUTH_SOURCES.has(adv.source) ? 95
+    : LAB_SOURCES.has(adv.source) ? 88
+    : adv.category === "social" ? 55 : 78;
+  const tlp = adv.category === "social" ? { label: "TLP:GREEN", color: "#00e676", bg: "rgba(0,230,118,0.1)" }
+    : (adv.exploit_in_wild && adv.severity === "CRITICAL") ? { label: "TLP:AMBER", color: "#ffb300", bg: "rgba(255,179,0,0.12)" }
+    : { label: "TLP:CLEAR", color: "#e0e0e0", bg: "rgba(255,255,255,0.06)" };
+  return { confidence, tlp };
+}
+
+// ── OASIS STIX 2.1 Bundle Generator (OpenCTI / MISP / SIEM compatible) ───────
+function stixUuid(seed) {
+  let h1 = 0xdeadbeef ^ seed.length, h2 = 0x41c6ce57 ^ seed.length;
+  for (let i = 0; i < seed.length; i++) {
+    const ch = seed.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  const hex = (n) => (n >>> 0).toString(16).padStart(8, "0");
+  const full = hex(h1) + hex(h2) + hex(h1 ^ 0x9e3779b9) + hex(h2 ^ 0x85ebca6b);
+  return `${full.slice(0,8)}-${full.slice(8,12)}-4${full.slice(13,16)}-a${full.slice(17,20)}-${full.slice(20,32)}`;
+}
+
+function buildStixBundle(items) {
+  const nowIso = new Date().toISOString();
+  const tlpClearId = "marking-definition--613f2e26-407d-48c7-9eca-b8e91df99dc9";
+  const authorId = `identity--${stixUuid("BCyberAware-Vikas-Pandita")}`;
+  const objects = new Map();
+
+  objects.set(tlpClearId, {
+    type: "marking-definition",
+    spec_version: "2.1",
+    id: tlpClearId,
+    created: "2017-01-20T00:00:00.000Z",
+    definition_type: "tlp",
+    name: "TLP:CLEAR",
+    definition: { tlp: "clear" },
+  });
+  objects.set(authorId, {
+    type: "identity",
+    spec_version: "2.1",
+    id: authorId,
+    created: nowIso,
+    modified: nowIso,
+    name: "BCyberAware Threat Intelligence (Vikas Pandita)",
+    identity_class: "organization",
+    contact_information: "https://advisory.bcyberaware.co.in",
+  });
+
+  items.forEach(adv => {
+    const createdIso = adv.ts ? new Date(adv.ts).toISOString() : nowIso;
+    const { confidence } = computeOpenCTIMeta(adv);
+    const refIds = [];
+
+    // 1. Vulnerability SDOs
+    const vulnIds = (adv.cve_ids || []).map(cve => {
+      const vid = `vulnerability--${stixUuid(cve)}`;
+      if (!objects.has(vid)) {
+        objects.set(vid, {
+          type: "vulnerability",
+          spec_version: "2.1",
+          id: vid,
+          created: createdIso,
+          modified: nowIso,
+          name: cve,
+          description: adv.summary || adv.title,
+          confidence,
+          external_references: [{ source_name: "cve", external_id: cve, url: `https://nvd.nist.gov/vuln/detail/${cve}` }],
+          x_opencti_cvss_base_score: adv.cvss || null,
+          x_opencti_epss_score: adv.epss != null ? adv.epss / 100 : null,
+          x_opencti_cisa_kev: !!adv.exploit_in_wild,
+          object_marking_refs: [tlpClearId],
+        });
+      }
+      refIds.push(vid);
+      return vid;
+    });
+
+    // 2. Attack-Pattern SDOs (MITRE ATT&CK)
+    const mitreList = mapMitreTactics(adv);
+    const apIds = mitreList.map(m => {
+      const apId = `attack-pattern--${stixUuid(m.id)}`;
+      if (!objects.has(apId)) {
+        objects.set(apId, {
+          type: "attack-pattern",
+          spec_version: "2.1",
+          id: apId,
+          created: createdIso,
+          modified: nowIso,
+          name: `${m.id} - ${m.name}`,
+          kill_chain_phases: [{ kill_chain_name: "mitre-attack", phase_name: m.tactic.toLowerCase().replace(/\s+/g, "-") }],
+          external_references: [{ source_name: "mitre-attack", external_id: m.id, url: `https://attack.mitre.org/techniques/${m.id}/` }],
+          object_marking_refs: [tlpClearId],
+        });
+      }
+      refIds.push(apId);
+      return apId;
+    });
+
+    // 3. Intrusion-Set SDO (Threat Actor)
+    let actorId = null;
+    if (adv.threat_actor) {
+      actorId = `intrusion-set--${stixUuid(adv.threat_actor)}`;
+      if (!objects.has(actorId)) {
+        objects.set(actorId, {
+          type: "intrusion-set",
+          spec_version: "2.1",
+          id: actorId,
+          created: createdIso,
+          modified: nowIso,
+          name: adv.threat_actor,
+          confidence,
+          object_marking_refs: [tlpClearId],
+        });
+      }
+      refIds.push(actorId);
+    }
+
+    // 4. Relationships
+    if (actorId) {
+      vulnIds.forEach(vid => {
+        const rid = `relationship--${stixUuid(actorId + "-targets-" + vid)}`;
+        objects.set(rid, { type: "relationship", spec_version: "2.1", id: rid, created: createdIso, modified: nowIso, relationship_type: "targets", source_ref: actorId, target_ref: vid, confidence });
+        refIds.push(rid);
+      });
+      apIds.forEach(apId => {
+        const rid = `relationship--${stixUuid(actorId + "-uses-" + apId)}`;
+        objects.set(rid, { type: "relationship", spec_version: "2.1", id: rid, created: createdIso, modified: nowIso, relationship_type: "uses", source_ref: actorId, target_ref: apId, confidence });
+        refIds.push(rid);
+      });
+    }
+    apIds.forEach(apId => {
+      vulnIds.forEach(vid => {
+        const rid = `relationship--${stixUuid(apId + "-targets-" + vid)}`;
+        objects.set(rid, { type: "relationship", spec_version: "2.1", id: rid, created: createdIso, modified: nowIso, relationship_type: "targets", source_ref: apId, target_ref: vid, confidence });
+        refIds.push(rid);
+      });
+    });
+
+    // 5. Report SDO
+    const repId = `report--${stixUuid(adv.id || adv.title)}`;
+    objects.set(repId, {
+      type: "report",
+      spec_version: "2.1",
+      id: repId,
+      created: createdIso,
+      modified: nowIso,
+      name: adv.title,
+      description: adv.summary || adv.title,
+      published: createdIso,
+      report_types: [adv.category || "threat-report"],
+      created_by_ref: authorId,
+      confidence,
+      labels: [adv.severity || "HIGH", adv.source, ...(adv.middle_east_relevance === "HIGH" ? ["gcc-priority"] : [])].filter(Boolean),
+      external_references: adv.source_url ? [{ source_name: adv.source || "source", url: adv.source_url }] : [],
+      object_refs: refIds.length ? refIds : [authorId],
+      object_marking_refs: [tlpClearId],
+    });
+  });
+
+  return {
+    type: "bundle",
+    id: `bundle--${stixUuid("bundle-" + nowIso)}`,
+    spec_version: "2.1",
+    objects: [...objects.values()],
+  };
 }
 
 // ── DEFCON Cyber Posture Calculator ──────────────────────────────────────────
@@ -107,13 +321,14 @@ function computeDefcon(advisories, exploits) {
   return { level: 4, label: "DEFCON 4 · GUARDED", color: "#00e676", bg: "rgba(0,230,118,0.12)", desc: "Baseline global threat activity — standard patch cadence" };
 }
 
-function AdvisoryCard({ adv, onAskAI, onToggleWatch, isWatched }) {
+function AdvisoryCard({ adv, onAskAI, onToggleWatch, isWatched, onOpenKnowledge }) {
   const s=SEV_S[adv.severity]||SEV_S.LOW;
   const isNews=adv.category==="news";
   const isExploit=adv.category==="exploit";
   const borderCol=isNews?"#1976d2":isExploit?"#c00000":s.border;
   const isFresh=adv.ts&&(Date.now()-adv.ts)<24*60*60*1000;
   const mitre = mapMitreTactics(adv);
+  const { confidence, tlp } = computeOpenCTIMeta(adv);
   const epssColor = (adv.epss||0)>=50 ? "#ff1744" : (adv.epss||0)>=15 ? "#ff9100" : "#00e5ff";
   return (
     <div className="card" style={{background:"rgba(5,8,15,0.92)",border:`1px solid ${borderCol}33`,borderLeft:`4px solid ${borderCol}`,borderRadius:6,padding:"18px 20px",marginBottom:12,boxShadow:adv.exploit_in_wild?`0 0 14px ${borderCol}12`:"none"}}>
@@ -126,6 +341,8 @@ function AdvisoryCard({ adv, onAskAI, onToggleWatch, isWatched }) {
         {adv.exploit_in_wild&&!isExploit&&<span style={{fontSize:12,padding:"4px 12px",background:"rgba(200,0,0,0.15)",border:"1px solid #c0000055",color:"#ff4444",letterSpacing:1,fontFamily:"var(--mono)",borderRadius:3}}>⚡ EXPLOIT IN WILD</span>}
         {adv.middle_east_relevance==="HIGH"&&<span style={{fontSize:12,padding:"4px 12px",background:"rgba(0,166,81,0.1)",border:"1px solid #00a65155",color:"#00e676",letterSpacing:1,fontFamily:"var(--mono)",borderRadius:3}}>🌍 GCC RISK</span>}
         {isFresh&&<span style={{fontSize:11,padding:"4px 10px",background:"rgba(0,200,255,0.1)",border:"1px solid rgba(0,200,255,.4)",color:"#00c8ff",letterSpacing:1,fontFamily:"var(--mono)",borderRadius:3,fontWeight:800}}>● FRESH</span>}
+        <span title="Source confidence (OpenCTI-style)" style={{fontSize:10,padding:"3px 8px",background:"rgba(0,200,255,0.07)",border:"1px solid rgba(0,200,255,0.22)",color:ACCENT,fontFamily:"var(--mono)",borderRadius:3,fontWeight:700}}>{confidence}%</span>
+        <span title="Traffic Light Protocol" style={{fontSize:10,padding:"3px 8px",background:tlp.bg,border:`1px solid ${tlp.color}55`,color:tlp.color,fontFamily:"var(--mono)",borderRadius:3,fontWeight:700}}>{tlp.label}</span>
         <span style={{fontSize:12,color:"rgba(200,220,240,0.4)"}}>{adv.source_flag} {adv.source} · {adv.ts?timeAgo(adv.ts):adv.date}</span>
         {onToggleWatch&&(
           <button onClick={()=>onToggleWatch(adv)} title={isWatched?"Remove from Watchlist":"Save to Watchlist"} style={{marginLeft:"auto",background:isWatched?"rgba(255,215,0,0.15)":"rgba(255,255,255,0.03)",border:`1px solid ${isWatched?"#ffd700":"rgba(255,255,255,0.12)"}`,color:isWatched?"#ffd700":"rgba(200,220,240,0.45)",padding:"3px 10px",borderRadius:4,cursor:"pointer",fontSize:12,fontFamily:"var(--mono)",fontWeight:700}}>
@@ -144,10 +361,11 @@ function AdvisoryCard({ adv, onAskAI, onToggleWatch, isWatched }) {
           <span key={p} style={{fontSize:11,color:"rgba(200,220,240,0.7)",fontFamily:"var(--mono)",background:"rgba(255,255,255,0.04)",padding:"4px 10px",border:"1px solid rgba(255,255,255,0.1)",borderRadius:3}}>📦 {p}</span>
         ))}
         {mitre.map(m=>(
-          <a key={m.id} href={`https://attack.mitre.org/techniques/${m.id}/`} target="_blank" rel="noopener noreferrer" title={`MITRE ATT&CK ${m.tactic}: ${m.name}`}
-            style={{fontSize:11,color:m.color,fontFamily:"var(--mono)",background:`${m.color}14`,padding:"4px 10px",border:`1px solid ${m.color}44`,borderRadius:3,fontWeight:600}}>⚔️ {m.id} · {m.name}</a>
+          <button key={m.id} type="button" onClick={()=>onOpenKnowledge?onOpenKnowledge({type:"technique",id:m.id}):window.open(`https://attack.mitre.org/techniques/${m.id}/`,"_blank")}
+            title={`Open Knowledge · MITRE ATT&CK ${m.tactic}: ${m.name}`}
+            style={{fontSize:11,color:m.color,fontFamily:"var(--mono)",background:`${m.color}14`,padding:"4px 10px",border:`1px solid ${m.color}44`,borderRadius:3,fontWeight:600,cursor:"pointer"}}>⚔️ {m.id} · {m.name}</button>
         ))}
-        {adv.threat_actor&&<span style={{fontSize:12,color:"#c084fc",fontFamily:"var(--mono)",background:"rgba(123,47,247,0.09)",padding:"4px 11px",border:"1px solid rgba(123,47,247,0.25)",borderRadius:3}}>🎯 {adv.threat_actor}</span>}
+        {adv.threat_actor&&<button type="button" onClick={()=>onOpenKnowledge&&onOpenKnowledge({type:"entity",id:adv.threat_actor})} style={{fontSize:12,color:"#c084fc",fontFamily:"var(--mono)",background:"rgba(123,47,247,0.09)",padding:"4px 11px",border:"1px solid rgba(123,47,247,0.25)",borderRadius:3,cursor:"pointer"}}>🎯 {adv.threat_actor}</button>}
         {adv.patch_available&&!isNews&&<span style={{fontSize:12,color:"#00e676",fontFamily:"var(--mono)",background:"rgba(0,200,100,0.07)",padding:"4px 11px",border:"1px solid rgba(0,200,100,0.22)",borderRadius:3}}>✔ PATCH AVAILABLE</span>}
       </div>
       <div style={{borderTop:"1px solid rgba(255,255,255,0.06)",paddingTop:12,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
@@ -948,6 +1166,296 @@ function ThreatAnalystChat({ externalPrompt, onConsumedPrompt }){
   );
 }
 
+// ── OpenCTI-inspired Knowledge Graph (native — no OpenCTI server) ────────────
+const KNOWN_ENTITIES = [
+  { name: "LockBit", kind: "ransomware", color: "#ff1744", re: /\blockbit\b/i },
+  { name: "Qilin", kind: "ransomware", color: "#ff5252", re: /\bqilin\b/i },
+  { name: "Akira", kind: "ransomware", color: "#ff6e40", re: /\bakira\b/i },
+  { name: "Cl0p", kind: "ransomware", color: "#ff1744", re: /\bcl0p\b|\bclop\b/i },
+  { name: "Black Basta", kind: "ransomware", color: "#e53935", re: /black\s*basta/i },
+  { name: "RansomHub", kind: "ransomware", color: "#d32f2f", re: /ransomhub/i },
+  { name: "Play", kind: "ransomware", color: "#c62828", re: /play ransomware|\bplay\b.*ransom/i },
+  { name: "Scattered Spider", kind: "intrusion-set", color: "#ab47bc", re: /scattered spider|unc3944|octo tempest/i },
+  { name: "Lazarus", kind: "intrusion-set", color: "#8e24aa", re: /\blazarus\b|hidden cobra|apt38/i },
+  { name: "APT29", kind: "intrusion-set", color: "#7b1fa2", re: /\bapt29\b|cozy bear|midnight blizzard/i },
+  { name: "APT28", kind: "intrusion-set", color: "#6a1b9a", re: /\bapt28\b|fancy bear|forest blizzard/i },
+  { name: "Volt Typhoon", kind: "intrusion-set", color: "#9c27b0", re: /volt typhoon/i },
+  { name: "Salt Typhoon", kind: "intrusion-set", color: "#8e24aa", re: /salt typhoon/i },
+  { name: "Kimsuky", kind: "intrusion-set", color: "#7e57c2", re: /\bkimsuky\b/i },
+  { name: "Lumma Stealer", kind: "malware", color: "#26c6da", re: /\blumma\b/i },
+  { name: "RedLine", kind: "malware", color: "#00acc1", re: /\bredline\b/i },
+  { name: "Cobalt Strike", kind: "tool", color: "#29b6f6", re: /cobalt strike/i },
+  { name: "Ivanti", kind: "vendor", color: "#ff9100", re: /\bivanti\b|connect secure/i },
+  { name: "Fortinet", kind: "vendor", color: "#ee3124", re: /fortinet|fortigate|fortios/i },
+  { name: "Cisco", kind: "vendor", color: "#049fd9", re: /\bcisco\b|ios xe|\basa\b/i },
+  { name: "Microsoft", kind: "vendor", color: "#0078d4", re: /microsoft|windows|exchange|sharepoint|azure/i },
+  { name: "Palo Alto", kind: "vendor", color: "#fa582d", re: /palo alto|pan-os|globalprotect/i },
+  { name: "VMware", kind: "vendor", color: "#607d8b", re: /vmware|esxi|vcenter/i },
+];
+
+const KNOWLEDGE_VENDORS = [
+  ["Microsoft", /microsoft|windows|exchange|sharepoint|azure|defender|office 365/i],
+  ["Cisco", /\bcisco\b|ios xe|asa|anyconnect/i],
+  ["Fortinet", /fortinet|fortigate|fortios|fortiguard/i],
+  ["Ivanti", /\bivanti\b|connect secure/i],
+  ["Palo Alto", /palo alto|pan-os|globalprotect/i],
+  ["Linux", /\blinux\b|kernel|ubuntu|debian/i],
+  ["WordPress", /wordpress|wp-content/i],
+  ["VMware", /vmware|esxi|vcenter/i],
+  ["Apple", /\bapple\b|\bios\b|macos|webkit/i],
+  ["GitLab", /gitlab|github/i],
+];
+
+function itemText(a){ return `${a.title||""} ${a.summary||""} ${(a.affected_products||[]).join(" ")} ${a.threat_actor||""}`; }
+
+function extractIOCs(text){
+  const ips = [...new Set((String(text).match(/\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\b/g)||[]))]
+    .filter(ip => !/^(0|127|255)\./.test(ip) && !/^10\./.test(ip) && !/^192\.168\./.test(ip)).slice(0, 10);
+  const hashes = [...new Set(String(text).match(/\b[a-fA-F0-9]{64}\b|\b[a-fA-F0-9]{40}\b/g)||[])].slice(0, 8);
+  const domains = [...new Set((String(text).match(/\b(?:[a-z0-9-]+\.)+(?:ru|cn|onion|xyz|top|cc)\b/gi)||[]))]
+    .filter(d => !/w3\.org|example\./i.test(d)).slice(0, 8);
+  return { ips, hashes, domains };
+}
+
+function buildKnowledgeIndex(items){
+  const techniques = ALL_MITRE_TECHNIQUES.map(t => {
+    const hits = items.filter(a => t.re.test(itemText(a)));
+    return { ...t, count: hits.length, items: hits.slice(0, 8) };
+  }).filter(t => t.count > 0);
+  const entities = KNOWN_ENTITIES.map(e => {
+    const hits = items.filter(a => e.re.test(itemText(a)) || (a.threat_actor && e.re.test(a.threat_actor)));
+    return { ...e, count: hits.length, items: hits.slice(0, 8) };
+  }).filter(e => e.count > 0);
+  items.forEach(a => {
+    if (a.threat_actor && !entities.some(e => e.name.toLowerCase() === a.threat_actor.toLowerCase())) {
+      const hits = items.filter(x => x.threat_actor === a.threat_actor);
+      entities.push({ name: a.threat_actor, kind: "intrusion-set", color: "#c084fc", count: hits.length, items: hits.slice(0, 8) });
+    }
+  });
+  const vendors = KNOWLEDGE_VENDORS.map(([name, re]) => {
+    const hits = items.filter(a => re.test(itemText(a)));
+    return { name, count: hits.length, items: hits.slice(0, 8), color: "#00c8ff" };
+  }).filter(v => v.count > 0).sort((a,b)=>b.count-a.count);
+  const cves = [];
+  const seen = new Set();
+  items.forEach(a => (a.cve_ids||[]).forEach(c => {
+    if (seen.has(c)) return;
+    seen.add(c);
+    const hits = items.filter(x => (x.cve_ids||[]).includes(c));
+    cves.push({ name: c, count: hits.length, items: hits.slice(0, 6), epss: Math.max(0, ...hits.map(h => h.epss||0)) });
+  }));
+  cves.sort((a,b)=>(b.epss-a.epss)||(b.count-a.count));
+  const iocs = { ips: [], hashes: [], domains: [] };
+  items.forEach(a => {
+    const found = extractIOCs(itemText(a));
+    found.ips.forEach(v => { if (!iocs.ips.includes(v)) iocs.ips.push(v); });
+    found.hashes.forEach(v => { if (!iocs.hashes.includes(v)) iocs.hashes.push(v); });
+    found.domains.forEach(v => { if (!iocs.domains.includes(v)) iocs.domains.push(v); });
+  });
+  return { techniques, entities, vendors, cves: cves.slice(0, 20), iocs };
+}
+
+function KnowledgeView({ advisories, exploits, news, focus, onClearFocus, onAskAI }) {
+  const [tab, setTab] = useState(focus?.type === "entity" ? "encyclopedia" : focus?.type === "ioc" ? "hunt" : "matrix");
+  const [selected, setSelected] = useState(focus || null);
+  const [dw, setDw] = useState(null);
+
+  useEffect(() => { fetch("/api/darkweb", { cache: "no-store" }).then(r => r.json()).then(setDw).catch(() => setDw(null)); }, []);
+  useEffect(() => { if (focus) { setSelected(focus); setTab(focus.type === "entity" ? "encyclopedia" : focus.type === "ioc" ? "hunt" : "matrix"); } }, [focus]);
+
+  const items = [...advisories, ...exploits, ...news];
+  const idx = buildKnowledgeIndex(items);
+  const groups = dw?.ransomware_groups || [];
+  const victims = dw?.ransomware_victims || [];
+  const c2s = dw?.c2_servers || [];
+
+  const selectedItems = (() => {
+    if (!selected) return [];
+    if (selected.type === "technique") return (idx.techniques.find(t => t.id === selected.id)?.items) || items.filter(a => ALL_MITRE_TECHNIQUES.find(t => t.id === selected.id)?.re.test(itemText(a)));
+    if (selected.type === "entity") return (idx.entities.find(e => e.name === selected.id)?.items) || items.filter(a => itemText(a).toLowerCase().includes(String(selected.id).toLowerCase()));
+    if (selected.type === "vendor") return (idx.vendors.find(v => v.name === selected.id)?.items) || [];
+    if (selected.type === "cve") return items.filter(a => (a.cve_ids||[]).includes(selected.id));
+    return [];
+  })();
+
+  const diamond = {
+    adversary: idx.entities.filter(e => e.kind === "ransomware" || e.kind === "intrusion-set").length + groups.filter(g => (g.status||"").includes("activ")).length,
+    infra: idx.vendors.length + c2s.length,
+    victim: victims.length + items.filter(a => a.middle_east_relevance === "HIGH").length,
+    capability: idx.techniques.length + idx.entities.filter(e => e.kind === "malware" || e.kind === "tool").length,
+  };
+
+  const copy = (text) => { try { navigator.clipboard.writeText(text); } catch {} };
+
+  return (
+    <div style={{animation:"fadeIn .3s ease"}}>
+      <div style={{textAlign:"center",marginBottom:18}}>
+        <div style={{fontSize:13,letterSpacing:4,color:ACCENT2,marginBottom:8,fontFamily:"var(--mono)"}}>🧬 THREAT KNOWLEDGE GRAPH</div>
+        <div style={{fontSize:22,fontWeight:900,color:"#ddeeff",marginBottom:6}}>ATT&amp;CK · Entities · Relationships · Hunt</div>
+        <div style={{fontSize:13,color:"rgba(200,220,240,.4)"}}>OpenCTI ideas, native on this dashboard — STIX 2.1 export, no OpenCTI server</div>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:16}}>
+        {[
+          {q:"ADVERSARY",v:diamond.adversary,c:"#c084fc",s:"Actors & ransomware groups"},
+          {q:"INFRASTRUCTURE",v:diamond.infra,c:"#29b6f6",s:"Vendors + C2 servers"},
+          {q:"VICTIMOLOGY",v:diamond.victim,c:"#00e676",s:"Leak victims + GCC risk"},
+          {q:"CAPABILITY",v:diamond.capability,c:"#ff9100",s:"TTPs, malware & tools"},
+        ].map(d=>(
+          <div key={d.q} style={{background:`${d.c}10`,border:`1px solid ${d.c}44`,borderRadius:8,padding:"14px 16px"}}>
+            <div style={{fontSize:10,letterSpacing:2,color:d.c,fontFamily:"var(--mono)",marginBottom:6}}>{d.q}</div>
+            <div style={{fontSize:28,fontWeight:900,color:d.c,fontFamily:"var(--mono)",lineHeight:1}}>{d.v}</div>
+            <div style={{fontSize:11,color:"rgba(200,220,240,.4)",marginTop:4}}>{d.s}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{display:"flex",gap:4,marginBottom:16,borderBottom:"1px solid rgba(255,255,255,.07)",overflowX:"auto"}}>
+        {[["matrix","⚔️ ATT&CK Matrix"],["graph","🕸 Relationship Graph"],["encyclopedia","📚 Encyclopedia"],["hunt","🎯 IOC Hunt"]].map(([id,lbl])=>(
+          <button key={id} onClick={()=>setTab(id)} style={{padding:"10px 16px",background:"transparent",border:"none",borderBottom:tab===id?`3px solid ${ACCENT2}`:"3px solid transparent",color:tab===id?ACCENT2:"rgba(200,220,240,.45)",fontSize:13,cursor:"pointer",fontFamily:"var(--mono)",fontWeight:tab===id?700:400,whiteSpace:"nowrap"}}>{lbl}</button>
+        ))}
+      </div>
+
+      {tab==="matrix"&&(
+        <div>
+          <div style={{overflowX:"auto",marginBottom:16}}>
+            <div style={{display:"grid",gridTemplateColumns:`repeat(${MITRE_MATRIX.length},minmax(110px,1fr))`,gap:6,minWidth:980}}>
+              {MITRE_MATRIX.map(col=>{
+                const max = Math.max(1, ...col.techniques.map(t => (idx.techniques.find(x=>x.id===t.id)?.count)||0));
+                return (
+                  <div key={col.code}>
+                    <div style={{fontSize:10,fontWeight:800,color:ACCENT,fontFamily:"var(--mono)",letterSpacing:.4,marginBottom:6,minHeight:32}}>{col.tactic}<div style={{color:"rgba(200,220,240,.35)",fontWeight:500}}>{col.code}</div></div>
+                    {col.techniques.map(t=>{
+                      const hit = idx.techniques.find(x=>x.id===t.id);
+                      const n = hit?.count||0;
+                      const hot = selected?.type==="technique"&&selected.id===t.id;
+                      const alpha = n?(.12+.55*(n/max)):0.03;
+                      return (
+                        <button key={t.id} onClick={()=>setSelected(hot?null:{type:"technique",id:t.id})}
+                          style={{display:"block",width:"100%",textAlign:"left",marginBottom:5,padding:"8px 8px",borderRadius:5,cursor:"pointer",background:n?`${t.color}${Math.round(alpha*255).toString(16).padStart(2,"0")}`:"rgba(255,255,255,.03)",border:`1px solid ${hot?t.color:n?t.color+"66":"rgba(255,255,255,.06)"}`,boxShadow:hot?`0 0 10px ${t.color}55`:"none"}}>
+                          <div style={{fontSize:10,fontWeight:800,color:n?t.color:"rgba(200,220,240,.3)",fontFamily:"var(--mono)"}}>{t.id}{n?` · ${n}`:""}</div>
+                          <div style={{fontSize:10,color:n?"rgba(230,238,250,.8)":"rgba(200,220,240,.28)",lineHeight:1.35}}>{t.name}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div style={{fontSize:12,color:"rgba(200,220,240,.4)",marginBottom:10,fontFamily:"var(--mono)"}}>Click a technique cell to list live items mapped to it. Heat = current feed volume.</div>
+        </div>
+      )}
+
+      {tab==="graph"&&(
+        <div style={{background:"rgba(5,8,15,.95)",border:"1px solid rgba(123,47,247,.25)",borderRadius:8,padding:"16px 12px",overflowX:"auto",marginBottom:16}}>
+          <svg viewBox="0 0 920 340" style={{width:"100%",minWidth:720}} xmlns="http://www.w3.org/2000/svg">
+            <rect width="920" height="340" fill="#060c18" rx="6"/>
+            {["VENDORS","CVEs","ATT&CK","ACTORS"].map((lbl,i)=>(
+              <text key={lbl} x={80+i*230} y="22" fill="rgba(200,220,240,.4)" fontSize="10" fontFamily="monospace" letterSpacing="2">{lbl}</text>
+            ))}
+            {(() => {
+              const vendors = idx.vendors.slice(0,6);
+              const cves = idx.cves.slice(0,7);
+              const techs = idx.techniques.slice(0,7);
+              const actors = idx.entities.filter(e=>e.kind!=="vendor").slice(0,6);
+              const node = (list, x, color) => list.map((n,i)=>({ ...n, x, y: 50+i*42, color: n.color||color }));
+              const V = node(vendors, 80, "#00c8ff");
+              const C = node(cves, 310, "#ff6e6e");
+              const T = node(techs, 540, "#ffab40");
+              const A = node(actors, 770, "#c084fc");
+              const edges = [];
+              V.forEach(v => C.forEach(c => { if (c.items.some(it => v.items.includes(it) || itemText(it).toLowerCase().includes(v.name.toLowerCase()))) edges.push([v,c,"#00c8ff33"]); }));
+              C.forEach(c => T.forEach(t => { if (c.items.some(it => t.re?.test(itemText(it)))) edges.push([c,t,"#ffab4033"]); }));
+              A.forEach(a => C.forEach(c => { if (c.items.some(it => a.re?.test(itemText(it)) || itemText(it).toLowerCase().includes(a.name.toLowerCase()))) edges.push([a,c,"#c084fc33"]); }));
+              return (
+                <g>
+                  {edges.slice(0,40).map((e,i)=><line key={i} x1={e[0].x+70} y1={e[0].y+8} x2={e[1].x} y2={e[1].y+8} stroke={e[2]} strokeWidth="1"/>)}
+                  {[...V,...C,...T,...A].map((n,i)=>(
+                    <g key={i} style={{cursor:"pointer"}} onClick={()=>setSelected({type:n.id?"technique":n.name?.startsWith("CVE")?"cve":KNOWN_ENTITIES.some(k=>k.name===n.name)?"entity":"vendor", id:n.id||n.name})}>
+                      <rect x={n.x-8} y={n.y-10} width={150} height={28} rx="4" fill={`${n.color}18`} stroke={`${n.color}66`}/>
+                      <text x={n.x} y={n.y+8} fill={n.color} fontSize="10" fontFamily="monospace" fontWeight="700">{(n.id||n.name||"").slice(0,18)}{n.count?` (${n.count})`:""}</text>
+                    </g>
+                  ))}
+                </g>
+              );
+            })()}
+          </svg>
+          <div style={{fontSize:12,color:"rgba(200,220,240,.4)",marginTop:8,fontFamily:"var(--mono)"}}>Edges = co-occurrence in the live feed (vendor ↔ CVE ↔ technique ↔ actor). Click a node to inspect.</div>
+        </div>
+      )}
+
+      {tab==="encyclopedia"&&(
+        <div>
+          <div style={{fontSize:11,letterSpacing:2,color:"rgba(192,132,252,.75)",fontFamily:"var(--mono)",marginBottom:10}}>LIVE ENTITIES IN THIS FEED</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:10,marginBottom:18}}>
+            {idx.entities.slice(0,16).map(e=>(
+              <button key={e.name} onClick={()=>setSelected({type:"entity",id:e.name})} style={{textAlign:"left",background:"rgba(5,8,15,.92)",border:`1px solid ${selected?.id===e.name?e.color:e.color+"33"}`,borderLeft:`4px solid ${e.color}`,borderRadius:6,padding:"14px 16px",cursor:"pointer"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                  <span style={{fontSize:14,fontWeight:800,color:"#eef4ff"}}>{e.name}</span>
+                  <span style={{fontSize:10,fontFamily:"var(--mono)",color:e.color,border:`1px solid ${e.color}55`,padding:"2px 7px",borderRadius:3}}>{e.kind}</span>
+                </div>
+                <div style={{fontSize:22,fontWeight:900,color:e.color,fontFamily:"var(--mono)",lineHeight:1}}>{e.count}</div>
+                <div style={{fontSize:11,color:"rgba(200,220,240,.4)"}}>linked live items</div>
+              </button>
+            ))}
+            {idx.entities.length===0&&<div style={{color:"rgba(200,220,240,.35)",padding:"20px"}}>No named actors in the current snapshot — ransomware groups from Dark Web still appear below.</div>}
+          </div>
+          {groups.length>0&&<>
+            <div style={{fontSize:11,letterSpacing:2,color:"rgba(255,23,68,.7)",fontFamily:"var(--mono)",marginBottom:10}}>RANSOMWARE GROUPS (ransomware.live)</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8,marginBottom:16}}>
+              {groups.filter(g=>(g.status||"").includes("activ")).slice(0,12).map(g=>(
+                <div key={g.name} style={{background:"rgba(5,8,15,.92)",border:"1px solid rgba(255,23,68,.2)",borderLeft:"4px solid #c00000",borderRadius:6,padding:"12px 14px"}}>
+                  <div style={{fontSize:14,fontWeight:700,color:"#eef4ff"}}>{g.name}</div>
+                  <div style={{fontSize:11,color:"#ff6666",fontFamily:"var(--mono)",marginTop:4}}>● ACTIVE{g.victim_count?` · ${g.victim_count} victims`:""}</div>
+                  {g.description&&<div style={{fontSize:11,color:"rgba(200,220,240,.4)",marginTop:6,lineHeight:1.5}}>{g.description.slice(0,120)}</div>}
+                </div>
+              ))}
+            </div>
+          </>}
+        </div>
+      )}
+
+      {tab==="hunt"&&(
+        <div>
+          <div style={{padding:"12px 16px",background:"rgba(255,145,0,.06)",border:"1px solid rgba(255,145,0,.25)",borderRadius:6,marginBottom:14,fontSize:12.5,color:"rgba(200,220,240,.55)",lineHeight:1.7}}>
+            🎯 Observables extracted from the live feed plus Feodo Tracker C2 servers. For defensive hunting only — verify before blocking.
+          </div>
+          {[["IPv4", idx.iocs.ips, "#29b6f6"],["Hashes", idx.iocs.hashes, "#ffab40"],["Suspicious domains", idx.iocs.domains, "#c084fc"]].map(([lbl, list, col])=>(
+            <div key={lbl} style={{marginBottom:14}}>
+              <div style={{fontSize:11,letterSpacing:2,color:col,fontFamily:"var(--mono)",marginBottom:8}}>{lbl.toUpperCase()} ({list.length})</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                {list.length===0&&<span style={{fontSize:12,color:"rgba(200,220,240,.3)"}}>None extracted this cycle.</span>}
+                {list.map(v=>(
+                  <button key={v} onClick={()=>copy(v)} title="Copy" style={{fontSize:11,fontFamily:"var(--mono)",padding:"5px 10px",background:`${col}14`,border:`1px solid ${col}44`,color:col,borderRadius:4,cursor:"pointer"}}>{v} ⧉</button>
+                ))}
+              </div>
+            </div>
+          ))}
+          {c2s.length>0&&<>
+            <div style={{fontSize:11,letterSpacing:2,color:"#ff9944",fontFamily:"var(--mono)",margin:"16px 0 8px"}}>ACTIVE BOTNET C2 (abuse.ch Feodo / Cybercrime Tracker)</div>
+            {c2s.slice(0,8).map((c,i)=>(
+              <div key={i} style={{background:"rgba(5,8,15,.92)",border:"1px solid rgba(255,109,0,.25)",borderLeft:"4px solid #e65100",borderRadius:6,padding:"10px 14px",marginBottom:8,fontFamily:"var(--mono)",fontSize:12,color:"#eef4ff"}}>
+                {c.title}{c.url&&<a href={c.url} target="_blank" rel="noopener noreferrer" style={{marginLeft:10,color:ACCENT}}>inspect ↗</a>}
+              </div>
+            ))}
+          </>}
+        </div>
+      )}
+
+      {selected&&selectedItems.length>0&&(
+        <div style={{marginTop:8}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+            <div style={{fontSize:12,letterSpacing:1.5,color:ACCENT,fontFamily:"var(--mono)"}}>LINKED LIVE ITEMS · {selected.type} · {selected.id} ({selectedItems.length})</div>
+            <button onClick={()=>{setSelected(null);onClearFocus&&onClearFocus();}} style={{fontSize:11,fontFamily:"var(--mono)",padding:"4px 10px",background:"transparent",border:"1px solid rgba(255,255,255,.15)",color:"rgba(200,220,240,.5)",borderRadius:4,cursor:"pointer"}}>✕ Clear</button>
+          </div>
+          {selectedItems.map(a=><AdvisoryCard key={a.id} adv={a} onAskAI={onAskAI}/>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function BCyberAwareDashboard() {
   const [advisories,setAdvisories] = useState([]);
   const [exploits,  setExploits]   = useState([]);
@@ -969,6 +1477,7 @@ function BCyberAwareDashboard() {
     try { return JSON.parse(localStorage.getItem("bca_watchlist") || "[]"); } catch { return []; }
   });
   const [aiPrompt,  setAiPrompt]   = useState(null);
+  const [knowFocus, setKnowFocus]  = useState(null);
   const [view,      setView]       = useState("feed");
   const [feedTab,   setFeedTab]    = useState("advisories");
   const searchInputRef = React.useRef(null);
@@ -1004,8 +1513,21 @@ function BCyberAwareDashboard() {
     setAiPrompt(`Triage this ${item.severity || ""} item from ${item.source}: "${item.title}"${cvePart}${epssPart}. Explain: 1) What is vulnerable & impact, 2) Detection / IOCs to hunt, 3) Immediate remediation steps for enterprise / GCC SOC teams.`);
   }, []);
 
+  const openKnowledge = useCallback(focus => {
+    setKnowFocus(focus || null);
+    setView("knowledge");
+  }, []);
+
   const exportIntel = useCallback((items, fmt) => {
     const stamp = new Date().toISOString().slice(0, 10);
+    if (fmt === "stix") {
+      const bundle = buildStixBundle(items);
+      const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: "application/stix+json" });
+      const u = URL.createObjectURL(blob);
+      const a = document.createElement("a"); a.href = u; a.download = `bcyberaware-stix21-${stamp}.json`; a.click();
+      URL.revokeObjectURL(u);
+      return;
+    }
     if (fmt === "json") {
       const blob = new Blob([JSON.stringify(items, null, 2)], { type: "application/json" });
       const u = URL.createObjectURL(blob);
@@ -1172,7 +1694,7 @@ function BCyberAwareDashboard() {
             </div>
           </div>
           <nav className="topnav" aria-label="Main navigation" style={{display:"flex",gap:4,flex:"1 1 auto",overflowX:"auto",WebkitOverflowScrolling:"touch",padding:"4px 0",justifyContent:"center"}}>
-            {[["feed","▦ Live Feed"],["heatmap","🌍 Heatmap"],["ciso","📋 CISO Brief"],["genai","🤖 GenAI"],["darkweb","🕵️ Dark Web"],["sources","◎ Sources"],["demo","▶ Demo"],["about","◉ About"]].map(([v,l])=>navBtn(v,l))}
+            {[["feed","▦ Live Feed"],["knowledge","🧬 Knowledge"],["heatmap","🌍 Heatmap"],["ciso","📋 CISO Brief"],["genai","🤖 GenAI"],["darkweb","🕵️ Dark Web"],["sources","◎ Sources"],["demo","▶ Demo"],["about","◉ About"]].map(([v,l])=>navBtn(v,l))}
           </nav>
           <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
             {loading?(
@@ -1231,6 +1753,7 @@ function BCyberAwareDashboard() {
               <div style={{display:"flex",gap:6,marginLeft:"auto"}}>
                 <button onClick={()=>exportIntel(feedTab==="advisories"?fAdvisories:feedTab==="exploits"?fExploits:feedTab==="news"?fNews:feedTab==="watchlist"?watchlist:fSocial,"csv")} title="Export current view to CSV" style={{padding:"5px 10px",fontSize:11,fontFamily:"var(--mono)",background:"rgba(0,200,255,0.07)",border:"1px solid rgba(0,200,255,0.25)",color:ACCENT,borderRadius:4,cursor:"pointer",fontWeight:600}}>⬇ CSV</button>
                 <button onClick={()=>exportIntel(feedTab==="advisories"?fAdvisories:feedTab==="exploits"?fExploits:feedTab==="news"?fNews:feedTab==="watchlist"?watchlist:fSocial,"json")} title="Export current view to JSON" style={{padding:"5px 10px",fontSize:11,fontFamily:"var(--mono)",background:"rgba(123,47,247,0.1)",border:"1px solid rgba(123,47,247,0.3)",color:"#d8b4fe",borderRadius:4,cursor:"pointer",fontWeight:600}}>⬇ JSON</button>
+                <button onClick={()=>exportIntel(feedTab==="advisories"?fAdvisories:feedTab==="exploits"?fExploits:feedTab==="news"?fNews:feedTab==="watchlist"?watchlist:fSocial,"stix")} title="Export OASIS STIX 2.1 bundle (OpenCTI / MISP / TAXII compatible)" style={{padding:"5px 10px",fontSize:11,fontFamily:"var(--mono)",background:"rgba(255,145,0,0.1)",border:"1px solid rgba(255,145,0,0.35)",color:"#ffab40",borderRadius:4,cursor:"pointer",fontWeight:600}}>⬇ STIX 2.1</button>
               </div>
             </div>
 
@@ -1266,9 +1789,9 @@ function BCyberAwareDashboard() {
                 </div>
               </div>
             )}
-            {feedTab==="advisories"&&(fAdvisories.length===0?<div style={{textAlign:"center",padding:"40px",color:"rgba(200,220,240,.35)",fontSize:14}}>No advisories match your current filter/search.</div>:fAdvisories.map(a=><AdvisoryCard key={a.id} adv={a} onAskAI={askAIAboutItem} onToggleWatch={toggleWatch} isWatched={watchIds.has(a.id)}/>))}
-            {feedTab==="exploits"  &&(fExploits.length===0?<div style={{textAlign:"center",padding:"40px",color:"rgba(200,220,240,.35)",fontSize:14}}>No exploits match your current filter/search.</div>:fExploits.map(a=><AdvisoryCard key={a.id} adv={a} onAskAI={askAIAboutItem} onToggleWatch={toggleWatch} isWatched={watchIds.has(a.id)}/>))}
-            {feedTab==="news"      &&(fNews.length===0?<div style={{textAlign:"center",padding:"40px",color:"rgba(200,220,240,.35)",fontSize:14}}>No news items match "{searchQ}".</div>:fNews.map(a=><AdvisoryCard key={a.id} adv={a} onAskAI={askAIAboutItem} onToggleWatch={toggleWatch} isWatched={watchIds.has(a.id)}/>))}
+            {feedTab==="advisories"&&(fAdvisories.length===0?<div style={{textAlign:"center",padding:"40px",color:"rgba(200,220,240,.35)",fontSize:14}}>No advisories match your current filter/search.</div>:fAdvisories.map(a=><AdvisoryCard key={a.id} adv={a} onAskAI={askAIAboutItem} onToggleWatch={toggleWatch} isWatched={watchIds.has(a.id)} onOpenKnowledge={openKnowledge}/>))}
+            {feedTab==="exploits"  &&(fExploits.length===0?<div style={{textAlign:"center",padding:"40px",color:"rgba(200,220,240,.35)",fontSize:14}}>No exploits match your current filter/search.</div>:fExploits.map(a=><AdvisoryCard key={a.id} adv={a} onAskAI={askAIAboutItem} onToggleWatch={toggleWatch} isWatched={watchIds.has(a.id)} onOpenKnowledge={openKnowledge}/>))}
+            {feedTab==="news"      &&(fNews.length===0?<div style={{textAlign:"center",padding:"40px",color:"rgba(200,220,240,.35)",fontSize:14}}>No news items match "{searchQ}".</div>:fNews.map(a=><AdvisoryCard key={a.id} adv={a} onAskAI={askAIAboutItem} onToggleWatch={toggleWatch} isWatched={watchIds.has(a.id)} onOpenKnowledge={openKnowledge}/>))}
             {feedTab==="social"    &&(
               <>
                 <div style={{padding:"12px 16px",background:"rgba(99,100,255,.06)",border:"1px solid rgba(99,100,255,.2)",borderRadius:6,marginBottom:14,fontSize:12.5,color:"rgba(200,220,240,.55)",lineHeight:1.7}}>
@@ -1284,7 +1807,7 @@ function BCyberAwareDashboard() {
                 ?<div style={{textAlign:"center",padding:"45px 20px",color:"rgba(200,220,240,.4)",fontSize:14,background:"rgba(255,255,255,.015)",border:"1px dashed rgba(255,255,255,.1)",borderRadius:8}}>
                   ★ Your analyst watchlist is empty. Click <strong>☆ SAVE</strong> on any advisory, exploit, or news card to pin items here for triage or export (saved in your browser).
                 </div>
-                :watchlist.map(a=><AdvisoryCard key={a.id} adv={a} onAskAI={askAIAboutItem} onToggleWatch={toggleWatch} isWatched={true}/>)
+                :watchlist.map(a=><AdvisoryCard key={a.id} adv={a} onAskAI={askAIAboutItem} onToggleWatch={toggleWatch} isWatched={true} onOpenKnowledge={openKnowledge}/>)
             )}
           </div>
         )}
@@ -1477,7 +2000,7 @@ function BCyberAwareDashboard() {
             </div>
             <div style={{background:"rgba(255,255,255,.025)",border:"1px solid rgba(0,200,255,.12)",borderRadius:6,padding:"22px 24px"}}>
               <div style={{fontSize:12,letterSpacing:3,color:"rgba(0,200,255,.55)",marginBottom:12,fontFamily:"var(--mono)",fontWeight:700}}>PLATFORM CAPABILITIES</div>
-              {["🛡️ AI Threat Analyst — chat assistant grounded in the live feed (Cloudflare Workers AI)","🤖 AI Situation Summary — executive brief regenerated with every feed refresh","💬 Social Intel — infosec.exchange, Bluesky, Hacker News, r/netsec","35+ live intelligence sources with real-time health telemetry","🔴 Breaking-news ticker — incident-grade stories from the last 48 hours","ZDI 0-Day Pipeline — vulnerabilities awaiting vendor disclosure","GenAI tab — OWASP LLM Top 10, Standards & Tools (Awesome AI Security)","CISO Brief — AI governance links (NIST AI RMF, MITRE ATLAS, AI Incident Database)","CISA KEV · NVD · CERT-In · NCSC UK · CERT-EU · Microsoft Security","The Record · Unit 42 · Check Point Research · Talos · Project Zero · Krebs","GCC / Middle East relevance scoring per advisory","Global threat heatmap — country-level risk visualisation","Source verification link on every advisory card · auto-refresh every 2 hours"].map((f,i)=>(
+              {["🛡️ AI Threat Analyst — chat assistant grounded in the live feed (Cloudflare Workers AI)","🤖 AI Situation Summary — executive brief regenerated with every feed refresh","🧬 Knowledge Graph — ATT&CK heat matrix, relationship graph, actor encyclopedia, IOC hunt (OpenCTI ideas, native)","⬇ STIX 2.1 export — OASIS bundle for OpenCTI / MISP / TAXII / SIEM","💬 Social Intel — infosec.exchange, Bluesky, Hacker News, r/netsec","48 live intelligence sources with real-time health telemetry","🔴 Breaking-news ticker — incident-grade stories from the last 48 hours","ZDI 0-Day Pipeline — vulnerabilities awaiting vendor disclosure","GenAI tab — OWASP LLM Top 10, Standards & Tools (Awesome AI Security)","CISO Brief — AI governance links (NIST AI RMF, MITRE ATLAS, AI Incident Database)","CISA KEV · NVD · GHSA · CERT-In · NCSC UK · CERT-EU · JPCERT · Cisco / Palo Alto / FortiGuard PSIRT","The Record · Unit 42 · Check Point · CrowdStrike · Mandiant · Talos · Project Zero · Krebs","GCC / Middle East relevance scoring + OpenCTI-style confidence & TLP on every card","Global threat heatmap — country-level risk visualisation","Source verification link on every advisory card · auto-refresh every 2 hours"].map((f,i)=>(
                 <div key={i} style={{fontSize:14,color:"rgba(200,220,240,.55)",padding:"7px 0",borderBottom:"1px solid rgba(255,255,255,.05)",display:"flex",gap:10,lineHeight:1.5}}>
                   <span style={{color:ACCENT,flexShrink:0}}>▸</span>{f}
                 </div>
@@ -1486,6 +2009,8 @@ function BCyberAwareDashboard() {
             </div>
           </div>
         )}
+
+        {view==="knowledge"&&<KnowledgeView advisories={advisories} exploits={exploits} news={news} focus={knowFocus} onClearFocus={()=>setKnowFocus(null)} onAskAI={askAIAboutItem}/>}
 
         {/* ══ CISO BRIEF ══ */}
         {view==="ciso"&&<CISOBriefView advisories={advisories} exploits={exploits} news={news}/>}
