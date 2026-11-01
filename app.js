@@ -4493,7 +4493,7 @@ function BCyberAwareDashboard() {
   const [filterExp, setFilterExp] = useState(false);
   const [filterEpss, setFilterEpss] = useState(false);
   const [searchQ, setSearchQ] = useState("");
-  const [sortBy, setSortBy] = useState("sev");
+  const [sortBy, setSortBy] = useState("recent");
   const [watchlist, setWatchlist] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem("bca_watchlist") || "[]");
@@ -4504,7 +4504,7 @@ function BCyberAwareDashboard() {
   const [aiPrompt, setAiPrompt] = useState(null);
   const [knowFocus, setKnowFocus] = useState(null);
   const [view, setView] = useState("feed");
-  const [feedTab, setFeedTab] = useState("advisories");
+  const [feedTab, setFeedTab] = useState("news");
   const searchInputRef = React.useRef(null);
   useEffect(() => {
     const onKey = e => {

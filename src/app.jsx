@@ -1610,14 +1610,14 @@ function BCyberAwareDashboard() {
   const [filterExp, setFilterExp]  = useState(false);
   const [filterEpss,setFilterEpss] = useState(false);
   const [searchQ,   setSearchQ]    = useState("");
-  const [sortBy,    setSortBy]     = useState("sev"); // sev | epss | recent
+  const [sortBy,    setSortBy]     = useState("recent"); // recent | sev | epss
   const [watchlist, setWatchlist]  = useState(() => {
     try { return JSON.parse(localStorage.getItem("bca_watchlist") || "[]"); } catch { return []; }
   });
   const [aiPrompt,  setAiPrompt]   = useState(null);
   const [knowFocus, setKnowFocus]  = useState(null);
   const [view,      setView]       = useState("feed");
-  const [feedTab,   setFeedTab]    = useState("advisories");
+  const [feedTab,   setFeedTab]    = useState("news");
   const searchInputRef = React.useRef(null);
 
   useEffect(() => {
