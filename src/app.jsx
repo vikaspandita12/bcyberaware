@@ -321,6 +321,114 @@ function computeDefcon(advisories, exploits) {
   return { level: 4, label: "DEFCON 4 · GUARDED", color: "#00e676", bg: "rgba(0,230,118,0.12)", desc: "Baseline global threat activity — standard patch cadence" };
 }
 
+function decayOf(adv) {
+  if (typeof adv.decay === "number") return adv.decay;
+  const ageDays = adv.ts ? Math.max(0, (Date.now() - adv.ts) / 86400000) : 14;
+  const half = (adv.exploit_in_wild || (adv.epss || 0) >= 50) ? 30
+    : adv.category === "exploit" ? 21
+    : adv.category === "advisory" ? 14
+    : adv.category === "social" ? 2
+    : 7;
+  return Math.max(4, Math.round(100 * Math.pow(0.5, ageDays / half)));
+}
+
+const STORY_STOP = new Set(("the a an of and to in for on with from after new says said that this have been was were their its into over than just more also via using used found finds data users user million billion company companies report reports warns warning alert alerts cyber cybersecurity hacked hack hackers breach breached leak leaked ransomware malware exploit exploited critical high severity product products software system systems server servers network cloud attack attacker attackers threat threats group groups advisory advisories issue issues flaw flaws bug bugs zero day wild actively remote code execution authentication bypass access privilege escalation affected affects affecting versions including through against researchers research team according published released available fixed fixes update updates patch patches microsoft windows linux google apple cisco fortinet ivanti palo alto wordpress vmware gitlab github android chrome php kernel exchange sharepoint azure security vulnerability vulnerabilities known catalog catalogue added recently status impact multiple several customer customers internal tools identity release hardening october november december january february march april august september").split(/\s+/));
+
+function storyWords(title) {
+  return [...new Set(((title || "").toLowerCase().match(/[a-z][a-z0-9]{4,}/g) || []).filter(w => !STORY_STOP.has(w)))].slice(0, 8);
+}
+
+function buildIncidents(items) {
+  const parent = items.map((_, i) => i);
+  const find = i => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
+  const union = (i, j) => { const a = find(i), b = find(j); if (a !== b) parent[b] = a; };
+  const words = items.map(a => storyWords(a.title));
+  const byCve = new Map();
+  items.forEach((a, i) => (a.cve_ids || []).forEach(c => {
+    if (byCve.has(c)) union(i, byCve.get(c)); else byCve.set(c, i);
+  }));
+  for (let i = 0; i < items.length; i++) {
+    for (let j = i + 1; j < items.length; j++) {
+      if (find(i) === find(j)) continue;
+      if (Math.abs((items[i].ts || 0) - (items[j].ts || 0)) > 7 * 86400000) continue;
+      const shared = words[i].filter(w => words[j].includes(w));
+      const strong = shared.filter(w => w.length >= 6);
+      const sameActor = items[i].threat_actor && items[i].threat_actor === items[j].threat_actor;
+      if ((shared.length >= 2 && strong.length >= 1) || (sameActor && strong.length >= 1)) union(i, j);
+    }
+  }
+  const groups = new Map();
+  items.forEach((item, i) => {
+    const r = find(i);
+    if (!groups.has(r)) groups.set(r, []);
+    groups.get(r).push(item);
+  });
+  return [...groups.values()].map(g => {
+    const sources = [...new Set(g.flatMap(x => (x.sighting_sources && x.sighting_sources.length) ? x.sighting_sources : [x.source]).filter(Boolean))];
+    const lead = g.slice().sort((a, b) => (b.ts || 0) - (a.ts || 0))[0];
+    return { id: lead.id, title: lead.title, sources, count: sources.length, items: g, ts: lead.ts, cve: (lead.cve_ids || g.flatMap(x => x.cve_ids || []))[0] || "" };
+  }).filter(c => c.sources.length >= 2).sort((a, b) => b.count - a.count || (b.ts || 0) - (a.ts || 0)).slice(0, 6);
+}
+
+// Compact MISP-style warninglists: public resolvers, CDN edges, and documentation ranges.
+const WARN_CIDRS = [
+  ["1.1.1.0", 24, "Cloudflare public DNS"],
+  ["1.0.0.0", 24, "Cloudflare public DNS"],
+  ["8.8.8.0", 24, "Google Public DNS"],
+  ["8.8.4.0", 24, "Google Public DNS"],
+  ["9.9.9.0", 24, "Quad9"],
+  ["149.112.112.0", 24, "Quad9"],
+  ["208.67.222.0", 24, "OpenDNS"],
+  ["208.67.220.0", 24, "OpenDNS"],
+  ["104.16.0.0", 12, "Cloudflare"],
+  ["172.64.0.0", 13, "Cloudflare"],
+  ["173.245.48.0", 20, "Cloudflare"],
+  ["103.21.244.0", 22, "Cloudflare"],
+  ["198.41.128.0", 17, "Cloudflare"],
+  ["192.0.2.0", 24, "Documentation range"],
+  ["198.51.100.0", 24, "Documentation range"],
+  ["203.0.113.0", 24, "Documentation range"],
+];
+const WARN_DOMAINS = ["google.com","googleapis.com","gstatic.com","googleusercontent.com","microsoft.com","office.com","office365.com","windows.com","windowsupdate.com","microsoftonline.com","live.com","outlook.com","cloudflare.com","cloudflare-dns.com","cloudfront.net","amazonaws.com","akamai.net","akamaized.net","fastly.net","azure.com","azureedge.net","apple.com","icloud.com","github.com","githubusercontent.com","w3.org","schema.org","example.com","example.org"];
+
+function ipToInt(ip) {
+  const p = String(ip).split(".").map(Number);
+  if (p.length !== 4 || p.some(n => !Number.isInteger(n) || n < 0 || n > 255)) return null;
+  return (((p[0] << 24) >>> 0) + (p[1] << 16) + (p[2] << 8) + p[3]) >>> 0;
+}
+function warningFor(kind, value) {
+  if (kind === "ip") {
+    const n = ipToInt(value);
+    if (n == null) return null;
+    for (const [base, bits, label] of WARN_CIDRS) {
+      const b = ipToInt(base);
+      const mask = bits === 0 ? 0 : ((~0 << (32 - bits)) >>> 0);
+      if ((n & mask) === (b & mask)) return label;
+    }
+    return null;
+  }
+  const d = String(value).toLowerCase();
+  const hit = WARN_DOMAINS.find(s => d === s || d.endsWith("." + s));
+  return hit ? "Well-known infrastructure" : null;
+}
+function downloadText(filename, text, mime) {
+  const blob = new Blob([text], { type: mime });
+  const u = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = u; a.download = filename; a.click();
+  URL.revokeObjectURL(u);
+}
+function suricataRules(c2s) {
+  return c2s.map((c, i) => {
+    const msg = `BCyberAware C2 ${(c.malware || "malware").replace(/"/g, "")} ${c.ip}`.slice(0, 120);
+    const port = c.port && Number(c.port) > 0 ? c.port : "any";
+    return `alert ip $HOME_NET any -> ${c.ip} ${port} (msg:"${msg}"; classtype:trojan-activity; sid:${9100001 + i}; rev:1;)`;
+  }).join("\n") + "\n";
+}
+function zeekIntel(c2s) {
+  const header = "#fields\tindicator\tindicator_type\tmeta.source\tmeta.desc\tmeta.url\n";
+  return header + c2s.map(c => [c.ip, "Intel::ADDR", "BCyberAware", (c.malware || "C2").replace(/[\t\n]/g, " "), c.url || ""].join("\t")).join("\n") + "\n";
+}
+
 function AdvisoryCard({ adv, onAskAI, onToggleWatch, isWatched, onOpenKnowledge }) {
   const s=SEV_S[adv.severity]||SEV_S.LOW;
   const isNews=adv.category==="news";
@@ -330,6 +438,9 @@ function AdvisoryCard({ adv, onAskAI, onToggleWatch, isWatched, onOpenKnowledge 
   const mitre = mapMitreTactics(adv);
   const { confidence, tlp } = computeOpenCTIMeta(adv);
   const epssColor = (adv.epss||0)>=50 ? "#ff1744" : (adv.epss||0)>=15 ? "#ff9100" : "#00e5ff";
+  const decay = decayOf(adv);
+  const decayColor = decay >= 70 ? "#00e676" : decay >= 40 ? "#ffab40" : "#ff6e6e";
+  const seen = adv.sightings || (adv.sighting_sources || []).length || 1;
   return (
     <div className="card" style={{background:"rgba(5,8,15,0.92)",border:`1px solid ${borderCol}33`,borderLeft:`4px solid ${borderCol}`,borderRadius:6,padding:"18px 20px",marginBottom:12,boxShadow:adv.exploit_in_wild?`0 0 14px ${borderCol}12`:"none"}}>
       <div style={{display:"flex",gap:7,flexWrap:"wrap",alignItems:"center",marginBottom:10}}>
@@ -343,6 +454,8 @@ function AdvisoryCard({ adv, onAskAI, onToggleWatch, isWatched, onOpenKnowledge 
         {isFresh&&<span style={{fontSize:11,padding:"4px 10px",background:"rgba(0,200,255,0.1)",border:"1px solid rgba(0,200,255,.4)",color:"#00c8ff",letterSpacing:1,fontFamily:"var(--mono)",borderRadius:3,fontWeight:800}}>● FRESH</span>}
         <span title="Source confidence (OpenCTI-style)" style={{fontSize:10,padding:"3px 8px",background:"rgba(0,200,255,0.07)",border:"1px solid rgba(0,200,255,0.22)",color:ACCENT,fontFamily:"var(--mono)",borderRadius:3,fontWeight:700}}>{confidence}%</span>
         <span title="Traffic Light Protocol" style={{fontSize:10,padding:"3px 8px",background:tlp.bg,border:`1px solid ${tlp.color}55`,color:tlp.color,fontFamily:"var(--mono)",borderRadius:3,fontWeight:700}}>{tlp.label}</span>
+        {seen>=2&&<span title={`Corroborated by: ${(adv.sighting_sources||[adv.source]).join(", ")}`} style={{fontSize:10,padding:"3px 8px",background:"rgba(0,230,118,0.1)",border:"1px solid rgba(0,230,118,0.4)",color:"#00e676",fontFamily:"var(--mono)",borderRadius:3,fontWeight:800}}>◎ {seen} FEEDS</span>}
+        <span title="Indicator decay — relevance falls as the item ages. Exploited and high-EPSS items fade slower." style={{fontSize:10,padding:"3px 8px",background:`${decayColor}14`,border:`1px solid ${decayColor}55`,color:decayColor,fontFamily:"var(--mono)",borderRadius:3,fontWeight:700}}>↓ {decay}</span>
         <span style={{fontSize:12,color:"rgba(200,220,240,0.4)"}}>{adv.source_flag} {adv.source} · {adv.ts?timeAgo(adv.ts):adv.date}</span>
         {onToggleWatch&&(
           <button onClick={()=>onToggleWatch(adv)} title={isWatched?"Remove from Watchlist":"Save to Watchlist"} style={{marginLeft:"auto",background:isWatched?"rgba(255,215,0,0.15)":"rgba(255,255,255,0.03)",border:`1px solid ${isWatched?"#ffd700":"rgba(255,255,255,0.12)"}`,color:isWatched?"#ffd700":"rgba(200,220,240,0.45)",padding:"3px 10px",borderRadius:4,cursor:"pointer",fontSize:12,fontFamily:"var(--mono)",fontWeight:700}}>
@@ -1416,32 +1529,57 @@ function KnowledgeView({ advisories, exploits, news, focus, onClearFocus, onAskA
         </div>
       )}
 
-      {tab==="hunt"&&(
+      {tab==="hunt"&&(() => {
+        const blockC2 = c2s.filter(c => c.ip && !warningFor("ip", c.ip));
+        const warnC2 = c2s.filter(c => c.ip && warningFor("ip", c.ip));
+        const reviewIps = idx.iocs.ips.filter(ip => !warningFor("ip", ip));
+        const benignIps = idx.iocs.ips.filter(ip => warningFor("ip", ip));
+        const reviewDomains = idx.iocs.domains.filter(d => !warningFor("domain", d));
+        const benignDomains = idx.iocs.domains.filter(d => warningFor("domain", d));
+        const chip = (v, col, note) => (
+          <button key={v+note} onClick={()=>copy(v)} title={note ? `${note} — click to copy` : "Copy"} style={{fontSize:11,fontFamily:"var(--mono)",padding:"5px 10px",background:`${col}14`,border:`1px solid ${col}44`,color:col,borderRadius:4,cursor:"pointer"}}>{v}{note ? ` · ${note}` : ""} ⧉</button>
+        );
+        return (
         <div>
           <div style={{padding:"12px 16px",background:"rgba(255,145,0,.06)",border:"1px solid rgba(255,145,0,.25)",borderRadius:6,marginBottom:14,fontSize:12.5,color:"rgba(200,220,240,.55)",lineHeight:1.7}}>
-            🎯 Observables extracted from the live feed plus Feodo Tracker C2 servers. For defensive hunting only — verify before blocking.
+            Warninglists split observables the way MISP does: confirmed C2 addresses can be blocked. Public DNS, CDN edges, and documentation ranges stay context-only. Hashes pulled from headlines are not turned into rules.
           </div>
-          {[["IPv4", idx.iocs.ips, "#29b6f6"],["Hashes", idx.iocs.hashes, "#ffab40"],["Suspicious domains", idx.iocs.domains, "#c084fc"]].map(([lbl, list, col])=>(
-            <div key={lbl} style={{marginBottom:14}}>
-              <div style={{fontSize:11,letterSpacing:2,color:col,fontFamily:"var(--mono)",marginBottom:8}}>{lbl.toUpperCase()} ({list.length})</div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:10}}>
+            <div style={{fontSize:11,letterSpacing:2,color:"#ff5252",fontFamily:"var(--mono)"}}>TO_IDS · BLOCK · CONFIRMED C2 ({blockC2.length})</div>
+            <div style={{display:"flex",gap:6}}>
+              <button disabled={!blockC2.length} onClick={()=>downloadText("bcyberaware-c2.rules", suricataRules(blockC2), "text/plain")} style={{fontSize:11,fontFamily:"var(--mono)",padding:"5px 10px",background:"rgba(255,82,82,.12)",border:"1px solid rgba(255,82,82,.4)",color:"#ff8a80",borderRadius:4,cursor:blockC2.length?"pointer":"not-allowed",fontWeight:700}}>⬇ Suricata</button>
+              <button disabled={!blockC2.length} onClick={()=>downloadText("bcyberaware-c2.intel", zeekIntel(blockC2), "text/plain")} style={{fontSize:11,fontFamily:"var(--mono)",padding:"5px 10px",background:"rgba(255,171,64,.1)",border:"1px solid rgba(255,171,64,.4)",color:"#ffab40",borderRadius:4,cursor:blockC2.length?"pointer":"not-allowed",fontWeight:700}}>⬇ Zeek</button>
+            </div>
+          </div>
+          {blockC2.length===0&&<div style={{fontSize:12,color:"rgba(200,220,240,.3)",marginBottom:14}}>No confirmed C2 addresses in this snapshot.</div>}
+          {blockC2.slice(0,12).map((c,i)=>(
+            <div key={c.ip+i} style={{background:"rgba(5,8,15,.92)",border:"1px solid rgba(255,82,82,.28)",borderLeft:"4px solid #ff5252",borderRadius:6,padding:"10px 14px",marginBottom:8,fontFamily:"var(--mono)",fontSize:12,color:"#eef4ff"}}>
+              <span style={{color:"#ff8a80",fontWeight:800,marginRight:8}}>BLOCK</span>{c.malware||"C2"} · {c.ip}{c.port?`:${c.port}`:""}
+              {c.url&&<a href={c.url} target="_blank" rel="noopener noreferrer" style={{marginLeft:10,color:ACCENT}}>inspect ↗</a>}
+            </div>
+          ))}
+          {[["REVIEW · FEED IPs", reviewIps, "#29b6f6", ""],["REVIEW · DOMAINS", reviewDomains, "#c084fc", ""],["CONTEXT ONLY · WARNINGLIST", [...benignIps.map(ip=>ip+"|"+warningFor("ip",ip)), ...benignDomains.map(d=>d+"|"+warningFor("domain",d)), ...warnC2.map(c=>c.ip+"|"+warningFor("ip",c.ip))], "#ffab40", "warn"]].map(([lbl, list, col])=>(
+            <div key={lbl} style={{marginTop:16}}>
+              <div style={{fontSize:11,letterSpacing:2,color:col,fontFamily:"var(--mono)",marginBottom:8}}>{lbl} ({list.length})</div>
               <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                {list.length===0&&<span style={{fontSize:12,color:"rgba(200,220,240,.3)"}}>None extracted this cycle.</span>}
-                {list.map(v=>(
-                  <button key={v} onClick={()=>copy(v)} title="Copy" style={{fontSize:11,fontFamily:"var(--mono)",padding:"5px 10px",background:`${col}14`,border:`1px solid ${col}44`,color:col,borderRadius:4,cursor:"pointer"}}>{v} ⧉</button>
-                ))}
+                {list.length===0&&<span style={{fontSize:12,color:"rgba(200,220,240,.3)"}}>None this cycle.</span>}
+                {list.slice(0,24).map(v=>{
+                  const [val, note] = String(v).includes("|") ? String(v).split("|") : [v, ""];
+                  return chip(val, col, note);
+                })}
               </div>
             </div>
           ))}
-          {c2s.length>0&&<>
-            <div style={{fontSize:11,letterSpacing:2,color:"#ff9944",fontFamily:"var(--mono)",margin:"16px 0 8px"}}>ACTIVE BOTNET C2 (abuse.ch Feodo / Cybercrime Tracker)</div>
-            {c2s.slice(0,8).map((c,i)=>(
-              <div key={i} style={{background:"rgba(5,8,15,.92)",border:"1px solid rgba(255,109,0,.25)",borderLeft:"4px solid #e65100",borderRadius:6,padding:"10px 14px",marginBottom:8,fontFamily:"var(--mono)",fontSize:12,color:"#eef4ff"}}>
-                {c.title}{c.url&&<a href={c.url} target="_blank" rel="noopener noreferrer" style={{marginLeft:10,color:ACCENT}}>inspect ↗</a>}
-              </div>
-            ))}
-          </>}
+          <div style={{marginTop:16}}>
+            <div style={{fontSize:11,letterSpacing:2,color:"#ffab40",fontFamily:"var(--mono)",marginBottom:8}}>HASHES · CONTEXT ONLY ({idx.iocs.hashes.length}) — not exported as block rules</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {idx.iocs.hashes.length===0&&<span style={{fontSize:12,color:"rgba(200,220,240,.3)"}}>None extracted this cycle.</span>}
+              {idx.iocs.hashes.slice(0,16).map(v=>chip(v, "#ffab40", ""))}
+            </div>
+          </div>
         </div>
-      )}
+        );
+      })()}
 
       {selected&&selectedItems.length>0&&(
         <div style={{marginTop:8}}>
@@ -1758,6 +1896,25 @@ function BCyberAwareDashboard() {
             </div>
 
             <ThreatVelocityPanel advisories={advisories} exploits={exploits} news={news} activeSearch={searchQ} onSelectKeyword={q=>setSearchQ(q)}/>
+
+            {(() => {
+              const incidents = buildIncidents([...advisories, ...exploits, ...news]);
+              if (!incidents.length) return null;
+              return (
+                <div style={{margin:"4px 0 16px"}}>
+                  <div style={{fontSize:11,letterSpacing:2,color:"#00e676",fontFamily:"var(--mono)",marginBottom:8}}>CORROBORATED INCIDENTS · SAME STORY ACROSS FEEDS</div>
+                  <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:4}}>
+                    {incidents.map(inc=>(
+                      <button key={inc.id} onClick={()=>{ setSearchQ(inc.cve || storyWords(inc.title).slice(0,2).join(" ") || inc.title); setFeedTab(inc.items.some(i=>i.category==="advisory")?"advisories":"news"); }} title={inc.sources.join(" · ")} style={{flex:"0 0 260px",textAlign:"left",background:"rgba(0,230,118,.05)",border:"1px solid rgba(0,230,118,.28)",borderRadius:6,padding:"10px 12px",cursor:"pointer"}}>
+                        <div style={{fontSize:10,fontFamily:"var(--mono)",color:"#00e676",fontWeight:800,marginBottom:6}}>◎ SEEN IN {inc.count}</div>
+                        <div style={{fontSize:12.5,color:"#eef4ff",lineHeight:1.4,fontWeight:650}}>{inc.title.length>92?inc.title.slice(0,90)+"…":inc.title}</div>
+                        <div style={{fontSize:10,color:"rgba(200,220,240,.45)",marginTop:6,fontFamily:"var(--mono)"}}>{inc.sources.slice(0,3).join(" · ")}{inc.sources.length>3?" …":""}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
 
             <div style={{display:"flex",gap:4,marginBottom:16,borderBottom:"1px solid rgba(255,255,255,.07)",overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
               {[

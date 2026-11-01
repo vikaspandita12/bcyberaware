@@ -161,7 +161,9 @@ export async function handleFeedRequest(request, env) {
     const social     = sortAndDedup(byCat.social).slice(0, 60);
 
     // Enrich all CVE-bearing items with FIRST.org EPSS (Exploit Prediction Scoring System)
-    await enrichWithEPSS([...advisories, ...exploits, ...news, ...social]);
+    const liveItems = [...advisories, ...exploits, ...news, ...social];
+    await enrichWithEPSS(liveItems);
+    applyDecay(liveItems, now);
 
     const payload = {
       advisories, exploits, news, social,
@@ -603,15 +605,42 @@ function getMERelevance(products, title, desc) {
   return hi.some(k => text.includes(k)) ? "HIGH" : "MEDIUM";
 }
 
-// Dedup on CVE-set OR normalized title (kills cross-source duplicates of the same story)
+// Correlate then collapse: same CVE-set or normalized title becomes one item
+// that remembers every independent source (MISP-style sightings).
 function dedup(arr) {
-  const seen = new Set();
-  return arr.filter(a => {
-    const cveKey   = a.cve_ids?.length ? "cve:" + [...a.cve_ids].sort().join(",") : null;
-    const titleKey = "t:" + a.title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 70);
-    if ((cveKey && seen.has(cveKey)) || seen.has(titleKey)) return false;
-    if (cveKey) seen.add(cveKey);
-    seen.add(titleKey);
-    return true;
+  const out = [];
+  const byCve = new Map();
+  const byTitle = new Map();
+  for (const a of arr) {
+    const cveKey = a.cve_ids?.length ? [...a.cve_ids].sort().join(",") : "";
+    const titleKey = (a.title || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 70);
+    const existing = (cveKey && byCve.get(cveKey)) || (titleKey && byTitle.get(titleKey));
+    if (!existing) {
+      const item = { ...a, sightings: 1, sighting_sources: a.source ? [a.source] : [] };
+      out.push(item);
+      if (cveKey) byCve.set(cveKey, item);
+      if (titleKey) byTitle.set(titleKey, item);
+    } else {
+      if (a.source && !existing.sighting_sources.includes(a.source)) {
+        existing.sighting_sources.push(a.source);
+        existing.sightings = existing.sighting_sources.length;
+      }
+      if (cveKey && !byCve.has(cveKey)) byCve.set(cveKey, existing);
+      if ((a.epss || 0) > (existing.epss || 0)) existing.epss = a.epss;
+    }
+  }
+  return out;
+}
+
+// MISP-style decay: relevance halves over a window. Exploited / high-EPSS items fade slower.
+function applyDecay(items, now) {
+  items.forEach(item => {
+    const ageDays = item.ts ? Math.max(0, (now - item.ts) / 86400000) : 14;
+    const half = (item.exploit_in_wild || (item.epss || 0) >= 50) ? 30
+      : item.category === "exploit" ? 21
+      : item.category === "advisory" ? 14
+      : item.category === "social" ? 2
+      : 7;
+    item.decay = Math.max(4, Math.round(100 * Math.pow(0.5, ageDays / half)));
   });
 }
