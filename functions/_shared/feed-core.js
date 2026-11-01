@@ -14,21 +14,9 @@
 
 import { jsonResponse } from "./http.js";
 
-const CACHE    = { sources: {} };
-const CACHE_MS = 90 * 1000; // assembled snapshot — sources keep their own longer TTL
+const CACHE    = {};
+const CACHE_MS = 2 * 60 * 60 * 1000; // 2 hours
 const FETCH_TIMEOUT_MS = 9000;
-const FETCH_SLOTS = 30; // Cloudflare free Workers cap at 50 subrequests; leave room for nested fetches + EPSS
-const SOURCE_TTL = { news: 12 * 60 * 1000, social: 8 * 60 * 1000, advisory: 30 * 60 * 1000, exploit: 30 * 60 * 1000 };
-const NEWS_FIRST = ["gnews_latest","bleeping","thn","secweek","register","secaffairs","hackread","therecord","darkreading","helpnet","gbhackers","infosecmag","cisa_kev","certin","nvd"];
-
-function sourcePriority(src) {
-  const i = NEWS_FIRST.indexOf(src.key);
-  if (i >= 0) return 200 - i;
-  if (src.cat === "news") return 80;
-  if (src.cat === "social") return 70;
-  if (src.cat === "advisory") return 50;
-  return 40;
-}
 
 const UA = { "User-Agent": "Mozilla/5.0 (compatible; BCyberAware/3.0; +https://advisory.bcyberaware.co.in)" };
 
@@ -64,8 +52,7 @@ const SOURCES = [
   { key: "zdi",          name: "ZDI 0-Day Pipeline",     flag: "🧨", cat: "exploit", fn: () => rss("https://www.zerodayinitiative.com/rss/upcoming/", { id_prefix: "ZDI", source: "ZDI 0-Day Pipeline", source_url: "https://www.zerodayinitiative.com/advisories/upcoming/", source_color: "#d32f2f", source_flag: "🧨", category: "exploit", default_sev: "HIGH", exploit_wild: false, limit: 20, countries: ["US", "GB", "DE", "JP"] }) },
 
   { key: "thn",          name: "The Hacker News",        flag: "📰", cat: "news", fn: () => rss("https://feeds.feedburner.com/TheHackersNews", { id_prefix: "THN", source: "The Hacker News", source_url: "https://thehackernews.com", source_color: "#e91e63", source_flag: "📰", category: "news", default_sev: "HIGH", limit: 15, countries: ["US", "CN", "RU", "IR"] }) },
-  { key: "bleeping",     name: "Bleeping Computer",      flag: "📰", cat: "news", fn: fetchBleeping },
-  { key: "gnews_latest", name: "World Latest Incidents", flag: "🌐", cat: "news", fn: fetchWorldLatest },
+  { key: "bleeping",     name: "Bleeping Computer",      flag: "📰", cat: "news", fn: () => rss("https://www.bleepingcomputer.com/feed/", { id_prefix: "BC", source: "Bleeping Computer", source_url: "https://www.bleepingcomputer.com", source_color: "#2196f3", source_flag: "📰", category: "news", default_sev: "MEDIUM", limit: 15, countries: ["US", "RU", "CN"] }) },
   { key: "therecord",    name: "The Record",             flag: "🎙️", cat: "news", fn: () => rss("https://therecord.media/feed", { id_prefix: "TRECORD", source: "The Record", source_url: "https://therecord.media", source_color: "#111827", source_flag: "🎙️", category: "news", default_sev: "HIGH", limit: 12, countries: ["US", "RU", "CN", "UA"] }) },
   { key: "cyberscoop",   name: "CyberScoop",             flag: "📰", cat: "news", fn: () => rss("https://cyberscoop.com/feed/", { id_prefix: "CSCOOP", source: "CyberScoop", source_url: "https://cyberscoop.com", source_color: "#00b0ff", source_flag: "📰", category: "news", default_sev: "HIGH", limit: 10, countries: ["US"] }) },
   { key: "secaffairs",   name: "Security Affairs",       flag: "📰", cat: "news", fn: () => rss("https://securityaffairs.com/feed", { id_prefix: "SECAFF", source: "Security Affairs", source_url: "https://securityaffairs.com", source_color: "#263238", source_flag: "📰", category: "news", default_sev: "HIGH", limit: 12, countries: ["US", "GB", "IT", "RU", "CN"] }) },
@@ -137,40 +124,16 @@ export async function handleFeedRequest(request, env) {
     if (!bust && CACHE.feed && (now - CACHE.feed.ts) < CACHE_MS)
       return jsonResponse({ ...CACHE.feed.data, from_cache: true });
 
-    // Cloudflare free Workers stop at 50 subrequests. Refresh a priority slice and
-    // reuse per-source cache for the rest so Force Latest still returns today's news.
-    const stale = SOURCES.filter(src => {
-      const row = CACHE.sources[src.key];
-      if (!row) return true;
-      if (bust) return true;
-      return (now - row.ts) >= (SOURCE_TTL[src.cat] || 20 * 60 * 1000);
-    }).sort((a, b) => {
-      const missA = CACHE.sources[a.key] ? 0 : 35;
-      const missB = CACHE.sources[b.key] ? 0 : 35;
-      const pa = (sourcePriority(b) + missB) - (sourcePriority(a) + missA);
-      if (pa) return pa;
-      return (CACHE.sources[a.key]?.ts || 0) - (CACHE.sources[b.key]?.ts || 0);
-    });
-    const fetchSet = new Set(stale.slice(0, FETCH_SLOTS).map(s => s.key));
-
+    // Run every source in parallel, each individually timed and fault-isolated
     const runs = await Promise.all(SOURCES.map(async (src) => {
-      if (!fetchSet.has(src.key)) {
-        const row = CACHE.sources[src.key];
-        if (row) return { src, items: row.items, health: { ...row.health, cached: true } };
-        return { src, items: [], health: { key: src.key, name: src.name, flag: src.flag, cat: src.cat, ok: false, items: 0, ms: 0, error: "warming" } };
-      }
       const t0 = Date.now();
       try {
         const items = (await src.fn()) || [];
+        // Keyword-filtered mainstream feeds are "live" even when 0 items match this cycle
         const ok = items.length > 0 || !!src.filtered;
-        const health = { key: src.key, name: src.name, flag: src.flag, cat: src.cat, ok, items: items.length, ms: Date.now() - t0 };
-        CACHE.sources[src.key] = { ts: now, items, health };
-        return { src, items, health };
+        return { src, items, health: { key: src.key, name: src.name, flag: src.flag, cat: src.cat, ok, items: items.length, ms: Date.now() - t0 } };
       } catch (e) {
-        const health = { key: src.key, name: src.name, flag: src.flag, cat: src.cat, ok: false, items: 0, ms: Date.now() - t0, error: String(e?.message || e).slice(0, 80) };
-        const prev = CACHE.sources[src.key];
-        if (prev?.items?.length) return { src, items: prev.items, health: { ...prev.health, stale: true, error: health.error } };
-        return { src, items: [], health };
+        return { src, items: [], health: { key: src.key, name: src.name, flag: src.flag, cat: src.cat, ok: false, items: 0, ms: Date.now() - t0, error: String(e?.message || e).slice(0, 80) } };
       }
     }));
 
@@ -198,9 +161,7 @@ export async function handleFeedRequest(request, env) {
     const social     = sortAndDedup(byCat.social).slice(0, 60);
 
     // Enrich all CVE-bearing items with FIRST.org EPSS (Exploit Prediction Scoring System)
-    const liveItems = [...advisories, ...exploits, ...news, ...social];
-    await enrichWithEPSS(liveItems);
-    applyDecay(liveItems, now);
+    await enrichWithEPSS([...advisories, ...exploits, ...news, ...social]);
 
     const payload = {
       advisories, exploits, news, social,
@@ -480,29 +441,6 @@ async function fetchInfosecExchange() {
 }
 
 // Bluesky — public AppView API (getAuthorFeed across verified security feeds, no auth required)
-async function fetchBleeping() {
-  const meta = { id_prefix: "BC", source: "Bleeping Computer", source_url: "https://www.bleepingcomputer.com", source_color: "#2196f3", source_flag: "📰", category: "news", default_sev: "MEDIUM", limit: 15, countries: ["US", "RU", "CN"] };
-  try {
-    const items = await rss("https://www.bleepingcomputer.com/feed/", meta);
-    if (items.length) return items;
-  } catch {}
-  return rss("https://news.google.com/rss/search?q=site:bleepingcomputer.com+when:2d&hl=en-US&gl=US&ceid=US:en", meta);
-}
-
-async function fetchWorldLatest() {
-  return rss("https://news.google.com/rss/search?q=when:1d+(ransomware+OR+%22data+breach%22+OR+hacked+OR+%22zero-day%22+OR+%22cyber+attack%22)+-stock+-earnings&hl=en-US&gl=US&ceid=US:en", {
-    id_prefix: "WORLD",
-    source: "World Latest",
-    source_url: "https://news.google.com",
-    source_color: "#1a73e8",
-    source_flag: "🌐",
-    category: "news",
-    default_sev: "HIGH",
-    limit: 18,
-    countries: ["US", "GB", "IN", "CN", "RU"],
-  });
-}
-
 async function fetchBluesky() {
   const actors = [
     "bleepingcomputer.com",
@@ -511,10 +449,8 @@ async function fetchBluesky() {
     "schneier.com",
     "infosec.skyfleet.blue",
   ];
-  const start = Math.floor(Date.now() / 600000) % actors.length;
-  const pick = [0, 1, 2].map(i => actors[(start + i) % actors.length]);
   const settled = await Promise.allSettled(
-    pick.map(actor =>
+    actors.map(actor =>
       fetchWithTimeout(`https://public.api.bsky.app/xrpc/app.bsky.feed.getAuthorFeed?actor=${encodeURIComponent(actor)}&limit=5&filter=posts_no_replies`, 6500)
         .then(r => (r.ok ? r.json() : { feed: [] }))
     )
@@ -667,42 +603,15 @@ function getMERelevance(products, title, desc) {
   return hi.some(k => text.includes(k)) ? "HIGH" : "MEDIUM";
 }
 
-// Correlate then collapse: same CVE-set or normalized title becomes one item
-// that remembers every independent source (MISP-style sightings).
+// Dedup on CVE-set OR normalized title (kills cross-source duplicates of the same story)
 function dedup(arr) {
-  const out = [];
-  const byCve = new Map();
-  const byTitle = new Map();
-  for (const a of arr) {
-    const cveKey = a.cve_ids?.length ? [...a.cve_ids].sort().join(",") : "";
-    const titleKey = (a.title || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 70);
-    const existing = (cveKey && byCve.get(cveKey)) || (titleKey && byTitle.get(titleKey));
-    if (!existing) {
-      const item = { ...a, sightings: 1, sighting_sources: a.source ? [a.source] : [] };
-      out.push(item);
-      if (cveKey) byCve.set(cveKey, item);
-      if (titleKey) byTitle.set(titleKey, item);
-    } else {
-      if (a.source && !existing.sighting_sources.includes(a.source)) {
-        existing.sighting_sources.push(a.source);
-        existing.sightings = existing.sighting_sources.length;
-      }
-      if (cveKey && !byCve.has(cveKey)) byCve.set(cveKey, existing);
-      if ((a.epss || 0) > (existing.epss || 0)) existing.epss = a.epss;
-    }
-  }
-  return out;
-}
-
-// MISP-style decay: relevance halves over a window. Exploited / high-EPSS items fade slower.
-function applyDecay(items, now) {
-  items.forEach(item => {
-    const ageDays = item.ts ? Math.max(0, (now - item.ts) / 86400000) : 14;
-    const half = (item.exploit_in_wild || (item.epss || 0) >= 50) ? 30
-      : item.category === "exploit" ? 21
-      : item.category === "advisory" ? 14
-      : item.category === "social" ? 2
-      : 7;
-    item.decay = Math.max(4, Math.round(100 * Math.pow(0.5, ageDays / half)));
+  const seen = new Set();
+  return arr.filter(a => {
+    const cveKey   = a.cve_ids?.length ? "cve:" + [...a.cve_ids].sort().join(",") : null;
+    const titleKey = "t:" + a.title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 70);
+    if ((cveKey && seen.has(cveKey)) || seen.has(titleKey)) return false;
+    if (cveKey) seen.add(cveKey);
+    seen.add(titleKey);
+    return true;
   });
 }
