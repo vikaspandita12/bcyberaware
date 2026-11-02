@@ -53,6 +53,7 @@ function BreakingTicker({
   if (!items || items.length === 0) return null;
   const doubled = [...items, ...items];
   return React.createElement("div", {
+    className: "ticker-wrap",
     style: {
       background: "linear-gradient(90deg,rgba(80,0,0,.55),rgba(40,0,10,.4))",
       borderBottom: "1px solid rgba(255,23,68,.25)",
@@ -62,6 +63,7 @@ function BreakingTicker({
       height: 38
     }
   }, React.createElement("div", {
+    className: "ticker-badge",
     style: {
       flexShrink: 0,
       display: "flex",
@@ -83,6 +85,7 @@ function BreakingTicker({
       display: "inline-block"
     }
   }), React.createElement("span", {
+    className: "ticker-badge-text",
     style: {
       fontSize: 11,
       fontWeight: 900,
@@ -111,6 +114,7 @@ function BreakingTicker({
     href: b.source_url,
     target: "_blank",
     rel: "noopener noreferrer",
+    className: "ticker-item",
     style: {
       display: "inline-flex",
       alignItems: "center",
@@ -120,6 +124,7 @@ function BreakingTicker({
       fontSize: 13
     }
   }, React.createElement("span", {
+    className: "ticker-meta",
     style: {
       color: "#ff7961",
       fontFamily: "var(--mono)",
@@ -127,11 +132,13 @@ function BreakingTicker({
       letterSpacing: .5
     }
   }, b.source_flag, " ", b.source, " \xB7 ", timeAgo(b.ts)), React.createElement("span", {
+    className: "ticker-title",
     style: {
       fontWeight: 600,
       color: "#ffe3e3"
     }
   }, b.title), React.createElement("span", {
+    className: "ticker-sep",
     style: {
       color: "rgba(255,100,100,.3)"
     }
@@ -163,6 +170,7 @@ function StatCard({
   sub
 }) {
   return React.createElement("div", {
+    className: "stat-card",
     style: {
       flex: 1,
       minWidth: 100,
@@ -173,6 +181,7 @@ function StatCard({
       textAlign: "center"
     }
   }, React.createElement("div", {
+    className: "stat-value",
     style: {
       fontSize: 34,
       fontWeight: 900,
@@ -181,6 +190,7 @@ function StatCard({
       lineHeight: 1
     }
   }, value), React.createElement("div", {
+    className: "stat-label",
     style: {
       fontSize: 11,
       letterSpacing: 1.5,
@@ -190,6 +200,7 @@ function StatCard({
       fontWeight: 600
     }
   }, label), sub && React.createElement("div", {
+    className: "stat-sub",
     style: {
       fontSize: 11,
       color: "rgba(200,220,240,0.25)",
@@ -653,7 +664,7 @@ function AdvisoryCard({
   } = computeOpenCTIMeta(adv);
   const epssColor = (adv.epss || 0) >= 50 ? "#ff1744" : (adv.epss || 0) >= 15 ? "#ff9100" : "#00e5ff";
   return React.createElement("div", {
-    className: "card",
+    className: "card advisory-card",
     style: {
       background: "rgba(5,8,15,0.92)",
       border: `1px solid ${borderCol}33`,
@@ -674,6 +685,7 @@ function AdvisoryCard({
   }, !isNews && React.createElement(SevBadge, {
     sev: adv.severity
   }), adv.cvss && React.createElement("span", {
+    className: "cvss-tag",
     style: {
       fontSize: 11,
       padding: "4px 9px",
@@ -778,6 +790,7 @@ function AdvisoryCard({
       fontWeight: 700
     }
   }, tlp.label), React.createElement("span", {
+    className: "card-meta",
     style: {
       fontSize: 12,
       color: "rgba(200,220,240,0.4)"
@@ -798,6 +811,7 @@ function AdvisoryCard({
       fontWeight: 700
     }
   }, isWatched ? "★ SAVED" : "☆ SAVE")), React.createElement("div", {
+    className: "card-title",
     style: {
       fontSize: 17,
       fontWeight: 700,
@@ -806,6 +820,7 @@ function AdvisoryCard({
       lineHeight: 1.45
     }
   }, adv.title), React.createElement("div", {
+    className: "card-summary",
     style: {
       fontSize: 14,
       color: "rgba(200,220,240,0.6)",
@@ -835,6 +850,7 @@ function AdvisoryCard({
     }
   }, c, " \u2197")), adv.affected_products?.slice(0, 3).map(p => React.createElement("span", {
     key: p,
+    className: "product-tag",
     style: {
       fontSize: 11,
       color: "rgba(200,220,240,0.7)",
@@ -890,6 +906,7 @@ function AdvisoryCard({
       borderRadius: 3
     }
   }, "\u2714 PATCH AVAILABLE")), React.createElement("div", {
+    className: "card-footer",
     style: {
       borderTop: "1px solid rgba(255,255,255,0.06)",
       paddingTop: 12,
@@ -900,6 +917,7 @@ function AdvisoryCard({
       gap: 10
     }
   }, React.createElement("span", {
+    className: "verify-label",
     style: {
       fontSize: 12,
       color: "rgba(200,220,240,0.3)",
@@ -957,7 +975,7 @@ function SocialCard({
     href: post.source_url,
     target: "_blank",
     rel: "noopener noreferrer",
-    className: "card",
+    className: "card social-card",
     style: {
       display: "block",
       background: "rgba(5,8,15,0.92)",
@@ -988,6 +1006,7 @@ function SocialCard({
       fontWeight: 700
     }
   }, post.source_flag, " ", post.source.toUpperCase()), post.author && React.createElement("span", {
+    className: "social-author",
     style: {
       fontSize: 12,
       color: "rgba(200,220,240,.55)",
@@ -1016,6 +1035,7 @@ function SocialCard({
       fontWeight: 800
     }
   }, "\u25CF FRESH"), React.createElement("span", {
+    className: "card-meta",
     style: {
       fontSize: 11,
       color: "rgba(200,220,240,.35)",
@@ -1023,6 +1043,7 @@ function SocialCard({
       fontFamily: "var(--mono)"
     }
   }, timeAgo(post.ts))), React.createElement("div", {
+    className: "social-summary",
     style: {
       fontSize: 14,
       color: "rgba(220,232,245,.85)",
@@ -1172,6 +1193,7 @@ function ThreatVelocityPanel({
       }
     }, d.label));
   }))), React.createElement("div", {
+    className: "ecosystems-panel",
     style: {
       background: "rgba(255,255,255,0.02)",
       border: "1px solid rgba(123,47,247,0.18)",
@@ -1194,6 +1216,7 @@ function ThreatVelocityPanel({
       fontWeight: 700
     }
   }, "\uD83C\uDFAF TOP TARGETED ECOSYSTEMS"), React.createElement("span", {
+    className: "card-meta",
     style: {
       fontSize: 10,
       color: "rgba(200,220,240,0.35)",
@@ -1209,6 +1232,7 @@ function ThreatVelocityPanel({
     const active = activeSearch && activeSearch.toLowerCase() === v.keyword.toLowerCase();
     return React.createElement("button", {
       key: v.name,
+      className: `vendor-btn ${active ? "active" : ""}`,
       onClick: () => onSelectKeyword(active ? "" : v.keyword),
       style: {
         padding: "5px 10px",
@@ -1265,6 +1289,7 @@ function AIBriefCard({
 }) {
   if (!brief) return null;
   if (brief.loading) return React.createElement("div", {
+    className: "ai-brief-card",
     style: {
       background: "linear-gradient(135deg,rgba(123,47,247,.10),rgba(0,200,255,.06))",
       border: "1px solid rgba(123,47,247,.3)",
@@ -1302,6 +1327,7 @@ function AIBriefCard({
   }))));
   if (!brief.brief) return null;
   return React.createElement("div", {
+    className: "ai-brief-card",
     style: {
       background: "linear-gradient(135deg,rgba(123,47,247,.12),rgba(0,200,255,.06))",
       border: "1px solid rgba(123,47,247,.35)",
@@ -1328,12 +1354,14 @@ function AIBriefCard({
       fontFamily: "var(--mono)"
     }
   }, "\uD83E\uDD16 AI SITUATION SUMMARY"), React.createElement("div", {
+    className: "brief-meta",
     style: {
       fontSize: 10,
       color: "rgba(200,220,240,.35)",
       fontFamily: "var(--mono)"
     }
   }, "Generated from ", brief.items, " items \xB7 ", brief.sources, " sources \xB7 Workers AI", brief.stale ? " · cached" : "")), React.createElement("div", {
+    className: "brief-text",
     style: {
       fontSize: 15,
       color: "rgba(230,238,250,.9)",
@@ -3292,6 +3320,7 @@ function ThreatAnalystChat({
       backdropFilter: "blur(12px)"
     }
   }, React.createElement("div", {
+    className: "chat-header",
     style: {
       display: "flex",
       alignItems: "center",
@@ -3310,6 +3339,7 @@ function ThreatAnalystChat({
       minWidth: 0
     }
   }, React.createElement("div", {
+    className: "chat-title",
     style: {
       fontSize: 13,
       fontWeight: 800,
@@ -3330,6 +3360,7 @@ function ThreatAnalystChat({
       verticalAlign: "middle"
     }
   }, "AI")), React.createElement("div", {
+    className: "chat-subtitle",
     style: {
       fontSize: 10,
       color: "rgba(200,220,240,.45)",
@@ -3380,6 +3411,7 @@ function ThreatAnalystChat({
       maxWidth: "88%"
     }
   }, React.createElement("div", {
+    className: m.role === "user" ? "chat-msg-user" : "chat-msg-bot",
     style: {
       fontSize: 13.5,
       lineHeight: 1.6,
@@ -3417,6 +3449,7 @@ function ThreatAnalystChat({
   }, "TRY ASKING"), CHAT_SUGGESTIONS.map(s => React.createElement("button", {
     key: s,
     onClick: () => send(s),
+    className: "chat-suggestion",
     style: {
       textAlign: "left",
       padding: "8px 12px",
@@ -3434,6 +3467,7 @@ function ThreatAnalystChat({
       e.preventDefault();
       send();
     },
+    className: "chat-composer",
     style: {
       display: "flex",
       gap: 8,
@@ -4287,7 +4321,27 @@ function BCyberAwareDashboard() {
   const [knowFocus, setKnowFocus] = useState(null);
   const [view, setView] = useState("feed");
   const [feedTab, setFeedTab] = useState("advisories");
+  const [theme, setTheme] = useState(() => {
+    try {
+      return localStorage.getItem("bca_theme") || (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+    } catch {
+      return "dark";
+    }
+  });
   const searchInputRef = React.useRef(null);
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    if (theme === "light") {
+      document.body.classList.add("light-theme");
+      document.documentElement.classList.add("light-theme");
+    } else {
+      document.body.classList.remove("light-theme");
+      document.documentElement.classList.remove("light-theme");
+    }
+    try {
+      localStorage.setItem("bca_theme", theme);
+    } catch {}
+  }, [theme]);
   useEffect(() => {
     const onKey = e => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
@@ -4465,6 +4519,7 @@ function BCyberAwareDashboard() {
   const navBtn = (v, l) => React.createElement("button", {
     key: v,
     onClick: () => setView(v),
+    className: view === v ? "nav-active" : "",
     style: {
       padding: "5px 10px",
       whiteSpace: "nowrap",
@@ -4803,9 +4858,11 @@ function BCyberAwareDashboard() {
     healthByName[h.name] = h;
   });
   return React.createElement("div", {
+    className: `bca-app ${theme === "light" ? "light-theme" : "dark-theme"}`,
     style: {
       minHeight: "100vh",
-      background: "#05080f"
+      background: theme === "light" ? "#f4f6fb" : "#05080f",
+      color: theme === "light" ? "#1e293b" : "#c8d8e8"
     }
   }, React.createElement("style", null, `
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
@@ -4817,9 +4874,10 @@ function BCyberAwareDashboard() {
         @media(max-width:520px){.chat-panel{right:0 !important;bottom:0 !important;width:100vw !important;max-width:100vw !important;height:100vh !important;max-height:100vh !important;border-radius:0 !important}}
         button:hover{opacity:.85}
       `), React.createElement("div", {
+    className: "topbar-wrap",
     style: {
-      background: "rgba(0,0,0,.7)",
-      borderBottom: "1px solid rgba(0,200,255,.1)",
+      background: theme === "light" ? "rgba(255,255,255,0.92)" : "rgba(0,0,0,.7)",
+      borderBottom: `1px solid ${theme === "light" ? "rgba(0,0,0,0.08)" : "rgba(0,200,255,.1)"}`,
       position: "sticky",
       top: 0,
       zIndex: 50,
@@ -4863,9 +4921,10 @@ function BCyberAwareDashboard() {
       fontFamily: "var(--display)"
     }
   }, "BCyberAware"), React.createElement("div", {
+    className: "logo-sub",
     style: {
       fontSize: 9,
-      color: "rgba(200,220,240,.4)",
+      color: theme === "light" ? "#64748b" : "rgba(200,220,240,.4)",
       letterSpacing: 1
     }
   }, "by Vikas Pandita"))), React.createElement("nav", {
@@ -4949,7 +5008,27 @@ function BCyberAwareDashboard() {
       fontWeight: 600,
       whiteSpace: "nowrap"
     }
-  }, "\u26A1 Force Latest")))), React.createElement(BreakingTicker, {
+  }, "\u26A1 Force Latest"), React.createElement("button", {
+    onClick: () => setTheme(theme === "dark" ? "light" : "dark"),
+    title: theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode",
+    "aria-label": theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode",
+    className: "theme-toggle-btn",
+    style: {
+      padding: "5px 11px",
+      background: theme === "dark" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)",
+      border: `1px solid ${theme === "dark" ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.12)"}`,
+      color: theme === "dark" ? "#ffd700" : "#b45309",
+      fontSize: 12,
+      cursor: "pointer",
+      fontFamily: "var(--mono)",
+      borderRadius: 4,
+      fontWeight: 700,
+      whiteSpace: "nowrap",
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 5
+    }
+  }, theme === "dark" ? "☀️ Light" : "🌙 Dark")))), React.createElement(BreakingTicker, {
     items: breaking
   }), React.createElement("div", {
     style: {
@@ -5030,6 +5109,7 @@ function BCyberAwareDashboard() {
   }, "\u26A0 ", feedError), React.createElement(AIBriefCard, {
     brief: brief
   }), React.createElement("div", {
+    className: "search-bar-wrap",
     style: {
       display: "flex",
       gap: 8,
@@ -5082,6 +5162,7 @@ function BCyberAwareDashboard() {
   }, React.createElement("button", {
     onClick: () => exportIntel(feedTab === "advisories" ? fAdvisories : feedTab === "exploits" ? fExploits : feedTab === "news" ? fNews : feedTab === "watchlist" ? watchlist : fSocial, "csv"),
     title: "Export current view to CSV",
+    className: "export-btn",
     style: {
       padding: "5px 10px",
       fontSize: 11,
@@ -5096,6 +5177,7 @@ function BCyberAwareDashboard() {
   }, "\u2B07 CSV"), React.createElement("button", {
     onClick: () => exportIntel(feedTab === "advisories" ? fAdvisories : feedTab === "exploits" ? fExploits : feedTab === "news" ? fNews : feedTab === "watchlist" ? watchlist : fSocial, "json"),
     title: "Export current view to JSON",
+    className: "export-btn",
     style: {
       padding: "5px 10px",
       fontSize: 11,
@@ -5110,6 +5192,7 @@ function BCyberAwareDashboard() {
   }, "\u2B07 JSON"), React.createElement("button", {
     onClick: () => exportIntel(feedTab === "advisories" ? fAdvisories : feedTab === "exploits" ? fExploits : feedTab === "news" ? fNews : feedTab === "watchlist" ? watchlist : fSocial, "stix"),
     title: "Export OASIS STIX 2.1 bundle (OpenCTI / MISP / TAXII compatible)",
+    className: "export-btn",
     style: {
       padding: "5px 10px",
       fontSize: 11,
@@ -5128,6 +5211,7 @@ function BCyberAwareDashboard() {
     activeSearch: searchQ,
     onSelectKeyword: q => setSearchQ(q)
   }), React.createElement("div", {
+    className: "feed-tabs-wrap",
     style: {
       display: "flex",
       gap: 4,
@@ -5139,6 +5223,7 @@ function BCyberAwareDashboard() {
   }, [["advisories", `🏛️ Advisories (${fAdvisories.length})`], ["exploits", `⚡ Exploits (${fExploits.length})`], ["news", `📰 Security News (${fNews.length})`], ["social", `💬 Social Intel (${fSocial.length})`], ["watchlist", `★ Watchlist (${watchlist.length})`]].map(([id, lbl]) => React.createElement("button", {
     key: id,
     onClick: () => setFeedTab(id),
+    className: `feed-tab-btn ${feedTab === id ? "tab-active" : ""}`,
     style: {
       padding: "10px 18px",
       background: "transparent",
@@ -5153,6 +5238,7 @@ function BCyberAwareDashboard() {
       whiteSpace: "nowrap"
     }
   }, lbl))), feedTab !== "news" && feedTab !== "social" && feedTab !== "watchlist" && React.createElement("div", {
+    className: "filter-bar-wrap",
     style: {
       display: "flex",
       gap: 7,
@@ -5172,6 +5258,7 @@ function BCyberAwareDashboard() {
     return React.createElement("button", {
       key: s,
       onClick: () => setFilterSev(s),
+      className: `filter-btn ${filterSev === s ? "active" : ""}`,
       style: {
         padding: "5px 14px",
         fontSize: 13,
@@ -5192,6 +5279,7 @@ function BCyberAwareDashboard() {
     }
   }), React.createElement("button", {
     onClick: () => setFilterME(!filterME),
+    className: `filter-btn ${filterME ? "active" : ""}`,
     style: {
       padding: "5px 14px",
       fontSize: 13,
@@ -5205,6 +5293,7 @@ function BCyberAwareDashboard() {
     }
   }, "\uD83C\uDF0D GCC / Middle East"), React.createElement("button", {
     onClick: () => setFilterExp(!filterExp),
+    className: `filter-btn ${filterExp ? "active" : ""}`,
     style: {
       padding: "5px 14px",
       fontSize: 13,
@@ -5218,6 +5307,7 @@ function BCyberAwareDashboard() {
     }
   }, "\u26A1 Exploit in Wild"), React.createElement("button", {
     onClick: () => setFilterEpss(!filterEpss),
+    className: `filter-btn ${filterEpss ? "active" : ""}`,
     style: {
       padding: "5px 14px",
       fontSize: 13,
@@ -5245,6 +5335,7 @@ function BCyberAwareDashboard() {
   }, "SORT:"), [["sev", "Severity"], ["epss", "EPSS Risk"], ["recent", "Newest"]].map(([k, lbl]) => React.createElement("button", {
     key: k,
     onClick: () => setSortBy(k),
+    className: `sort-btn ${sortBy === k ? "active" : ""}`,
     style: {
       padding: "4px 10px",
       fontSize: 11.5,
@@ -6263,6 +6354,7 @@ function BCyberAwareDashboard() {
     externalPrompt: aiPrompt,
     onConsumedPrompt: () => setAiPrompt(null)
   }), React.createElement("div", {
+    className: "footer-wrap",
     style: {
       borderTop: "1px solid rgba(255,255,255,.05)",
       marginTop: 32,

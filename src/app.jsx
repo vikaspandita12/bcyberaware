@@ -36,18 +36,18 @@ function BreakingTicker({ items }) {
   if(!items||items.length===0) return null;
   const doubled=[...items,...items];
   return (
-    <div style={{background:"linear-gradient(90deg,rgba(80,0,0,.55),rgba(40,0,10,.4))",borderBottom:"1px solid rgba(255,23,68,.25)",display:"flex",alignItems:"stretch",overflow:"hidden",height:38}}>
-      <div style={{flexShrink:0,display:"flex",alignItems:"center",gap:8,padding:"0 16px",background:"rgba(200,0,0,.3)",borderRight:"1px solid rgba(255,23,68,.35)",zIndex:2}}>
+    <div className="ticker-wrap" style={{background:"linear-gradient(90deg,rgba(80,0,0,.55),rgba(40,0,10,.4))",borderBottom:"1px solid rgba(255,23,68,.25)",display:"flex",alignItems:"stretch",overflow:"hidden",height:38}}>
+      <div className="ticker-badge" style={{flexShrink:0,display:"flex",alignItems:"center",gap:8,padding:"0 16px",background:"rgba(200,0,0,.3)",borderRight:"1px solid rgba(255,23,68,.35)",zIndex:2}}>
         <span style={{width:8,height:8,borderRadius:"50%",background:"#ff1744",boxShadow:"0 0 8px #ff1744",animation:"pulse 1.1s infinite",display:"inline-block"}}/>
-        <span style={{fontSize:11,fontWeight:900,color:"#ff6e6e",fontFamily:"var(--mono)",letterSpacing:2.5,whiteSpace:"nowrap"}}>BREAKING</span>
+        <span className="ticker-badge-text" style={{fontSize:11,fontWeight:900,color:"#ff6e6e",fontFamily:"var(--mono)",letterSpacing:2.5,whiteSpace:"nowrap"}}>BREAKING</span>
       </div>
       <div style={{flex:1,overflow:"hidden",position:"relative"}}>
         <div className="ticker-track" style={{display:"flex",alignItems:"center",height:"100%",width:"max-content",animation:`tickerScroll ${Math.max(40,items.length*11)}s linear infinite`}}>
           {doubled.map((b,i)=>(
-            <a key={i} href={b.source_url} target="_blank" rel="noopener noreferrer" style={{display:"inline-flex",alignItems:"center",gap:9,padding:"0 28px",whiteSpace:"nowrap",fontSize:13}}>
-              <span style={{color:"#ff7961",fontFamily:"var(--mono)",fontSize:11,letterSpacing:.5}}>{b.source_flag} {b.source} · {timeAgo(b.ts)}</span>
-              <span style={{fontWeight:600,color:"#ffe3e3"}}>{b.title}</span>
-              <span style={{color:"rgba(255,100,100,.3)"}}>◆</span>
+            <a key={i} href={b.source_url} target="_blank" rel="noopener noreferrer" className="ticker-item" style={{display:"inline-flex",alignItems:"center",gap:9,padding:"0 28px",whiteSpace:"nowrap",fontSize:13}}>
+              <span className="ticker-meta" style={{color:"#ff7961",fontFamily:"var(--mono)",fontSize:11,letterSpacing:.5}}>{b.source_flag} {b.source} · {timeAgo(b.ts)}</span>
+              <span className="ticker-title" style={{fontWeight:600,color:"#ffe3e3"}}>{b.title}</span>
+              <span className="ticker-sep" style={{color:"rgba(255,100,100,.3)"}}>◆</span>
             </a>
           ))}
         </div>
@@ -63,10 +63,10 @@ function SevBadge({ sev }) {
 
 function StatCard({ label, value, color, sub }) {
   return (
-    <div style={{flex:1,minWidth:100,background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:6,padding:"16px 14px",textAlign:"center"}}>
-      <div style={{fontSize:34,fontWeight:900,color:color||ACCENT,fontFamily:"var(--mono)",lineHeight:1}}>{value}</div>
-      <div style={{fontSize:11,letterSpacing:1.5,color:"rgba(200,220,240,0.4)",textTransform:"uppercase",marginTop:7,fontWeight:600}}>{label}</div>
-      {sub&&<div style={{fontSize:11,color:"rgba(200,220,240,0.25)",marginTop:3}}>{sub}</div>}
+    <div className="stat-card" style={{flex:1,minWidth:100,background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:6,padding:"16px 14px",textAlign:"center"}}>
+      <div className="stat-value" style={{fontSize:34,fontWeight:900,color:color||ACCENT,fontFamily:"var(--mono)",lineHeight:1}}>{value}</div>
+      <div className="stat-label" style={{fontSize:11,letterSpacing:1.5,color:"rgba(200,220,240,0.4)",textTransform:"uppercase",marginTop:7,fontWeight:600}}>{label}</div>
+      {sub&&<div className="stat-sub" style={{fontSize:11,color:"rgba(200,220,240,0.25)",marginTop:3}}>{sub}</div>}
     </div>
   );
 }
@@ -331,10 +331,10 @@ function AdvisoryCard({ adv, onAskAI, onToggleWatch, isWatched, onOpenKnowledge 
   const { confidence, tlp } = computeOpenCTIMeta(adv);
   const epssColor = (adv.epss||0)>=50 ? "#ff1744" : (adv.epss||0)>=15 ? "#ff9100" : "#00e5ff";
   return (
-    <div className="card" style={{background:"rgba(5,8,15,0.92)",border:`1px solid ${borderCol}33`,borderLeft:`4px solid ${borderCol}`,borderRadius:6,padding:"18px 20px",marginBottom:12,boxShadow:adv.exploit_in_wild?`0 0 14px ${borderCol}12`:"none"}}>
+    <div className="card advisory-card" style={{background:"rgba(5,8,15,0.92)",border:`1px solid ${borderCol}33`,borderLeft:`4px solid ${borderCol}`,borderRadius:6,padding:"18px 20px",marginBottom:12,boxShadow:adv.exploit_in_wild?`0 0 14px ${borderCol}12`:"none"}}>
       <div style={{display:"flex",gap:7,flexWrap:"wrap",alignItems:"center",marginBottom:10}}>
         {!isNews&&<SevBadge sev={adv.severity}/>}
-        {adv.cvss&&<span style={{fontSize:11,padding:"4px 9px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.15)",color:"#eef4ff",fontFamily:"var(--mono)",borderRadius:3,fontWeight:700}}>CVSS {adv.cvss}</span>}
+        {adv.cvss&&<span className="cvss-tag" style={{fontSize:11,padding:"4px 9px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.15)",color:"#eef4ff",fontFamily:"var(--mono)",borderRadius:3,fontWeight:700}}>CVSS {adv.cvss}</span>}
         {adv.epss!=null&&<span title={`FIRST.org EPSS: ${adv.epss}% probability of exploitation in the next 30 days (${adv.epss_percentile||0}th percentile)`} style={{fontSize:11,padding:"4px 10px",background:`${epssColor}18`,border:`1px solid ${epssColor}66`,color:epssColor,letterSpacing:.8,fontFamily:"var(--mono)",borderRadius:3,fontWeight:800}}>🎯 EPSS {adv.epss}%{adv.epss_percentile>=90?` (P${adv.epss_percentile})`:""}</span>}
         {isNews&&<span style={{fontSize:12,padding:"4px 12px",background:"rgba(25,118,210,0.15)",border:"1px solid #1976d255",color:"#64b5f6",letterSpacing:1,fontFamily:"var(--mono)",borderRadius:3}}>📰 NEWS</span>}
         {isExploit&&<span style={{fontSize:12,padding:"4px 12px",background:"rgba(200,0,0,0.15)",border:"1px solid #c0000055",color:"#ff4444",letterSpacing:1,fontFamily:"var(--mono)",borderRadius:3}}>⚡ PUBLIC EXPLOIT</span>}
@@ -343,22 +343,22 @@ function AdvisoryCard({ adv, onAskAI, onToggleWatch, isWatched, onOpenKnowledge 
         {isFresh&&<span style={{fontSize:11,padding:"4px 10px",background:"rgba(0,200,255,0.1)",border:"1px solid rgba(0,200,255,.4)",color:"#00c8ff",letterSpacing:1,fontFamily:"var(--mono)",borderRadius:3,fontWeight:800}}>● FRESH</span>}
         <span title="Source confidence (OpenCTI-style)" style={{fontSize:10,padding:"3px 8px",background:"rgba(0,200,255,0.07)",border:"1px solid rgba(0,200,255,0.22)",color:ACCENT,fontFamily:"var(--mono)",borderRadius:3,fontWeight:700}}>{confidence}%</span>
         <span title="Traffic Light Protocol" style={{fontSize:10,padding:"3px 8px",background:tlp.bg,border:`1px solid ${tlp.color}55`,color:tlp.color,fontFamily:"var(--mono)",borderRadius:3,fontWeight:700}}>{tlp.label}</span>
-        <span style={{fontSize:12,color:"rgba(200,220,240,0.4)"}}>{adv.source_flag} {adv.source} · {adv.ts?timeAgo(adv.ts):adv.date}</span>
+        <span className="card-meta" style={{fontSize:12,color:"rgba(200,220,240,0.4)"}}>{adv.source_flag} {adv.source} · {adv.ts?timeAgo(adv.ts):adv.date}</span>
         {onToggleWatch&&(
           <button onClick={()=>onToggleWatch(adv)} title={isWatched?"Remove from Watchlist":"Save to Watchlist"} style={{marginLeft:"auto",background:isWatched?"rgba(255,215,0,0.15)":"rgba(255,255,255,0.03)",border:`1px solid ${isWatched?"#ffd700":"rgba(255,255,255,0.12)"}`,color:isWatched?"#ffd700":"rgba(200,220,240,0.45)",padding:"3px 10px",borderRadius:4,cursor:"pointer",fontSize:12,fontFamily:"var(--mono)",fontWeight:700}}>
             {isWatched?"★ SAVED":"☆ SAVE"}
           </button>
         )}
       </div>
-      <div style={{fontSize:17,fontWeight:700,color:"#eef4ff",marginBottom:10,lineHeight:1.45}}>{adv.title}</div>
-      <div style={{fontSize:14,color:"rgba(200,220,240,0.6)",lineHeight:1.75,marginBottom:12}}>{adv.summary}</div>
+      <div className="card-title" style={{fontSize:17,fontWeight:700,color:"#eef4ff",marginBottom:10,lineHeight:1.45}}>{adv.title}</div>
+      <div className="card-summary" style={{fontSize:14,color:"rgba(200,220,240,0.6)",lineHeight:1.75,marginBottom:12}}>{adv.summary}</div>
       <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
         {adv.cve_ids?.map(c=>(
           <a key={c} href={`https://nvd.nist.gov/vuln/detail/${c}`} target="_blank" rel="noopener noreferrer"
             style={{fontSize:12,color:ACCENT,fontFamily:"var(--mono)",background:"rgba(0,200,255,0.07)",padding:"4px 11px",border:`1px solid rgba(0,200,255,0.22)`,borderRadius:3}}>{c} ↗</a>
         ))}
         {adv.affected_products?.slice(0,3).map(p=>(
-          <span key={p} style={{fontSize:11,color:"rgba(200,220,240,0.7)",fontFamily:"var(--mono)",background:"rgba(255,255,255,0.04)",padding:"4px 10px",border:"1px solid rgba(255,255,255,0.1)",borderRadius:3}}>📦 {p}</span>
+          <span key={p} className="product-tag" style={{fontSize:11,color:"rgba(200,220,240,0.7)",fontFamily:"var(--mono)",background:"rgba(255,255,255,0.04)",padding:"4px 10px",border:"1px solid rgba(255,255,255,0.1)",borderRadius:3}}>📦 {p}</span>
         ))}
         {mitre.map(m=>(
           <button key={m.id} type="button" onClick={()=>onOpenKnowledge?onOpenKnowledge({type:"technique",id:m.id}):window.open(`https://attack.mitre.org/techniques/${m.id}/`,"_blank")}
@@ -368,8 +368,8 @@ function AdvisoryCard({ adv, onAskAI, onToggleWatch, isWatched, onOpenKnowledge 
         {adv.threat_actor&&<button type="button" onClick={()=>onOpenKnowledge&&onOpenKnowledge({type:"entity",id:adv.threat_actor})} style={{fontSize:12,color:"#c084fc",fontFamily:"var(--mono)",background:"rgba(123,47,247,0.09)",padding:"4px 11px",border:"1px solid rgba(123,47,247,0.25)",borderRadius:3,cursor:"pointer"}}>🎯 {adv.threat_actor}</button>}
         {adv.patch_available&&!isNews&&<span style={{fontSize:12,color:"#00e676",fontFamily:"var(--mono)",background:"rgba(0,200,100,0.07)",padding:"4px 11px",border:"1px solid rgba(0,200,100,0.22)",borderRadius:3}}>✔ PATCH AVAILABLE</span>}
       </div>
-      <div style={{borderTop:"1px solid rgba(255,255,255,0.06)",paddingTop:12,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
-        <span style={{fontSize:12,color:"rgba(200,220,240,0.3)",fontFamily:"var(--mono)",letterSpacing:1}}>🔗 VERIFY &amp; TRIAGE</span>
+      <div className="card-footer" style={{borderTop:"1px solid rgba(255,255,255,0.06)",paddingTop:12,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
+        <span className="verify-label" style={{fontSize:12,color:"rgba(200,220,240,0.3)",fontFamily:"var(--mono)",letterSpacing:1}}>🔗 VERIFY &amp; TRIAGE</span>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
           {onAskAI&&(
             <button onClick={()=>onAskAI(adv)} style={{display:"inline-flex",alignItems:"center",gap:6,fontSize:12,color:"#d8b4fe",fontFamily:"var(--mono)",background:"rgba(123,47,247,0.12)",border:"1px solid rgba(123,47,247,0.4)",padding:"7px 14px",borderRadius:4,cursor:"pointer",fontWeight:700}}>
@@ -391,15 +391,15 @@ function SocialCard({ post }) {
   const col=post.source_color||"#6364ff";
   const isFresh=post.ts&&(Date.now()-post.ts)<24*60*60*1000;
   return (
-    <a href={post.source_url} target="_blank" rel="noopener noreferrer" className="card" style={{display:"block",background:"rgba(5,8,15,0.92)",border:`1px solid ${col}33`,borderLeft:`4px solid ${col}`,borderRadius:6,padding:"14px 18px",marginBottom:10}}>
+    <a href={post.source_url} target="_blank" rel="noopener noreferrer" className="card social-card" style={{display:"block",background:"rgba(5,8,15,0.92)",border:`1px solid ${col}33`,borderLeft:`4px solid ${col}`,borderRadius:6,padding:"14px 18px",marginBottom:10}}>
       <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",marginBottom:8}}>
         <span style={{fontSize:11,padding:"3px 10px",background:`${col}1f`,border:`1px solid ${col}66`,color:col,letterSpacing:1,fontFamily:"var(--mono)",borderRadius:3,fontWeight:700}}>{post.source_flag} {post.source.toUpperCase()}</span>
-        {post.author&&<span style={{fontSize:12,color:"rgba(200,220,240,.55)",fontFamily:"var(--mono)"}}>{post.author}</span>}
+        {post.author&&<span className="social-author" style={{fontSize:12,color:"rgba(200,220,240,.55)",fontFamily:"var(--mono)"}}>{post.author}</span>}
         {post.exploit_in_wild&&<span style={{fontSize:11,padding:"3px 8px",background:"rgba(200,0,0,.15)",border:"1px solid #c0000055",color:"#ff4444",borderRadius:3,fontFamily:"var(--mono)"}}>⚡</span>}
         {isFresh&&<span style={{fontSize:10,padding:"3px 8px",background:"rgba(0,200,255,0.1)",border:"1px solid rgba(0,200,255,.4)",color:"#00c8ff",letterSpacing:1,fontFamily:"var(--mono)",borderRadius:3,fontWeight:800}}>● FRESH</span>}
-        <span style={{fontSize:11,color:"rgba(200,220,240,.35)",marginLeft:"auto",fontFamily:"var(--mono)"}}>{timeAgo(post.ts)}</span>
+        <span className="card-meta" style={{fontSize:11,color:"rgba(200,220,240,.35)",marginLeft:"auto",fontFamily:"var(--mono)"}}>{timeAgo(post.ts)}</span>
       </div>
-      <div style={{fontSize:14,color:"rgba(220,232,245,.85)",lineHeight:1.65}}>{post.summary}</div>
+      <div className="social-summary" style={{fontSize:14,color:"rgba(220,232,245,.85)",lineHeight:1.65}}>{post.summary}</div>
       {post.cve_ids?.length>0&&<div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:10}}>{post.cve_ids.map(c=><span key={c} style={{fontSize:11,color:ACCENT,fontFamily:"var(--mono)",background:"rgba(0,200,255,.07)",padding:"3px 9px",border:"1px solid rgba(0,200,255,.22)",borderRadius:3}}>{c}</span>)}</div>}
     </a>
   );
@@ -475,16 +475,16 @@ function ThreatVelocityPanel({ advisories, exploits, news, activeSearch, onSelec
       </div>
 
       {/* Top Targeted Ecosystems (click to filter) */}
-      <div style={{background:"rgba(255,255,255,0.02)",border:"1px solid rgba(123,47,247,0.18)",borderRadius:8,padding:"14px 16px"}}>
+      <div className="ecosystems-panel" style={{background:"rgba(255,255,255,0.02)",border:"1px solid rgba(123,47,247,0.18)",borderRadius:8,padding:"14px 16px"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
           <span style={{fontSize:11,letterSpacing:2,color:"rgba(192,132,252,0.8)",fontFamily:"var(--mono)",fontWeight:700}}>🎯 TOP TARGETED ECOSYSTEMS</span>
-          <span style={{fontSize:10,color:"rgba(200,220,240,0.35)",fontFamily:"var(--mono)"}}>Click to filter</span>
+          <span className="card-meta" style={{fontSize:10,color:"rgba(200,220,240,0.35)",fontFamily:"var(--mono)"}}>Click to filter</span>
         </div>
         <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
           {vendorCounts.map(v => {
             const active = activeSearch && activeSearch.toLowerCase() === v.keyword.toLowerCase();
             return (
-              <button key={v.name} onClick={() => onSelectKeyword(active ? "" : v.keyword)}
+              <button key={v.name} className={`vendor-btn ${active?"active":""}`} onClick={() => onSelectKeyword(active ? "" : v.keyword)}
                 style={{padding:"5px 10px",fontSize:11.5,fontFamily:"var(--mono)",borderRadius:4,cursor:"pointer",background:active?"rgba(0,200,255,0.18)":"rgba(255,255,255,0.03)",border:`1px solid ${active?ACCENT:"rgba(255,255,255,0.1)"}`,color:active?ACCENT:"#ddeeff",fontWeight:active?700:500}}>
                 {v.name} <span style={{color:ACCENT2,fontWeight:800}}>({v.count})</span>
               </button>
@@ -511,19 +511,19 @@ function ThreatVelocityPanel({ advisories, exploits, news, activeSearch, onSelec
 function AIBriefCard({ brief }) {
   if(!brief) return null;
   if(brief.loading) return (
-    <div style={{background:"linear-gradient(135deg,rgba(123,47,247,.10),rgba(0,200,255,.06))",border:"1px solid rgba(123,47,247,.3)",borderRadius:10,padding:"18px 22px",marginBottom:20}}>
+    <div className="ai-brief-card" style={{background:"linear-gradient(135deg,rgba(123,47,247,.10),rgba(0,200,255,.06))",border:"1px solid rgba(123,47,247,.3)",borderRadius:10,padding:"18px 22px",marginBottom:20}}>
       <div style={{fontSize:11,letterSpacing:3,color:"rgba(192,132,252,.8)",fontFamily:"var(--mono)",marginBottom:10}}>🤖 AI SITUATION SUMMARY</div>
       {[92,100,78].map((w,i)=><div key={i} style={{height:12,width:`${w}%`,borderRadius:6,background:"rgba(255,255,255,.06)",marginBottom:9,position:"relative",overflow:"hidden"}}><div style={{position:"absolute",inset:0,width:"50%",background:"linear-gradient(90deg,transparent,rgba(192,132,252,.25),transparent)",animation:"shimmer 1.4s infinite"}}/></div>)}
     </div>
   );
   if(!brief.brief) return null;
   return (
-    <div style={{background:"linear-gradient(135deg,rgba(123,47,247,.12),rgba(0,200,255,.06))",border:"1px solid rgba(123,47,247,.35)",borderRadius:10,padding:"18px 22px",marginBottom:20,boxShadow:"0 0 30px rgba(123,47,247,.08)",animation:"fadeIn .4s ease"}}>
+    <div className="ai-brief-card" style={{background:"linear-gradient(135deg,rgba(123,47,247,.12),rgba(0,200,255,.06))",border:"1px solid rgba(123,47,247,.35)",borderRadius:10,padding:"18px 22px",marginBottom:20,boxShadow:"0 0 30px rgba(123,47,247,.08)",animation:"fadeIn .4s ease"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:10}}>
         <div style={{fontSize:11,letterSpacing:3,color:"rgba(192,132,252,.85)",fontFamily:"var(--mono)"}}>🤖 AI SITUATION SUMMARY</div>
-        <div style={{fontSize:10,color:"rgba(200,220,240,.35)",fontFamily:"var(--mono)"}}>Generated from {brief.items} items · {brief.sources} sources · Workers AI{brief.stale?" · cached":""}</div>
+        <div className="brief-meta" style={{fontSize:10,color:"rgba(200,220,240,.35)",fontFamily:"var(--mono)"}}>Generated from {brief.items} items · {brief.sources} sources · Workers AI{brief.stale?" · cached":""}</div>
       </div>
-      <div style={{fontSize:15,color:"rgba(230,238,250,.9)",lineHeight:1.8,fontWeight:400}}>{brief.brief}</div>
+      <div className="brief-text" style={{fontSize:15,color:"rgba(230,238,250,.9)",lineHeight:1.8,fontWeight:400}}>{brief.brief}</div>
     </div>
   );
 }
@@ -1120,11 +1120,11 @@ function ThreatAnalystChat({ externalPrompt, onConsumedPrompt }){
       {open&&(
         <div className="chat-panel" role="dialog" aria-label="AI Threat Analyst" style={{position:"fixed",right:20,bottom:20,zIndex:90,width:400,maxWidth:"calc(100vw - 24px)",height:600,maxHeight:"calc(100vh - 40px)",display:"flex",flexDirection:"column",background:"rgba(6,10,20,.97)",border:"1px solid rgba(0,200,255,.3)",borderRadius:14,boxShadow:"0 16px 60px rgba(0,0,0,.6), 0 0 30px rgba(0,200,255,.12)",overflow:"hidden",animation:"fadeIn .25s ease",backdropFilter:"blur(12px)"}}>
           {/* Header */}
-          <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",background:"linear-gradient(90deg,rgba(0,200,255,.12),rgba(123,47,247,.14))",borderBottom:"1px solid rgba(0,200,255,.18)"}}>
+          <div className="chat-header" style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",background:"linear-gradient(90deg,rgba(0,200,255,.12),rgba(123,47,247,.14))",borderBottom:"1px solid rgba(0,200,255,.18)"}}>
             <span style={{fontSize:22}}>🛡️</span>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:13,fontWeight:800,color:"#eef4ff",letterSpacing:.5}}>Threat Analyst <span style={{fontSize:9,padding:"2px 6px",marginLeft:4,borderRadius:3,background:"rgba(0,230,118,.12)",border:"1px solid rgba(0,230,118,.4)",color:"#00e676",fontFamily:"var(--mono)",letterSpacing:1,verticalAlign:"middle"}}>AI</span></div>
-              <div style={{fontSize:10,color:"rgba(200,220,240,.45)",fontFamily:"var(--mono)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>Grounded in live feed · Cloudflare Workers AI</div>
+              <div className="chat-title" style={{fontSize:13,fontWeight:800,color:"#eef4ff",letterSpacing:.5}}>Threat Analyst <span style={{fontSize:9,padding:"2px 6px",marginLeft:4,borderRadius:3,background:"rgba(0,230,118,.12)",border:"1px solid rgba(0,230,118,.4)",color:"#00e676",fontFamily:"var(--mono)",letterSpacing:1,verticalAlign:"middle"}}>AI</span></div>
+              <div className="chat-subtitle" style={{fontSize:10,color:"rgba(200,220,240,.45)",fontFamily:"var(--mono)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>Grounded in live feed · Cloudflare Workers AI</div>
             </div>
             <button onClick={()=>setMsgs(msgs.slice(0,1))} title="Clear conversation" aria-label="Clear conversation" style={{background:"transparent",border:"1px solid rgba(255,255,255,.1)",color:"rgba(200,220,240,.5)",borderRadius:6,padding:"4px 8px",cursor:"pointer",fontSize:12}}>↺</button>
             <button onClick={()=>setOpen(false)} aria-label="Close" style={{background:"transparent",border:"1px solid rgba(255,255,255,.1)",color:"rgba(200,220,240,.6)",borderRadius:6,padding:"4px 9px",cursor:"pointer",fontSize:14,lineHeight:1}}>✕</button>
@@ -1134,7 +1134,7 @@ function ThreatAnalystChat({ externalPrompt, onConsumedPrompt }){
           <div style={{flex:1,overflowY:"auto",padding:"14px 14px 6px",display:"flex",flexDirection:"column",gap:10}}>
             {msgs.map((m,i)=>(
               <div key={i} style={{alignSelf:m.role==="user"?"flex-end":"flex-start",maxWidth:"88%"}}>
-                <div style={{fontSize:13.5,lineHeight:1.6,padding:"10px 13px",borderRadius:m.role==="user"?"14px 14px 4px 14px":"14px 14px 14px 4px",background:m.role==="user"?"linear-gradient(135deg,rgba(0,200,255,.18),rgba(0,200,255,.08))":m.error?"rgba(200,0,0,.12)":"rgba(255,255,255,.04)",border:`1px solid ${m.role==="user"?"rgba(0,200,255,.35)":m.error?"rgba(200,0,0,.35)":"rgba(255,255,255,.08)"}`,color:m.error?"#ff8a80":"rgba(220,232,245,.92)",wordBreak:"break-word"}}>
+                <div className={m.role==="user"?"chat-msg-user":"chat-msg-bot"} style={{fontSize:13.5,lineHeight:1.6,padding:"10px 13px",borderRadius:m.role==="user"?"14px 14px 4px 14px":"14px 14px 14px 4px",background:m.role==="user"?"linear-gradient(135deg,rgba(0,200,255,.18),rgba(0,200,255,.08))":m.error?"rgba(200,0,0,.12)":"rgba(255,255,255,.04)",border:`1px solid ${m.role==="user"?"rgba(0,200,255,.35)":m.error?"rgba(200,0,0,.35)":"rgba(255,255,255,.08)"}`,color:m.error?"#ff8a80":"rgba(220,232,245,.92)",wordBreak:"break-word"}}>
                   {m.role==="assistant"?renderMd(m.content):m.content}
                   {m.streaming&&<span style={{display:"inline-block",width:7,height:14,background:ACCENT,marginLeft:3,verticalAlign:"text-bottom",animation:"pulse .8s infinite"}}/>}
                 </div>
@@ -1144,7 +1144,7 @@ function ThreatAnalystChat({ externalPrompt, onConsumedPrompt }){
               <div style={{display:"flex",flexDirection:"column",gap:6,marginTop:4}}>
                 <div style={{fontSize:10,letterSpacing:2,color:"rgba(200,220,240,.3)",fontFamily:"var(--mono)"}}>TRY ASKING</div>
                 {CHAT_SUGGESTIONS.map(s=>(
-                  <button key={s} onClick={()=>send(s)} style={{textAlign:"left",padding:"8px 12px",fontSize:12.5,background:"rgba(123,47,247,.08)",border:"1px solid rgba(123,47,247,.25)",color:"#d1c4e9",borderRadius:8,cursor:"pointer"}}>› {s}</button>
+                  <button key={s} onClick={()=>send(s)} className="chat-suggestion" style={{textAlign:"left",padding:"8px 12px",fontSize:12.5,background:"rgba(123,47,247,.08)",border:"1px solid rgba(123,47,247,.25)",color:"#d1c4e9",borderRadius:8,cursor:"pointer"}}>› {s}</button>
                 ))}
               </div>
             )}
@@ -1152,7 +1152,7 @@ function ThreatAnalystChat({ externalPrompt, onConsumedPrompt }){
           </div>
 
           {/* Composer */}
-          <form onSubmit={e=>{e.preventDefault();send();}} style={{display:"flex",gap:8,padding:"10px 12px",borderTop:"1px solid rgba(255,255,255,.07)",background:"rgba(0,0,0,.3)"}}>
+          <form onSubmit={e=>{e.preventDefault();send();}} className="chat-composer" style={{display:"flex",gap:8,padding:"10px 12px",borderTop:"1px solid rgba(255,255,255,.07)",background:"rgba(0,0,0,.3)"}}>
             <input value={input} onChange={e=>setInput(e.target.value)} placeholder="Ask about a CVE, threat actor, or today's feed…" maxLength={1200} disabled={busy} aria-label="Message"
               style={{flex:1,padding:"10px 12px",background:"rgba(255,255,255,.04)",border:"1px solid rgba(0,200,255,.2)",borderRadius:8,color:"#eef4ff",fontSize:13.5,outline:"none",fontFamily:"inherit"}}/>
             {busy
@@ -1480,7 +1480,26 @@ function BCyberAwareDashboard() {
   const [knowFocus, setKnowFocus]  = useState(null);
   const [view,      setView]       = useState("feed");
   const [feedTab,   setFeedTab]    = useState("advisories");
+  const [theme,     setTheme]      = useState(() => {
+    try {
+      return localStorage.getItem("bca_theme") || (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+    } catch {
+      return "dark";
+    }
+  });
   const searchInputRef = React.useRef(null);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    if (theme === "light") {
+      document.body.classList.add("light-theme");
+      document.documentElement.classList.add("light-theme");
+    } else {
+      document.body.classList.remove("light-theme");
+      document.documentElement.classList.remove("light-theme");
+    }
+    try { localStorage.setItem("bca_theme", theme); } catch {}
+  }, [theme]);
 
   useEffect(() => {
     const onKey = e => {
@@ -1609,7 +1628,7 @@ function BCyberAwareDashboard() {
   const FLAGS={US:"🇺🇸",GB:"🇬🇧",CN:"🇨🇳",RU:"🇷🇺",IN:"🇮🇳",DE:"🇩🇪",AU:"🇦🇺",CA:"🇨🇦",FR:"🇫🇷",IR:"🇮🇷",KP:"🇰🇵",AE:"🇦🇪",SA:"🇸🇦",QA:"🇶🇦",KW:"🇰🇼",PK:"🇵🇰",UA:"🇺🇦",BR:"🇧🇷",JP:"🇯🇵",KR:"🇰🇷",NL:"🇳🇱",SG:"🇸🇬",TR:"🇹🇷",IL:"🇮🇱",ZA:"🇿🇦",NG:"🇳🇬",MX:"🇲🇽"};
 
   const navBtn=(v,l)=>(
-    <button key={v} onClick={()=>setView(v)} style={{padding:"5px 10px",whiteSpace:"nowrap",background:view===v?"rgba(0,200,255,0.1)":"transparent",border:`1px solid ${view===v?"rgba(0,200,255,0.35)":"rgba(255,255,255,0.08)"}`,color:view===v?ACCENT:"rgba(200,220,240,0.45)",fontSize:12,letterSpacing:.5,cursor:"pointer",fontFamily:"var(--mono)",borderRadius:4,fontWeight:view===v?700:400}}>{l}</button>
+    <button key={v} onClick={()=>setView(v)} className={view===v?"nav-active":""} style={{padding:"5px 10px",whiteSpace:"nowrap",background:view===v?"rgba(0,200,255,0.1)":"transparent",border:`1px solid ${view===v?"rgba(0,200,255,0.35)":"rgba(255,255,255,0.08)"}`,color:view===v?ACCENT:"rgba(200,220,240,0.45)",fontSize:12,letterSpacing:.5,cursor:"pointer",fontFamily:"var(--mono)",borderRadius:4,fontWeight:view===v?700:400}}>{l}</button>
   );
 
   const SOURCES_DATA=[
@@ -1671,7 +1690,7 @@ function BCyberAwareDashboard() {
   (feedMeta?.source_health||[]).forEach(h=>{healthByName[h.name]=h;});
 
   return (
-    <div style={{minHeight:"100vh",background:"#05080f"}}>
+    <div className={`bca-app ${theme === "light" ? "light-theme" : "dark-theme"}`} style={{minHeight:"100vh",background:theme==="light"?"#f4f6fb":"#05080f",color:theme==="light"?"#1e293b":"#c8d8e8"}}>
       <style>{`
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
         @keyframes fadeIn{from{opacity:0}to{opacity:1}}
@@ -1684,13 +1703,13 @@ function BCyberAwareDashboard() {
       `}</style>
 
       {/* ── Top Bar ── */}
-      <div style={{background:"rgba(0,0,0,.7)",borderBottom:"1px solid rgba(0,200,255,.1)",position:"sticky",top:0,zIndex:50,backdropFilter:"blur(8px)"}}>
+      <div className="topbar-wrap" style={{background:theme==="light"?"rgba(255,255,255,0.92)":"rgba(0,0,0,.7)",borderBottom:`1px solid ${theme==="light"?"rgba(0,0,0,0.08)":"rgba(0,200,255,.1)"}`,position:"sticky",top:0,zIndex:50,backdropFilter:"blur(8px)"}}>
         <div className="topbar" style={{maxWidth:1400,margin:"0 auto",padding:"8px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",minHeight:58,gap:10,flexWrap:"wrap"}}>
           <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
             <img src="logo.svg" alt="BCyberAware Logo" style={{width:36,height:36,objectFit:"contain"}} />
             <div>
               <div style={{fontSize:15,fontWeight:900,color:ACCENT,letterSpacing:1.5,lineHeight:1.1,fontFamily:"var(--display)"}}>BCyberAware</div>
-              <div style={{fontSize:9,color:"rgba(200,220,240,.4)",letterSpacing:1}}>by Vikas Pandita</div>
+              <div className="logo-sub" style={{fontSize:9,color:theme==="light"?"#64748b":"rgba(200,220,240,.4)",letterSpacing:1}}>by Vikas Pandita</div>
             </div>
           </div>
           <nav className="topnav" aria-label="Main navigation" style={{display:"flex",gap:4,flex:"1 1 auto",overflowX:"auto",WebkitOverflowScrolling:"touch",padding:"4px 0",justifyContent:"center"}}>
@@ -1707,6 +1726,9 @@ function BCyberAwareDashboard() {
             )}
             <button onClick={()=>refreshFeed(false)} disabled={loading} style={{padding:"5px 12px",background:"transparent",border:`1px solid rgba(0,200,255,.3)`,color:ACCENT,fontSize:12,cursor:loading?"not-allowed":"pointer",fontFamily:"var(--mono)",opacity:loading?.4:1,borderRadius:4,fontWeight:600,whiteSpace:"nowrap"}}>⟳ Refresh</button>
             <button onClick={()=>refreshFeed(true)} disabled={loading} style={{padding:"5px 12px",background:"rgba(255,100,0,.08)",border:`1px solid rgba(255,100,0,.35)`,color:"#ff9944",fontSize:12,cursor:loading?"not-allowed":"pointer",fontFamily:"var(--mono)",opacity:loading?.4:1,borderRadius:4,fontWeight:600,whiteSpace:"nowrap"}}>⚡ Force Latest</button>
+            <button onClick={()=>setTheme(theme==="dark"?"light":"dark")} title={theme==="dark"?"Switch to Light Mode":"Switch to Dark Mode"} aria-label={theme==="dark"?"Switch to Light Mode":"Switch to Dark Mode"} className="theme-toggle-btn" style={{padding:"5px 11px",background:theme==="dark"?"rgba(255,255,255,0.06)":"rgba(0,0,0,0.05)",border:`1px solid ${theme==="dark"?"rgba(255,255,255,0.16)":"rgba(0,0,0,0.12)"}`,color:theme==="dark"?"#ffd700":"#b45309",fontSize:12,cursor:"pointer",fontFamily:"var(--mono)",borderRadius:4,fontWeight:700,whiteSpace:"nowrap",display:"inline-flex",alignItems:"center",gap:5}}>
+              {theme==="dark" ? "☀️ Light" : "🌙 Dark"}
+            </button>
           </div>
         </div>
       </div>
@@ -1737,7 +1759,7 @@ function BCyberAwareDashboard() {
             <AIBriefCard brief={brief}/>
 
             {/* ── Global Command Search + Velocity + Vendor Matrix ── */}
-            <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",marginBottom:14,background:"rgba(255,255,255,0.02)",border:"1px solid rgba(0,200,255,0.18)",borderRadius:8,padding:"10px 14px"}}>
+            <div className="search-bar-wrap" style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",marginBottom:14,background:"rgba(255,255,255,0.02)",border:"1px solid rgba(0,200,255,0.18)",borderRadius:8,padding:"10px 14px"}}>
               <span style={{fontSize:14,color:ACCENT}}>🔎</span>
               <input
                 ref={searchInputRef}
@@ -1751,15 +1773,15 @@ function BCyberAwareDashboard() {
                 <button onClick={()=>setSearchQ("")} style={{padding:"3px 9px",fontSize:11,fontFamily:"var(--mono)",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.15)",color:"#ddeeff",borderRadius:4,cursor:"pointer"}}>✕ Clear</button>
               )}
               <div style={{display:"flex",gap:6,marginLeft:"auto"}}>
-                <button onClick={()=>exportIntel(feedTab==="advisories"?fAdvisories:feedTab==="exploits"?fExploits:feedTab==="news"?fNews:feedTab==="watchlist"?watchlist:fSocial,"csv")} title="Export current view to CSV" style={{padding:"5px 10px",fontSize:11,fontFamily:"var(--mono)",background:"rgba(0,200,255,0.07)",border:"1px solid rgba(0,200,255,0.25)",color:ACCENT,borderRadius:4,cursor:"pointer",fontWeight:600}}>⬇ CSV</button>
-                <button onClick={()=>exportIntel(feedTab==="advisories"?fAdvisories:feedTab==="exploits"?fExploits:feedTab==="news"?fNews:feedTab==="watchlist"?watchlist:fSocial,"json")} title="Export current view to JSON" style={{padding:"5px 10px",fontSize:11,fontFamily:"var(--mono)",background:"rgba(123,47,247,0.1)",border:"1px solid rgba(123,47,247,0.3)",color:"#d8b4fe",borderRadius:4,cursor:"pointer",fontWeight:600}}>⬇ JSON</button>
-                <button onClick={()=>exportIntel(feedTab==="advisories"?fAdvisories:feedTab==="exploits"?fExploits:feedTab==="news"?fNews:feedTab==="watchlist"?watchlist:fSocial,"stix")} title="Export OASIS STIX 2.1 bundle (OpenCTI / MISP / TAXII compatible)" style={{padding:"5px 10px",fontSize:11,fontFamily:"var(--mono)",background:"rgba(255,145,0,0.1)",border:"1px solid rgba(255,145,0,0.35)",color:"#ffab40",borderRadius:4,cursor:"pointer",fontWeight:600}}>⬇ STIX 2.1</button>
+                <button onClick={()=>exportIntel(feedTab==="advisories"?fAdvisories:feedTab==="exploits"?fExploits:feedTab==="news"?fNews:feedTab==="watchlist"?watchlist:fSocial,"csv")} title="Export current view to CSV" className="export-btn" style={{padding:"5px 10px",fontSize:11,fontFamily:"var(--mono)",background:"rgba(0,200,255,0.07)",border:"1px solid rgba(0,200,255,0.25)",color:ACCENT,borderRadius:4,cursor:"pointer",fontWeight:600}}>⬇ CSV</button>
+                <button onClick={()=>exportIntel(feedTab==="advisories"?fAdvisories:feedTab==="exploits"?fExploits:feedTab==="news"?fNews:feedTab==="watchlist"?watchlist:fSocial,"json")} title="Export current view to JSON" className="export-btn" style={{padding:"5px 10px",fontSize:11,fontFamily:"var(--mono)",background:"rgba(123,47,247,0.1)",border:"1px solid rgba(123,47,247,0.3)",color:"#d8b4fe",borderRadius:4,cursor:"pointer",fontWeight:600}}>⬇ JSON</button>
+                <button onClick={()=>exportIntel(feedTab==="advisories"?fAdvisories:feedTab==="exploits"?fExploits:feedTab==="news"?fNews:feedTab==="watchlist"?watchlist:fSocial,"stix")} title="Export OASIS STIX 2.1 bundle (OpenCTI / MISP / TAXII compatible)" className="export-btn" style={{padding:"5px 10px",fontSize:11,fontFamily:"var(--mono)",background:"rgba(255,145,0,0.1)",border:"1px solid rgba(255,145,0,0.35)",color:"#ffab40",borderRadius:4,cursor:"pointer",fontWeight:600}}>⬇ STIX 2.1</button>
               </div>
             </div>
 
             <ThreatVelocityPanel advisories={advisories} exploits={exploits} news={news} activeSearch={searchQ} onSelectKeyword={q=>setSearchQ(q)}/>
 
-            <div style={{display:"flex",gap:4,marginBottom:16,borderBottom:"1px solid rgba(255,255,255,.07)",overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
+            <div className="feed-tabs-wrap" style={{display:"flex",gap:4,marginBottom:16,borderBottom:"1px solid rgba(255,255,255,.07)",overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
               {[
                 ["advisories",`🏛️ Advisories (${fAdvisories.length})`],
                 ["exploits",`⚡ Exploits (${fExploits.length})`],
@@ -1767,24 +1789,24 @@ function BCyberAwareDashboard() {
                 ["social",`💬 Social Intel (${fSocial.length})`],
                 ["watchlist",`★ Watchlist (${watchlist.length})`],
               ].map(([id,lbl])=>(
-                <button key={id} onClick={()=>setFeedTab(id)} style={{padding:"10px 18px",background:"transparent",border:"none",borderBottom:feedTab===id?`3px solid ${ACCENT}`:"3px solid transparent",color:feedTab===id?ACCENT:"rgba(200,220,240,.45)",fontSize:14,letterSpacing:.5,cursor:"pointer",fontFamily:"var(--mono)",fontWeight:feedTab===id?700:400,whiteSpace:"nowrap"}}>{lbl}</button>
+                <button key={id} onClick={()=>setFeedTab(id)} className={`feed-tab-btn ${feedTab===id?"tab-active":""}`} style={{padding:"10px 18px",background:"transparent",border:"none",borderBottom:feedTab===id?`3px solid ${ACCENT}`:"3px solid transparent",color:feedTab===id?ACCENT:"rgba(200,220,240,.45)",fontSize:14,letterSpacing:.5,cursor:"pointer",fontFamily:"var(--mono)",fontWeight:feedTab===id?700:400,whiteSpace:"nowrap"}}>{lbl}</button>
               ))}
             </div>
             {feedTab!=="news"&&feedTab!=="social"&&feedTab!=="watchlist"&&(
-              <div style={{display:"flex",gap:7,flexWrap:"wrap",marginBottom:16,alignItems:"center"}}>
+              <div className="filter-bar-wrap" style={{display:"flex",gap:7,flexWrap:"wrap",marginBottom:16,alignItems:"center"}}>
                 <span style={{fontSize:12,color:"rgba(200,220,240,.3)",letterSpacing:1.5,fontFamily:"var(--mono)"}}>FILTER:</span>
                 {["All","CRITICAL","HIGH","MEDIUM","LOW"].map(s=>{
                   const ss=SEV_S[s];
-                  return <button key={s} onClick={()=>setFilterSev(s)} style={{padding:"5px 14px",fontSize:13,cursor:"pointer",fontFamily:"var(--mono)",background:filterSev===s?(ss?.bg||"rgba(0,200,255,.09)"):"transparent",border:`1px solid ${filterSev===s?(ss?.border||ACCENT):"rgba(255,255,255,.1)"}`,color:filterSev===s?(ss?.text||ACCENT):"rgba(200,220,240,.45)",borderRadius:4,fontWeight:filterSev===s?700:400}}>{s}</button>;
+                  return <button key={s} onClick={()=>setFilterSev(s)} className={`filter-btn ${filterSev===s?"active":""}`} style={{padding:"5px 14px",fontSize:13,cursor:"pointer",fontFamily:"var(--mono)",background:filterSev===s?(ss?.bg||"rgba(0,200,255,.09)"):"transparent",border:`1px solid ${filterSev===s?(ss?.border||ACCENT):"rgba(255,255,255,.1)"}`,color:filterSev===s?(ss?.text||ACCENT):"rgba(200,220,240,.45)",borderRadius:4,fontWeight:filterSev===s?700:400}}>{s}</button>;
                 })}
                 <div style={{width:1,height:18,background:"rgba(255,255,255,.08)"}}/>
-                <button onClick={()=>setFilterME(!filterME)} style={{padding:"5px 14px",fontSize:13,cursor:"pointer",fontFamily:"var(--mono)",background:filterME?"rgba(0,166,81,.12)":"transparent",border:`1px solid ${filterME?"#00a651":"rgba(255,255,255,.1)"}`,color:filterME?"#00e676":"rgba(200,220,240,.45)",borderRadius:4,fontWeight:filterME?700:400}}>🌍 GCC / Middle East</button>
-                <button onClick={()=>setFilterExp(!filterExp)} style={{padding:"5px 14px",fontSize:13,cursor:"pointer",fontFamily:"var(--mono)",background:filterExp?"rgba(200,0,0,.12)":"transparent",border:`1px solid ${filterExp?"#c00000":"rgba(255,255,255,.1)"}`,color:filterExp?"#ff4444":"rgba(200,220,240,.45)",borderRadius:4,fontWeight:filterExp?700:400}}>⚡ Exploit in Wild</button>
-                <button onClick={()=>setFilterEpss(!filterEpss)} style={{padding:"5px 14px",fontSize:13,cursor:"pointer",fontFamily:"var(--mono)",background:filterEpss?"rgba(255,145,0,.14)":"transparent",border:`1px solid ${filterEpss?"#ff9100":"rgba(255,255,255,.1)"}`,color:filterEpss?"#ff9100":"rgba(200,220,240,.45)",borderRadius:4,fontWeight:filterEpss?700:400}}>🎯 EPSS ≥ 10%</button>
+                <button onClick={()=>setFilterME(!filterME)} className={`filter-btn ${filterME?"active":""}`} style={{padding:"5px 14px",fontSize:13,cursor:"pointer",fontFamily:"var(--mono)",background:filterME?"rgba(0,166,81,.12)":"transparent",border:`1px solid ${filterME?"#00a651":"rgba(255,255,255,.1)"}`,color:filterME?"#00e676":"rgba(200,220,240,.45)",borderRadius:4,fontWeight:filterME?700:400}}>🌍 GCC / Middle East</button>
+                <button onClick={()=>setFilterExp(!filterExp)} className={`filter-btn ${filterExp?"active":""}`} style={{padding:"5px 14px",fontSize:13,cursor:"pointer",fontFamily:"var(--mono)",background:filterExp?"rgba(200,0,0,.12)":"transparent",border:`1px solid ${filterExp?"#c00000":"rgba(255,255,255,.1)"}`,color:filterExp?"#ff4444":"rgba(200,220,240,.45)",borderRadius:4,fontWeight:filterExp?700:400}}>⚡ Exploit in Wild</button>
+                <button onClick={()=>setFilterEpss(!filterEpss)} className={`filter-btn ${filterEpss?"active":""}`} style={{padding:"5px 14px",fontSize:13,cursor:"pointer",fontFamily:"var(--mono)",background:filterEpss?"rgba(255,145,0,.14)":"transparent",border:`1px solid ${filterEpss?"#ff9100":"rgba(255,255,255,.1)"}`,color:filterEpss?"#ff9100":"rgba(200,220,240,.45)",borderRadius:4,fontWeight:filterEpss?700:400}}>🎯 EPSS ≥ 10%</button>
                 <div style={{marginLeft:"auto",display:"flex",gap:5,alignItems:"center"}}>
                   <span style={{fontSize:11,color:"rgba(200,220,240,.3)",fontFamily:"var(--mono)"}}>SORT:</span>
                   {[["sev","Severity"],["epss","EPSS Risk"],["recent","Newest"]].map(([k,lbl])=>(
-                    <button key={k} onClick={()=>setSortBy(k)} style={{padding:"4px 10px",fontSize:11.5,cursor:"pointer",fontFamily:"var(--mono)",background:sortBy===k?"rgba(0,200,255,.12)":"transparent",border:`1px solid ${sortBy===k?ACCENT:"rgba(255,255,255,.1)"}`,color:sortBy===k?ACCENT:"rgba(200,220,240,.45)",borderRadius:4,fontWeight:sortBy===k?700:400}}>{lbl}</button>
+                    <button key={k} onClick={()=>setSortBy(k)} className={`sort-btn ${sortBy===k?"active":""}`} style={{padding:"4px 10px",fontSize:11.5,cursor:"pointer",fontFamily:"var(--mono)",background:sortBy===k?"rgba(0,200,255,.12)":"transparent",border:`1px solid ${sortBy===k?ACCENT:"rgba(255,255,255,.1)"}`,color:sortBy===k?ACCENT:"rgba(200,220,240,.45)",borderRadius:4,fontWeight:sortBy===k?700:400}}>{lbl}</button>
                   ))}
                 </div>
               </div>
@@ -2027,7 +2049,7 @@ function BCyberAwareDashboard() {
       <ThreatAnalystChat externalPrompt={aiPrompt} onConsumedPrompt={()=>setAiPrompt(null)}/>
 
       {/* Footer */}
-      <div style={{borderTop:"1px solid rgba(255,255,255,.05)",marginTop:32,padding:"18px 24px",textAlign:"center"}}>
+      <div className="footer-wrap" style={{borderTop:"1px solid rgba(255,255,255,.05)",marginTop:32,padding:"18px 24px",textAlign:"center"}}>
         <div style={{fontSize:12,color:"rgba(200,220,240,.2)",letterSpacing:1,marginBottom:10}}>
           BCyberAware · Vikas Pandita · {new Date().getFullYear()} · MIT Licence · 30+ live sources · CISA · NVD · ZDI · The Record · Unit 42 · Check Point · Talos · Project Zero · Krebs · +20 more
         </div>
