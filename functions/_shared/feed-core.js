@@ -159,12 +159,37 @@ async function saveSharedSources() {
   } catch {}
 }
 
+const FEED_KEY = "https://bcyberaware-internal.cache/feed-snapshot-v1";
+
+export async function loadSharedFeed() {
+  if (CACHE.feed?.data) return CACHE.feed.data;
+  const c = edgeCache();
+  if (!c) return null;
+  try {
+    const r = await c.match(FEED_KEY);
+    if (!r) return null;
+    const data = await r.json();
+    if (data?.advisories) CACHE.feed = { ts: data.fetched_at || Date.now(), data };
+    return CACHE.feed?.data || null;
+  } catch { return null; }
+}
+
+async function saveSharedFeed(payload) {
+  const c = edgeCache();
+  if (!c) return;
+  try {
+    await c.put(FEED_KEY, new Response(JSON.stringify(payload), {
+      headers: { "content-type": "application/json", "cache-control": "public, max-age=7200" },
+    }));
+  } catch {}
+}
+
 export async function handleFeedRequest(request, env) {
   const url    = new URL(request.url);
   const action = url.searchParams.get("action");
   const bust   = url.searchParams.get("bust") === "1";
 
-  if (action === "brief") return handleBrief(env);
+  if (action === "brief") { await loadSharedFeed(); return handleBrief(env); }
   if (action !== "feed") return jsonResponse({ error: "Unknown action" }, 400);
 
   try {
@@ -265,6 +290,7 @@ export async function handleFeedRequest(request, env) {
       return jsonResponse({ ...CACHE.feed.data, from_cache: true, degraded: true });
 
     CACHE.feed = { ts: now, data: payload };
+    await saveSharedFeed(payload);
     return jsonResponse(payload);
 
   } catch (e) {
@@ -278,6 +304,7 @@ const xmlEsc = s => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;")
 
 export async function handleRssRequest(request, env) {
   // Warm the feed cache if this is the first request on a cold isolate
+  if (!CACHE.feed) await loadSharedFeed();
   if (!CACHE.feed) {
     const u = new URL(request.url);
     try { await handleFeedRequest(new Request(`${u.origin}/api/proxy?action=feed`), env); } catch {}

@@ -1052,7 +1052,7 @@ const CHAT_SUGGESTIONS=[
 
 function renderMd(text){
   const inline=(s,k)=>s.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((p,i)=>
-    p.startsWith("**")?<strong key={k+"-"+i} style={{color:"#eef4ff"}}>{p.slice(2,-2)}</strong>
+    p.startsWith("**")?<strong key={k+"-"+i}>{p.slice(2,-2)}</strong>
     :p.startsWith("`")?<code key={k+"-"+i} style={{fontFamily:"var(--mono)",background:"rgba(0,200,255,.08)",padding:"1px 5px",borderRadius:3,color:ACCENT}}>{p.slice(1,-1)}</code>
     :p);
   return text.split("\n").map((line,i)=>{
@@ -1064,7 +1064,13 @@ function renderMd(text){
   });
 }
 
-function ThreatAnalystChat({ externalPrompt, onConsumedPrompt }){
+function compactFeedContext(advisories, exploits, news){
+  const line=a=>`- [${a.severity||""}] ${a.title}${a.cve_ids?.length?" ("+a.cve_ids.slice(0,2).join(", ")+")":""} — ${a.source}${a.exploit_in_wild?" · EXPLOITED IN WILD":""}`;
+  const parts=["TOP ADVISORIES",...(advisories||[]).slice(0,14).map(line),"EXPLOITS / 0-DAY",...(exploits||[]).slice(0,8).map(line),"SECURITY NEWS",...(news||[]).slice(0,12).map(a=>`- ${a.title} — ${a.source}`)];
+  return parts.join("\n").slice(0,6000);
+}
+
+function ThreatAnalystChat({ externalPrompt, onConsumedPrompt, advisories, exploits, news }){
   const [open,setOpen]=useState(false);
   const [msgs,setMsgs]=useState([{role:"assistant",content:"👋 I'm the **BCyberAware Threat Analyst** — an AI grounded in the live feed on this dashboard.\n\nAsk me about today's advisories, active exploits, threat actors, or click **🛡️ AI Triage** on any advisory card."}]);
   const [input,setInput]=useState("");
@@ -1085,7 +1091,7 @@ function ThreatAnalystChat({ externalPrompt, onConsumedPrompt }){
     setBusy(true);
     const ctrl=new AbortController(); abortRef.current=ctrl;
     try{
-      const r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:history.slice(-8)}),signal:ctrl.signal});
+      const r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:history.slice(-8),context:compactFeedContext(advisories,exploits,news)}),signal:ctrl.signal});
       if(!r.ok){
         let e="Assistant unavailable"; try{e=(await r.json()).error||e;}catch{}
         throw new Error(e);
@@ -1098,7 +1104,7 @@ function ThreatAnalystChat({ externalPrompt, onConsumedPrompt }){
         for(const ln of lines){
           const s=ln.trim(); if(!s.startsWith("data:")) continue;
           const payload=s.slice(5).trim(); if(payload==="[DONE]") continue;
-          try{ const j=JSON.parse(payload); if(j.response){ acc+=j.response; setMsgs(m=>{const c=[...m]; c[c.length-1]={role:"assistant",content:acc,streaming:true}; return c;}); } }catch{}
+          try{ const j=JSON.parse(payload); const chunk=(typeof j.response==="string"&&j.response)||(j.choices?.[0]?.delta?.content)||""; if(chunk){ acc+=chunk; setMsgs(m=>{const c=[...m]; c[c.length-1]={role:"assistant",content:acc,streaming:true}; return c;}); } }catch{}
         }
       }
       setMsgs(m=>{const c=[...m]; c[c.length-1]={role:"assistant",content:acc||"_(no response)_"}; return c;});
@@ -2116,7 +2122,7 @@ function BCyberAwareDashboard() {
       </div>
 
       {/* AI Threat Analyst (floating) */}
-      <ThreatAnalystChat externalPrompt={aiPrompt} onConsumedPrompt={()=>setAiPrompt(null)}/>
+      <ThreatAnalystChat externalPrompt={aiPrompt} onConsumedPrompt={()=>setAiPrompt(null)} advisories={advisories} exploits={exploits} news={news}/>
 
       {/* Footer */}
       <div className="footer-wrap" style={{borderTop:"1px solid rgba(255,255,255,.05)",marginTop:32,padding:"18px 24px",textAlign:"center"}}>

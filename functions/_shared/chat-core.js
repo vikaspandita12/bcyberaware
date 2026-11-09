@@ -11,7 +11,7 @@
  *   scoped system prompt (cybersecurity only).
  */
 
-import { getFeedContext } from "./feed-core.js";
+import { getFeedContext, loadSharedFeed } from "./feed-core.js";
 
 const DEFAULT_MODEL   = "@cf/meta/llama-3.1-8b-instruct-fast";
 const MAX_MSG_CHARS   = 1200;
@@ -60,8 +60,9 @@ RULES
 - Never provide working malware, exploit code, or step-by-step attack instructions against systems the user does not own. Defensive explanations are fine.
 - Do not invent CVE numbers, dates or statistics. If unsure, say so.
 - Never claim to be a human. You are an AI assistant running on Cloudflare Workers AI.
+- If LIVE FEED CONTEXT is present, you MUST use it for "today/latest" questions. Never fall back to old well-known CVEs (Log4j, EternalBlue, etc.) as if they were current.
 
-${context ? `LIVE FEED CONTEXT (from the dashboard, auto-refreshed every 2 hours)\n${context}` : "LIVE FEED CONTEXT: not loaded yet — tell the user to open the Live Feed tab first if they ask about current items, and answer from general knowledge otherwise."}`;
+${context ? `LIVE FEED CONTEXT (items currently on this dashboard)\n${context}` : "LIVE FEED CONTEXT: unavailable on this request. Answer from general knowledge, say you cannot see the live feed right now, and do not invent today's headlines."}`;
 }
 
 export async function handleChatRequest(request, env) {
@@ -81,7 +82,10 @@ export async function handleChatRequest(request, env) {
 
   if (!history.length || history[history.length - 1].role !== "user") return err(400, "Last message must be from the user");
 
-  const messages = [{ role: "system", content: systemPrompt(getFeedContext()) }, ...history];
+  await loadSharedFeed();
+  const clientCtx = typeof body.context === "string" ? body.context.trim().slice(0, 6000) : "";
+  const ctx = clientCtx || getFeedContext();
+  const messages = [{ role: "system", content: systemPrompt(ctx) }, ...history];
   const model = env.AI_MODEL || DEFAULT_MODEL;
 
   try {

@@ -3095,10 +3095,7 @@ function DarkWebView() {
 const CHAT_SUGGESTIONS = ["Summarise today's critical threats", "What is being exploited in the wild right now?", "Which advisories matter for GCC / Middle East?", "Explain prompt injection and how to defend against it", "What should a CISO patch first this week?"];
 function renderMd(text) {
   const inline = (s, k) => s.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((p, i) => p.startsWith("**") ? React.createElement("strong", {
-    key: k + "-" + i,
-    style: {
-      color: "#eef4ff"
-    }
+    key: k + "-" + i
   }, p.slice(2, -2)) : p.startsWith("`") ? React.createElement("code", {
     key: k + "-" + i,
     style: {
@@ -3150,9 +3147,17 @@ function renderMd(text) {
     }, inline(t, i));
   });
 }
+function compactFeedContext(advisories, exploits, news) {
+  const line = a => `- [${a.severity || ""}] ${a.title}${a.cve_ids?.length ? " (" + a.cve_ids.slice(0, 2).join(", ") + ")" : ""} — ${a.source}${a.exploit_in_wild ? " · EXPLOITED IN WILD" : ""}`;
+  const parts = ["TOP ADVISORIES", ...(advisories || []).slice(0, 14).map(line), "EXPLOITS / 0-DAY", ...(exploits || []).slice(0, 8).map(line), "SECURITY NEWS", ...(news || []).slice(0, 12).map(a => `- ${a.title} — ${a.source}`)];
+  return parts.join("\n").slice(0, 6000);
+}
 function ThreatAnalystChat({
   externalPrompt,
-  onConsumedPrompt
+  onConsumedPrompt,
+  advisories,
+  exploits,
+  news
 }) {
   const [open, setOpen] = useState(false);
   const [msgs, setMsgs] = useState([{
@@ -3201,7 +3206,8 @@ function ThreatAnalystChat({
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          messages: history.slice(-8)
+          messages: history.slice(-8),
+          context: compactFeedContext(advisories, exploits, news)
         }),
         signal: ctrl.signal
       });
@@ -3234,8 +3240,9 @@ function ThreatAnalystChat({
           if (payload === "[DONE]") continue;
           try {
             const j = JSON.parse(payload);
-            if (j.response) {
-              acc += j.response;
+            const chunk = typeof j.response === "string" && j.response || j.choices?.[0]?.delta?.content || "";
+            if (chunk) {
+              acc += chunk;
               setMsgs(m => {
                 const c = [...m];
                 c[c.length - 1] = {
@@ -6478,7 +6485,10 @@ function BCyberAwareDashboard() {
     news: news
   }), view === "darkweb" && React.createElement(DarkWebView, null)), React.createElement(ThreatAnalystChat, {
     externalPrompt: aiPrompt,
-    onConsumedPrompt: () => setAiPrompt(null)
+    onConsumedPrompt: () => setAiPrompt(null),
+    advisories: advisories,
+    exploits: exploits,
+    news: news
   }), React.createElement("div", {
     className: "footer-wrap",
     style: {
