@@ -3716,6 +3716,7 @@ function ThreatAnalystChat({
     }
   }, [externalPrompt]);
   return React.createElement(React.Fragment, null, !open && React.createElement("button", {
+    className: "chat-launcher",
     onClick: () => {
       setOpen(true);
       setUnread(false);
@@ -4389,6 +4390,7 @@ function KnowledgeView({
       const alpha = n ? .12 + .55 * (n / max) : 0.03;
       return React.createElement("button", {
         key: t.id,
+        className: "attack-cell",
         onClick: () => setSelected(hot ? null : {
           type: "technique",
           id: t.id
@@ -4409,7 +4411,7 @@ function KnowledgeView({
         style: {
           fontSize: 10,
           fontWeight: 800,
-          color: n ? t.color : "rgba(200,220,240,.3)",
+          color: n ? alpha > .4 ? "#ffffff" : t.color : "rgba(200,220,240,.3)",
           fontFamily: "var(--mono)"
         }
       }, t.id, n ? ` · ${n}` : ""), React.createElement("div", {
