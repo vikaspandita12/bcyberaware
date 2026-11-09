@@ -39,6 +39,24 @@ async function loadFeed(force = false) {
   if (!r.ok) throw new Error(`Feed error ${r.status}`);
   return r.json();
 }
+async function showAlert(title, body, url) {
+  try {
+    const reg = "serviceWorker" in navigator ? await navigator.serviceWorker.getRegistration() : null;
+    if (reg && reg.showNotification) return reg.showNotification(title, {
+      body,
+      icon: "/logo.svg",
+      badge: "/logo.svg",
+      tag: title + body.slice(0, 40),
+      data: {
+        url
+      }
+    });
+    new Notification(title, {
+      body,
+      icon: "/logo.svg"
+    });
+  } catch {}
+}
 function timeAgo(ts) {
   if (!ts) return "";
   const s = (Date.now() - ts) / 1000;
@@ -4436,6 +4454,65 @@ function BCyberAwareDashboard() {
   useEffect(() => {
     refreshFeed();
   }, []);
+  const [alertsOn, setAlertsOn] = useState(() => {
+    try {
+      return localStorage.getItem("bca_alerts") === "1" && typeof Notification !== "undefined" && Notification.permission === "granted";
+    } catch {
+      return false;
+    }
+  });
+  const toggleAlerts = useCallback(async () => {
+    if (alertsOn) {
+      setAlertsOn(false);
+      try {
+        localStorage.setItem("bca_alerts", "0");
+      } catch {}
+      return;
+    }
+    if (typeof Notification === "undefined") return;
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") return;
+    try {
+      if ("serviceWorker" in navigator) await navigator.serviceWorker.register("/sw.js");
+    } catch {}
+    try {
+      localStorage.setItem("bca_alerts", "1");
+    } catch {}
+    setAlertsOn(true);
+    showAlert("🔔 BCyberAware alerts enabled", "You'll be notified about new CRITICAL and exploited-in-the-wild threats while the site is open in a tab. Nothing is stored on any server.", "/");
+  }, [alertsOn]);
+  useEffect(() => {
+    if (!alertsOn) return;
+    const KEY = "bca_alert_seen";
+    const check = async () => {
+      try {
+        const data = await loadFeed(false);
+        const hot = [...(data.advisories || []), ...(data.exploits || []), ...(data.breaking || [])].filter(a => a.severity === "CRITICAL" || a.exploit_in_wild);
+        let seen;
+        try {
+          seen = new Set(JSON.parse(localStorage.getItem(KEY) || "[]"));
+        } catch {
+          seen = new Set();
+        }
+        if (!seen.size) {
+          try {
+            localStorage.setItem(KEY, JSON.stringify(hot.map(a => a.id).slice(0, 300)));
+          } catch {}
+          return;
+        }
+        const fresh = hot.filter(a => a.id && !seen.has(a.id)).slice(0, 3);
+        fresh.forEach(a => showAlert(`🚨 ${a.severity || "ALERT"} · ${a.source}`, a.title, a.source_url || "/"));
+        if (fresh.length) {
+          try {
+            localStorage.setItem(KEY, JSON.stringify([...hot.map(a => a.id), ...seen].slice(0, 300)));
+          } catch {}
+        }
+      } catch {}
+    };
+    check();
+    const t = setInterval(check, 10 * 60 * 1000);
+    return () => clearInterval(t);
+  }, [alertsOn]);
   useEffect(() => {
     if (!feedMeta) return;
     let cancelled = false;
@@ -5028,7 +5105,26 @@ function BCyberAwareDashboard() {
       alignItems: "center",
       gap: 5
     }
-  }, theme === "dark" ? "☀️ Light" : "🌙 Dark")))), React.createElement(BreakingTicker, {
+  }, theme === "dark" ? "☀️ Light" : "🌙 Dark"), React.createElement("button", {
+    onClick: toggleAlerts,
+    title: alertsOn ? "Alerts are ON — click to turn off" : "Get browser notifications when new CRITICAL or exploited-in-the-wild threats appear. No login, no email — nothing leaves your browser.",
+    "aria-label": alertsOn ? "Disable threat alerts" : "Enable threat alerts",
+    style: {
+      padding: "5px 11px",
+      background: alertsOn ? "rgba(0,230,118,0.1)" : theme === "dark" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)",
+      border: `1px solid ${alertsOn ? "rgba(0,230,118,0.45)" : theme === "dark" ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.12)"}`,
+      color: alertsOn ? "#00e676" : theme === "dark" ? "#9fb6cc" : "#475569",
+      fontSize: 12,
+      cursor: "pointer",
+      fontFamily: "var(--mono)",
+      borderRadius: 4,
+      fontWeight: 700,
+      whiteSpace: "nowrap",
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 5
+    }
+  }, alertsOn ? "🔔 On" : "🔔 Alerts")))), React.createElement(BreakingTicker, {
     items: breaking
   }), React.createElement("div", {
     style: {
@@ -5204,7 +5300,25 @@ function BCyberAwareDashboard() {
       cursor: "pointer",
       fontWeight: 600
     }
-  }, "\u2B07 STIX 2.1"))), React.createElement(ThreatVelocityPanel, {
+  }, "\u2B07 STIX 2.1"), React.createElement("a", {
+    href: "/feed.xml",
+    target: "_blank",
+    rel: "noopener noreferrer",
+    title: "Subscribe to the live threat feed in any RSS reader \u2014 no login, no email",
+    className: "export-btn",
+    style: {
+      padding: "5px 10px",
+      fontSize: 11,
+      fontFamily: "var(--mono)",
+      background: "rgba(255,102,0,0.1)",
+      border: "1px solid rgba(255,102,0,0.35)",
+      color: "#ff8a50",
+      borderRadius: 4,
+      cursor: "pointer",
+      fontWeight: 600,
+      textDecoration: "none"
+    }
+  }, "\uD83D\uDCE1 RSS"))), React.createElement(ThreatVelocityPanel, {
     advisories: advisories,
     exploits: exploits,
     news: news,

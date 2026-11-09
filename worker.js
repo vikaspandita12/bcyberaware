@@ -3,7 +3,7 @@
  * Routes /api/* to feed handlers; everything else from static assets.
  */
 import { corsPreflightResponse, methodNotAllowed } from "./functions/_shared/http.js";
-import { handleFeedRequest } from "./functions/_shared/feed-core.js";
+import { handleFeedRequest, handleRssRequest } from "./functions/_shared/feed-core.js";
 import { handleDarkwebRequest } from "./functions/_shared/darkweb-core.js";
 import { handleChatRequest } from "./functions/_shared/chat-core.js";
 
@@ -22,6 +22,12 @@ export default {
       if (request.method === "OPTIONS") return corsPreflightResponse();
       if (request.method !== "GET") return methodNotAllowed();
       return handleFeedRequest(request, env);
+    }
+
+    // RSS feed — subscribe from any reader, no account needed
+    if (pathname === "/feed.xml" || pathname === "/rss.xml" || pathname === "/feed" || pathname === "/rss") {
+      if (request.method !== "GET") return methodNotAllowed();
+      return handleRssRequest(request, env);
     }
 
     if (pathname === "/api/darkweb" || pathname === "/api/darkweb/") {

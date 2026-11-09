@@ -189,6 +189,53 @@ export async function handleFeedRequest(request, env) {
   }
 }
 
+// ── RSS 2.0 feed (/feed.xml) — subscribe without login, email, or tracking ────
+const xmlEsc = s => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+export async function handleRssRequest(request, env) {
+  // Warm the feed cache if this is the first request on a cold isolate
+  if (!CACHE.feed) {
+    const u = new URL(request.url);
+    try { await handleFeedRequest(new Request(`${u.origin}/api/proxy?action=feed`), env); } catch {}
+  }
+  const d = CACHE.feed?.data;
+  if (!d) return new Response("Feed warming up — retry in a few seconds.", { status: 503, headers: { "Retry-After": "10" } });
+
+  const items = [...(d.advisories || []), ...(d.exploits || []), ...(d.news || [])]
+    .filter(a => a.ts)
+    .sort((a, b) => b.ts - a.ts)
+    .slice(0, 60);
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+<channel>
+<title>BCyberAware — Live Threat Intelligence</title>
+<link>https://advisory.bcyberaware.co.in/</link>
+<atom:link href="https://advisory.bcyberaware.co.in/feed.xml" rel="self" type="application/rss+xml"/>
+<description>Live advisories, exploits and breach news aggregated from ${d.sources_total || "45+"} public sources by BCyberAware. No login, no tracking.</description>
+<language>en</language>
+<lastBuildDate>${new Date(CACHE.feed.ts).toUTCString()}</lastBuildDate>
+<ttl>30</ttl>
+${items.map(a => `<item>
+<title>${xmlEsc(`[${a.severity || "INFO"}] ${a.title}`)}</title>
+<link>${xmlEsc(a.source_url || "https://advisory.bcyberaware.co.in/")}</link>
+<guid isPermaLink="false">${xmlEsc(a.id)}</guid>
+<pubDate>${new Date(a.ts).toUTCString()}</pubDate>
+<category>${xmlEsc(a.category || "news")}</category>
+<description>${xmlEsc(`${a.summary || a.title}${a.cve_ids?.length ? " — " + a.cve_ids.join(", ") : ""}${a.epss != null ? ` — EPSS ${a.epss}%` : ""} (Source: ${a.source})`)}</description>
+</item>`).join("\n")}
+</channel>
+</rss>`;
+
+  return new Response(xml, {
+    headers: {
+      "Content-Type": "application/rss+xml; charset=utf-8",
+      "Cache-Control": "public, max-age=600",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+}
+
 // ── AI Situation Summary (Workers AI, cached per feed snapshot) ───────────────
 // Generated at most once per feed refresh (~2h) → negligible neuron usage.
 async function handleBrief(env) {
