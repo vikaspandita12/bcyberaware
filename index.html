@@ -54,7 +54,7 @@
   </script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-  <script defer src="app.js?v=2.6"></script>
+  <script defer src="app.js?v=2.7"></script>
   <style>
     :root{
       --mono:'JetBrains Mono','SFMono-Regular',Menlo,Consolas,monospace;
@@ -371,6 +371,16 @@
       border-color:rgba(0,0,0,0.08) !important;
       box-shadow:0 1px 3px rgba(0,0,0,0.04) !important;
     }
+
+    /* GenAI tab in light mode — inline dark-theme text colours re-mapped for contrast */
+    html[data-theme="light"] .genai-view [style*="color: rgba(200, 220, 240"],
+    body.light-theme .genai-view [style*="color: rgba(200, 220, 240"]{ color:#475569 !important; }
+    html[data-theme="light"] .genai-view [style*="color: rgb(221, 238, 255)"],
+    html[data-theme="light"] .genai-view [style*="color: rgb(238, 244, 255)"],
+    body.light-theme .genai-view [style*="color: rgb(221, 238, 255)"],
+    body.light-theme .genai-view [style*="color: rgb(238, 244, 255)"]{ color:#0f172a !important; }
+    html[data-theme="light"] .genai-view [style*="background: rgba(5, 8, 15"],
+    body.light-theme .genai-view [style*="background: rgba(5, 8, 15"]{ background:#ffffff !important; }
 
     /* Chat Panel in light mode */
     html[data-theme="light"] .chat-panel,

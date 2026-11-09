@@ -1396,63 +1396,241 @@ function AIBriefCard({
     }
   }, brief.brief));
 }
-const AI_KW = ["artificial intelligence", "machine learning", " llm ", "large language", "chatgpt", "openai", "copilot", "gemini", "claude ", "anthropic", "genai", "generative ai", "prompt injection", "jailbreak", "model theft", "training data poisoning", "deepfake", "foundation model", "ai-powered", "ai vulnerability", "agentic ai", "gpt-", "ai agent", "chatbot security", "voice cloning", "ai fraud", "ai phishing", "ai scam", "ai attack", "owasp llm", "llm security", "stable diffusion", "midjourney", "dall-e", "synthetic media", "vector database", "rag attack", "mitre atlas", "ai red team", "model inversion", "data poisoning", "hallucination", "llm guard", "ai safety", "ai governance", "samsung chatgpt", "indirect prompt"];
+const AI_KW = ["artificial intelligence", "machine learning", " llm", "llms", "large language", "chatgpt", "openai", "copilot", "gemini", "claude ", "claude code", "anthropic", "deepseek", "hugging face", "huggingface", "genai", "generative ai", "prompt injection", "jailbreak", "model theft", "training data poisoning", "deepfake", "foundation model", "ai-powered", "ai-driven", "ai-assisted", "ai-generated", "ai-aided", "llm-powered", "ai vulnerability", "agentic", "gpt-", "ai agent", "autonomous agent", "chatbot", "voice cloning", "ai fraud", "ai phishing", "ai scam", "ai attack", "ai model", "ai coding", "coding assistant", "vibe coding", "slopsquatting", "owasp llm", "llm security", "model context protocol", "mcp server", " mcp ", "tool poisoning", "stable diffusion", "midjourney", "dall-e", "synthetic media", "vector database", "rag attack", "retrieval-augmented", "mitre atlas", "ai red team", "ai pentest", "model inversion", "data poisoning", "hallucination", "guardrail", "ai safety", "ai governance", "indirect prompt", "system prompt"];
 const OWASP_LLM = [{
   id: "LLM01",
   name: "Prompt Injection",
   risk: "CRITICAL",
-  desc: "Attackers craft inputs that override system instructions, causing LLMs to perform unintended actions or leak sensitive data from the system prompt or context window."
+  desc: "Direct or indirect (via web pages, documents, emails, tool output) inputs that override the model's instructions — leading to data leakage, unauthorised tool calls, or manipulated decisions."
 }, {
   id: "LLM02",
-  name: "Insecure Output Handling",
-  risk: "HIGH",
-  desc: "LLM outputs passed to downstream systems (shells, browsers, SQL engines) without sanitisation lead to RCE, XSS, or SQL injection vulnerabilities."
-}, {
-  id: "LLM03",
-  name: "Training Data Poisoning",
-  risk: "HIGH",
-  desc: "Malicious actors corrupt training datasets to introduce backdoors, biases, or vulnerabilities into the deployed model's behaviour at inference time."
-}, {
-  id: "LLM04",
-  name: "Model Denial of Service",
-  risk: "HIGH",
-  desc: "Resource-intensive prompts exhaust compute budgets, causing denial of service for legitimate users and inflating API costs at scale."
-}, {
-  id: "LLM05",
-  name: "Supply Chain Vulnerabilities",
-  risk: "HIGH",
-  desc: "Compromised pre-trained models, third-party datasets, or plugins introduce malicious code throughout the AI development and deployment supply chain."
-}, {
-  id: "LLM06",
   name: "Sensitive Information Disclosure",
   risk: "CRITICAL",
-  desc: "LLMs may reveal confidential data from training corpora, system prompts, or prior conversation context to adversaries through targeted queries."
+  desc: "PII, credentials, proprietary code or business data exposed through model output, training data memorisation, or over-broad RAG retrieval."
+}, {
+  id: "LLM03",
+  name: "Supply Chain",
+  risk: "HIGH",
+  desc: "Tampered pre-trained models, poisoned LoRA adapters, malicious pickle files, vulnerable plugins/MCP servers and hallucinated packages (slopsquatting) entering the AI stack."
+}, {
+  id: "LLM04",
+  name: "Data and Model Poisoning",
+  risk: "HIGH",
+  desc: "Manipulated pre-training, fine-tuning or embedding data that plants backdoors, biases or sleeper behaviour activated by trigger phrases."
+}, {
+  id: "LLM05",
+  name: "Improper Output Handling",
+  risk: "HIGH",
+  desc: "LLM output passed unchecked into shells, browsers, SQL or code interpreters — giving attackers RCE, XSS, SSRF or SQL injection through the model."
+}, {
+  id: "LLM06",
+  name: "Excessive Agency",
+  risk: "CRITICAL",
+  desc: "Agents with too many tools, permissions or autonomy taking destructive real-world actions once manipulated — the root cause behind most agentic AI incidents."
 }, {
   id: "LLM07",
-  name: "Insecure Plugin Design",
-  risk: "HIGH",
-  desc: "LLM plugins with excessive permissions or insufficient input validation can be weaponised for data exfiltration or unauthorised system actions."
+  name: "System Prompt Leakage",
+  risk: "MEDIUM",
+  desc: "System prompts exposing secrets, internal rules or guardrail logic. Never put credentials or security controls in the prompt — enforce them outside the model."
 }, {
   id: "LLM08",
-  name: "Excessive Agency",
+  name: "Vector and Embedding Weaknesses",
   risk: "HIGH",
-  desc: "Autonomous AI agents granted excessive permissions can take destructive or unauthorised real-world actions without adequate human oversight controls."
+  desc: "RAG pipelines leaking across tenants, embedding inversion, and poisoned documents injected into vector stores to steer answers."
 }, {
   id: "LLM09",
-  name: "Overreliance",
+  name: "Misinformation",
   risk: "MEDIUM",
-  desc: "Blind trust in AI outputs without human oversight leads to undetected errors, misinformation propagation, and exploitable security gaps in decision pipelines."
+  desc: "Confident hallucinations — fake facts, invented CVEs, non-existent packages or insecure code — trusted without verification in security and business decisions."
 }, {
   id: "LLM10",
-  name: "Model Theft",
+  name: "Unbounded Consumption",
   risk: "HIGH",
-  desc: "Adversaries extract proprietary model weights or replicate model behaviour through systematic API querying, stealing valuable IP and enabling targeted attacks."
+  desc: "Uncontrolled inference driving denial of service, denial-of-wallet cost spikes, and model extraction through high-volume querying."
 }];
+const OWASP_AGENTIC = [{
+  id: "ASI01",
+  name: "Agent Goal Hijack",
+  risk: "CRITICAL",
+  desc: "Injected content in emails, web pages, files or tool results redirects the agent's objective — it keeps working, but for the attacker."
+}, {
+  id: "ASI02",
+  name: "Tool Misuse & Exploitation",
+  risk: "CRITICAL",
+  desc: "Legitimate tools (shell, email, payments, cloud APIs) chained or invoked with attacker-chosen parameters, inside the agent's granted permissions."
+}, {
+  id: "ASI03",
+  name: "Identity & Privilege Abuse",
+  risk: "CRITICAL",
+  desc: "Agents inheriting broad user/service credentials, cached tokens or delegated OAuth scopes — a confused deputy with keys to production."
+}, {
+  id: "ASI04",
+  name: "Agentic Supply Chain",
+  risk: "HIGH",
+  desc: "Malicious or compromised MCP servers, agent skills, plugins, prompt templates and third-party agents loaded at runtime."
+}, {
+  id: "ASI05",
+  name: "Unexpected Code Execution",
+  risk: "CRITICAL",
+  desc: "Agents that write and run code (coding assistants, data agents) tricked into executing attacker payloads on developer or server hosts."
+}, {
+  id: "ASI06",
+  name: "Memory & Context Poisoning",
+  risk: "HIGH",
+  desc: "Persistent agent memory, RAG stores or shared context seeded with false instructions that resurface in later sessions and for other users."
+}, {
+  id: "ASI07",
+  name: "Insecure Inter-Agent Communication",
+  risk: "HIGH",
+  desc: "Unauthenticated or unvalidated messages between agents (A2A, MCP) allowing spoofing, replay and instruction smuggling across a multi-agent system."
+}, {
+  id: "ASI08",
+  name: "Cascading Failures",
+  risk: "HIGH",
+  desc: "One poisoned or faulty agent propagating bad actions through orchestrators and downstream agents faster than humans can intervene."
+}, {
+  id: "ASI09",
+  name: "Human-Agent Trust Exploitation",
+  risk: "HIGH",
+  desc: "Agents persuading users to approve risky actions — or attackers abusing the authority people give to confident AI recommendations."
+}, {
+  id: "ASI10",
+  name: "Rogue Agents",
+  risk: "HIGH",
+  desc: "Agents drifting from intended behaviour, hiding actions, self-replicating or colluding — requires kill switches, behavioural monitoring and audit trails."
+}];
+const AI_OFFENSIVE_TOOLS = [{
+  name: "Strix",
+  repo: "usestrix/strix",
+  stars: "74.6k",
+  cat: "Web & App",
+  desc: "Open-source AI agents that find and validate vulnerabilities in apps — dynamic testing with real PoCs, built for CI/CD."
+}, {
+  name: "Shannon",
+  repo: "KeygraphHQ/shannon",
+  stars: "51.5k",
+  cat: "Web & App",
+  desc: "Autonomous AI pentester for web apps and APIs — reads source code, then proves exploits against the running app."
+}, {
+  name: "PentAGI",
+  repo: "vxcontrol/pentagi",
+  stars: "33.8k",
+  cat: "Autonomous",
+  desc: "Fully autonomous multi-agent system for complex pentests, with 20+ built-in security tools in an isolated Docker sandbox."
+}, {
+  name: "PentestGPT",
+  repo: "GreyDGL/PentestGPT",
+  stars: "16.3k",
+  cat: "Autonomous",
+  desc: "The research pioneer — agentic framework that plans, reasons and guides penetration tests with LLMs."
+}, {
+  name: "HexStrike AI",
+  repo: "0x4m4/hexstrike-ai",
+  stars: "13.5k",
+  cat: "MCP / Harness",
+  desc: "MCP server exposing 150+ offensive security tools to Claude, GPT and Copilot agents. Seen abused by threat actors shortly after release."
+}, {
+  name: "CAI (archived)",
+  repo: "aliasrobotics/cai",
+  stars: "9.9k",
+  cat: "Framework",
+  desc: "Cybersecurity AI — open framework for building offensive and defensive AI agents. Now archived."
+}, {
+  name: "CyberStrikeAI",
+  repo: "AIPentest/CyberStrikeAI",
+  stars: "8.5k",
+  cat: "Autonomous",
+  desc: "AI-native security testing platform with orchestrated agents and governed tool execution."
+}, {
+  name: "Cairn",
+  repo: "oritera/Cairn",
+  stars: "5.0k",
+  cat: "Framework",
+  desc: "General-purpose AI state-space search engine, first validated on autonomous CTF and exploitation tasks."
+}, {
+  name: "CyberStrike",
+  repo: "CyberStrikeus/CyberStrike",
+  stars: "3.5k",
+  cat: "MCP / Harness",
+  desc: "Open-source AI-powered offensive security harness for automated penetration testing."
+}, {
+  name: "RedAmon",
+  repo: "samugit83/redamon",
+  stars: "3.3k",
+  cat: "Autonomous",
+  desc: "Self-hosted AI red-team framework — maps the attack surface into a graph, then plans and runs attacks."
+}, {
+  name: "PentestAgent",
+  repo: "GH05TCREW/pentestagent",
+  stars: "3.3k",
+  cat: "Web & App",
+  desc: "AI agent framework for black-box security testing — bug bounty, red team and pentest workflows."
+}, {
+  name: "Pentest-Swarm-AI",
+  repo: "Armur-Ai/Pentest-Swarm-AI",
+  stars: "3.2k",
+  cat: "Multi-agent",
+  desc: "Swarm of AI agents orchestrating recon, classification, exploitation and reporting."
+}, {
+  name: "Xalgorix",
+  repo: "xalgorix/xalgorix",
+  stars: "1.3k",
+  cat: "Autonomous",
+  desc: "Autonomous pentesting agents — real-time recon, vulnerability detection and exploitation."
+}, {
+  name: "hackingBuddyGPT",
+  repo: "ipa-lab/hackingBuddyGPT",
+  stars: "1.3k",
+  cat: "Research",
+  desc: "Academic project — LLM-driven privilege escalation and hacking in ~50 lines of code. Great for learning."
+}, {
+  name: "Nebula",
+  repo: "berylliumsec/nebula",
+  stars: "1.2k",
+  cat: "MCP / Harness",
+  desc: "AI-powered cybersecurity harness that assists with recon, note-taking and tool orchestration."
+}, {
+  name: "BugTraceAI",
+  repo: "BugTraceAI/BugTraceAI",
+  stars: "370",
+  cat: "Web & App",
+  desc: "Self-hosted web pentesting suite with agentic scanning, analyst tools and API testing."
+}, {
+  name: "VulnBot",
+  repo: "KHenryAegis/VulnBot",
+  stars: "223",
+  cat: "Multi-agent",
+  desc: "Research multi-agent framework for autonomous penetration testing (recon → scan → exploit)."
+}, {
+  name: "MAPTA",
+  repo: "arthurgervais/mapta",
+  stars: "129",
+  cat: "Multi-agent",
+  desc: "Multi-agent system for autonomous web-app security assessment that validates exploits end to end."
+}, {
+  name: "AutoPentester",
+  repo: "YasodGinige/AutoPentester",
+  stars: "94",
+  cat: "Research",
+  desc: "LLM agent framework automating pentest steps with a repetition-aware planner."
+}, {
+  name: "ARTEX",
+  repo: "horizonl/ARTEX",
+  stars: "38",
+  cat: "Autonomous",
+  desc: "AI autonomous pentest system (English build — the original upstream repo was taken down). Linked to real-world attacks; treat as threat intel."
+}];
+const AI_OFFENSIVE_CATS = ["All", "Autonomous", "Web & App", "Multi-agent", "MCP / Harness", "Framework", "Research"];
 const AI_SECURITY_FRAMEWORKS = [{
-  name: "OWASP LLM Top 10",
+  name: "OWASP LLM Top 10 (2025)",
   flag: "🔟",
-  url: "https://owasp.org/www-project-top-10-for-large-language-model-applications/",
+  url: "https://genai.owasp.org/llm-top-10/",
   desc: "Most critical risks in LLM applications — map controls to every GenAI deployment."
+}, {
+  name: "OWASP Agentic Top 10",
+  flag: "🤖",
+  url: "https://genai.owasp.org/",
+  desc: "OWASP GenAI Security Project — Top 10 for Agentic Applications, agent threat taxonomy and MCP guidance."
 }, {
   name: "MITRE ATLAS",
   flag: "🎯",
@@ -1466,8 +1644,13 @@ const AI_SECURITY_FRAMEWORKS = [{
 }, {
   name: "NIST AI 600-1 (GenAI)",
   flag: "📋",
-  url: "https://csrc.nist.gov/pubs/ai/600/1/e2023/final",
+  url: "https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.600-1.pdf",
   desc: "Generative AI profile for the NIST AI Risk Management Framework."
+}, {
+  name: "NIST AI 100-2 (Adversarial ML)",
+  flag: "🧪",
+  url: "https://csrc.nist.gov/pubs/ai/100/2/e2025/final",
+  desc: "Taxonomy and terminology of attacks on predictive and generative AI, including agents."
 }, {
   name: "ISO/IEC 42001",
   flag: "🌐",
@@ -1476,8 +1659,8 @@ const AI_SECURITY_FRAMEWORKS = [{
 }, {
   name: "Google SAIF",
   flag: "☁️",
-  url: "https://cloud.google.com/security/ai",
-  desc: "Secure AI Framework — design patterns for safe AI on cloud."
+  url: "https://saif.google/",
+  desc: "Secure AI Framework — risk map and controls for building AI safely."
 }, {
   name: "Microsoft AI Red Team",
   flag: "🛡️",
@@ -1490,30 +1673,60 @@ const AI_SECURITY_FRAMEWORKS = [{
   desc: "EU regulatory framework for high-risk and general-purpose AI."
 }];
 const AI_SECURITY_TOOLS = [{
-  name: "LLM Guard",
-  flag: "🛡️",
-  url: "https://github.com/protectai/llm-guard",
-  desc: "Open-source toolkit — prompt injection, PII, toxicity, and output scanning."
+  name: "promptfoo",
+  flag: "🧪",
+  url: "https://github.com/promptfoo/promptfoo",
+  desc: "Red teaming and evals for prompts, agents and RAG — OWASP / ATLAS presets, runs in CI."
 }, {
   name: "garak",
   flag: "🔍",
-  url: "https://github.com/leondz/garak",
-  desc: "LLM vulnerability scanner — jailbreaks, leakage, hallucination probes."
+  url: "https://github.com/NVIDIA/garak",
+  desc: "NVIDIA's LLM vulnerability scanner — jailbreaks, leakage, hallucination probes."
 }, {
   name: "PyRIT",
   flag: "⚔️",
-  url: "https://github.com/Azure/PyRIT",
+  url: "https://github.com/microsoft/PyRIT",
   desc: "Microsoft's AI red teaming framework for automated adversarial testing."
+}, {
+  name: "Snyk Agent Scan",
+  flag: "🧩",
+  url: "https://github.com/snyk/agent-scan",
+  desc: "Scans AI agents, MCP servers and agent skills for tool poisoning and toxic flows (formerly mcp-scan)."
+}, {
+  name: "Cisco MCP Scanner",
+  flag: "📡",
+  url: "https://github.com/cisco-ai-defense/mcp-scanner",
+  desc: "Detects malicious and vulnerable MCP server tools before you connect agents to them."
+}, {
+  name: "PurpleLlama / Llama Guard",
+  flag: "🦙",
+  url: "https://github.com/meta-llama/PurpleLlama",
+  desc: "Meta's input/output safety classifiers, Prompt Guard and CyberSecEval benchmarks."
 }, {
   name: "NeMo Guardrails",
   flag: "🚧",
-  url: "https://github.com/NVIDIA/NeMo-Guardrails",
+  url: "https://github.com/NVIDIA-NeMo/Guardrails",
   desc: "Programmable guardrails for LLM agents and tool-using apps."
 }, {
-  name: "Microsoft Presidio",
+  name: "Giskard",
+  flag: "🐢",
+  url: "https://github.com/Giskard-AI/giskard-oss",
+  desc: "Open-source testing for LLM agents — detects injection, hallucination and bias issues."
+}, {
+  name: "Adversarial Robustness Toolbox",
+  flag: "🧱",
+  url: "https://github.com/Trusted-AI/adversarial-robustness-toolbox",
+  desc: "Library for evasion, poisoning, extraction and inference attacks and defences on ML models."
+}, {
+  name: "Presidio",
   flag: "🔒",
-  url: "https://github.com/microsoft/presidio",
+  url: "https://github.com/data-privacy-stack/presidio",
   desc: "Detect and anonymise PII before data reaches an LLM or logs."
+}, {
+  name: "LLM Guard (archived)",
+  flag: "🛡️",
+  url: "https://github.com/protectai/llm-guard",
+  desc: "Prompt injection, PII and output scanners — archived, still a useful reference design."
 }, {
   name: "AI Incident Database",
   flag: "📊",
@@ -1523,7 +1736,7 @@ const AI_SECURITY_TOOLS = [{
   name: "Awesome AI Security",
   flag: "⭐",
   url: "https://github.com/restuhaqza/awesome-ai-security",
-  desc: "Master curated index — papers, tools, benchmarks, and community links."
+  desc: "Curated index — papers, tools, benchmarks, and community links."
 }];
 function CISOBriefView({
   advisories,
@@ -1816,7 +2029,7 @@ function CISOBriefView({
     style: {
       color: ACCENT2
     }
-  }, "Awesome AI Security \u2197"), " ", "\xB7 also in GenAI \u2192 Standards & Tools.")), React.createElement("div", {
+  }, "Awesome AI Security \u2197"), " ", "\xB7 also in GenAI \u2192 Standards & Defences.")), React.createElement("div", {
     style: {
       fontSize: 11,
       letterSpacing: 3,
@@ -1996,6 +2209,8 @@ function GenAISecurityView({
   news
 }) {
   const [aiTab, setAiTab] = useState("overview");
+  const [owaspList, setOwaspList] = useState("llm");
+  const [toolCat, setToolCat] = useState("All");
   const isAI = item => {
     const text = (item.title + " " + item.summary).toLowerCase();
     return AI_KW.some(kw => text.includes(kw));
@@ -2005,6 +2220,7 @@ function GenAISecurityView({
   const aiNews = news.filter(isAI);
   const totalAI = aiAdvisories.length + aiExploits.length + aiNews.length;
   return React.createElement("div", {
+    className: "genai-view",
     style: {
       animation: "fadeIn .3s ease"
     }
@@ -2065,7 +2281,7 @@ function GenAISecurityView({
       overflowX: "auto",
       WebkitOverflowScrolling: "touch"
     }
-  }, [["overview", "📊 Overview"], ["owasp", "🔟 OWASP LLM Top 10"], ["resources", "📚 Standards & Tools"], ["feed", "📡 Live AI Feed"]].map(([id, lbl]) => React.createElement("button", {
+  }, [["overview", "📊 Overview"], ["owasp", "🔟 OWASP Top 10s"], ["offensive", "⚔️ AI Offensive Tools"], ["resources", "📚 Standards & Defences"], ["feed", "📡 Live AI Feed"]].map(([id, lbl]) => React.createElement("button", {
     key: id,
     onClick: () => setAiTab(id),
     style: {
@@ -2148,6 +2364,34 @@ function GenAISecurityView({
     icon: "💰",
     name: "AI Fraud & Scams",
     desc: "Voice cloning and AI personas used for financial fraud, BEC, and executive impersonation at scale",
+    risk: "HIGH",
+    color: "#ff9944",
+    bg: "rgba(220,100,0,.08)"
+  }, {
+    icon: "🔌",
+    name: "MCP & Tool Poisoning",
+    desc: "Malicious MCP servers, agent skills and tool descriptions hide instructions that hijack agents and steal tokens or files",
+    risk: "CRITICAL",
+    color: "#ff4444",
+    bg: "rgba(200,0,0,.08)"
+  }, {
+    icon: "⚔️",
+    name: "Autonomous AI Attack Agents",
+    desc: "Open-source AI pentest agents (Strix, PentAGI, HexStrike) cut time-to-exploit from weeks to hours for any attacker",
+    risk: "CRITICAL",
+    color: "#ff4444",
+    bg: "rgba(200,0,0,.08)"
+  }, {
+    icon: "📦",
+    name: "AI Supply Chain & Slopsquatting",
+    desc: "Backdoored models on public hubs, unsafe pickle weights, and attackers registering package names that LLMs hallucinate",
+    risk: "HIGH",
+    color: "#ff9944",
+    bg: "rgba(220,100,0,.08)"
+  }, {
+    icon: "💻",
+    name: "AI Coding Assistant Abuse",
+    desc: "Prompt injection in repos, issues and docs turns Copilot / Cursor / Claude Code style agents into code-execution and secret-leak paths",
     risk: "HIGH",
     color: "#ff9944",
     bg: "rgba(220,100,0,.08)"
@@ -2244,87 +2488,269 @@ function GenAISecurityView({
       color: "rgba(200,220,240,.5)",
       lineHeight: 1.6
     }
-  }, r.impact)))))), aiTab === "owasp" && React.createElement("div", null, React.createElement("div", {
-    style: {
-      background: "rgba(255,255,255,.02)",
-      border: "1px solid rgba(0,200,255,.1)",
-      borderRadius: 8,
-      padding: "16px 20px",
-      marginBottom: 16,
-      fontSize: 13,
-      color: "rgba(200,220,240,.5)",
-      lineHeight: 1.7
-    }
-  }, "The ", React.createElement("strong", {
-    style: {
-      color: ACCENT
-    }
-  }, "OWASP Top 10 for LLM Applications"), " defines the most critical security risks in large language model deployments. As a GenAI Security specialist, these are the controls every AI system must address before going to production."), React.createElement("div", {
-    style: {
-      display: "grid",
-      gap: 10
-    }
-  }, OWASP_LLM.map(item => {
-    const s = SEV_S[item.risk] || SEV_S.LOW;
-    return React.createElement("div", {
-      key: item.id,
-      style: {
-        background: "rgba(5,8,15,.92)",
-        border: `1px solid ${s.border}33`,
-        borderLeft: `4px solid ${s.border}`,
-        borderRadius: 6,
-        padding: "16px 18px"
-      }
-    }, React.createElement("div", {
+  }, r.impact)))))), aiTab === "owasp" && (() => {
+    const isLLM = owaspList === "llm";
+    const list = isLLM ? OWASP_LLM : OWASP_AGENTIC;
+    return React.createElement("div", null, React.createElement("div", {
       style: {
         display: "flex",
-        gap: 10,
-        alignItems: "center",
-        marginBottom: 8,
+        gap: 8,
+        marginBottom: 14,
         flexWrap: "wrap"
       }
-    }, React.createElement("span", {
+    }, [["llm", "🔟 LLM Applications · 2025"], ["agentic", "🤖 Agentic Applications · 2026"]].map(([id, lbl]) => React.createElement("button", {
+      key: id,
+      onClick: () => setOwaspList(id),
       style: {
+        padding: "8px 14px",
+        background: owaspList === id ? "rgba(123,47,247,.18)" : "transparent",
+        border: `1px solid ${owaspList === id ? ACCENT2 : "rgba(123,47,247,.25)"}`,
+        color: owaspList === id ? "#eef4ff" : "rgba(200,220,240,.55)",
+        borderRadius: 4,
         fontSize: 13,
-        fontWeight: 900,
-        color: ACCENT2,
+        cursor: "pointer",
         fontFamily: "var(--mono)",
-        minWidth: 52
+        fontWeight: owaspList === id ? 700 : 400
       }
-    }, item.id), React.createElement("span", {
+    }, lbl))), React.createElement("div", {
+      className: "genai-card",
       style: {
-        fontSize: 15,
-        fontWeight: 700,
-        color: "#eef4ff"
+        background: "rgba(255,255,255,.02)",
+        border: "1px solid rgba(0,200,255,.1)",
+        borderRadius: 8,
+        padding: "16px 20px",
+        marginBottom: 16,
+        fontSize: 13,
+        color: "rgba(200,220,240,.5)",
+        lineHeight: 1.7
       }
-    }, item.name), React.createElement(SevBadge, {
-      sev: item.risk
+    }, isLLM ? React.createElement(React.Fragment, null, "The ", React.createElement("strong", {
+      style: {
+        color: ACCENT
+      }
+    }, "OWASP Top 10 for LLM Applications (2025)"), " is the current baseline for securing chatbots, copilots and RAG systems. New since 2023: System Prompt Leakage, Vector & Embedding Weaknesses, Misinformation and Unbounded Consumption.") : React.createElement(React.Fragment, null, "The ", React.createElement("strong", {
+      style: {
+        color: ACCENT
+      }
+    }, "OWASP Top 10 for Agentic Applications"), " covers AI that ", React.createElement("em", null, "acts"), " \u2014 agents with tools, memory, credentials and other agents. If your AI can send email, run code, call APIs or use MCP servers, these risks apply on top of the LLM Top 10.")), React.createElement("div", {
+      style: {
+        display: "grid",
+        gap: 10
+      }
+    }, list.map(item => {
+      const s = SEV_S[item.risk] || SEV_S.LOW;
+      return React.createElement("div", {
+        key: item.id,
+        className: "genai-card",
+        style: {
+          background: "rgba(5,8,15,.92)",
+          border: `1px solid ${s.border}33`,
+          borderLeft: `4px solid ${s.border}`,
+          borderRadius: 6,
+          padding: "16px 18px"
+        }
+      }, React.createElement("div", {
+        style: {
+          display: "flex",
+          gap: 10,
+          alignItems: "center",
+          marginBottom: 8,
+          flexWrap: "wrap"
+        }
+      }, React.createElement("span", {
+        style: {
+          fontSize: 13,
+          fontWeight: 900,
+          color: ACCENT2,
+          fontFamily: "var(--mono)",
+          minWidth: 52
+        }
+      }, item.id), React.createElement("span", {
+        className: "card-title",
+        style: {
+          fontSize: 15,
+          fontWeight: 700,
+          color: "#eef4ff"
+        }
+      }, item.name), React.createElement(SevBadge, {
+        sev: item.risk
+      })), React.createElement("div", {
+        className: "card-summary",
+        style: {
+          fontSize: 13,
+          color: "rgba(200,220,240,.6)",
+          lineHeight: 1.75
+        }
+      }, item.desc));
     })), React.createElement("div", {
       style: {
+        padding: "12px 16px",
+        background: "rgba(123,47,247,.05)",
+        border: "1px solid rgba(123,47,247,.15)",
+        borderRadius: 6,
+        marginTop: 14,
+        fontSize: 12,
+        color: "rgba(200,220,240,.4)",
+        lineHeight: 1.7
+      }
+    }, "Source: ", React.createElement("a", {
+      href: isLLM ? "https://genai.owasp.org/llm-top-10/" : "https://genai.owasp.org/",
+      target: "_blank",
+      rel: "noopener noreferrer",
+      style: {
+        color: ACCENT2
+      }
+    }, "OWASP GenAI Security Project \u2197"), " \xB7 Curated for GCC practitioners by Vikas Pandita"));
+  })(), aiTab === "offensive" && (() => {
+    const tools = toolCat === "All" ? AI_OFFENSIVE_TOOLS : AI_OFFENSIVE_TOOLS.filter(t => t.cat === toolCat);
+    return React.createElement("div", null, React.createElement("div", {
+      className: "genai-card",
+      style: {
+        background: "rgba(255,68,68,.05)",
+        border: "1px solid rgba(255,68,68,.2)",
+        borderRadius: 8,
+        padding: "16px 20px",
+        marginBottom: 14,
         fontSize: 13,
         color: "rgba(200,220,240,.6)",
         lineHeight: 1.75
       }
-    }, item.desc));
-  })), React.createElement("div", {
-    style: {
-      padding: "12px 16px",
-      background: "rgba(123,47,247,.05)",
-      border: "1px solid rgba(123,47,247,.15)",
-      borderRadius: 6,
-      marginTop: 14,
-      fontSize: 12,
-      color: "rgba(200,220,240,.4)",
-      lineHeight: 1.7
-    }
-  }, "Source: ", React.createElement("a", {
-    href: "https://owasp.org/www-project-top-10-for-large-language-model-applications/",
-    target: "_blank",
-    rel: "noopener noreferrer",
-    style: {
-      color: ACCENT2
-    }
-  }, "OWASP Top 10 for LLM Applications \u2197"), " \xB7 Curated for GCC practitioners by Vikas Pandita")), aiTab === "resources" && React.createElement("div", null, React.createElement("div", {
+    }, React.createElement("strong", {
+      style: {
+        color: "#ff6b6b"
+      }
+    }, "Offensive AI is now open source."), " These autonomous agents run recon, find vulnerabilities and validate exploits with little human input. Red teams use them for authorised testing \u2014 and attackers use the same code. Know what they can do so you can test your own estate with them first.", React.createElement("div", {
+      style: {
+        marginTop: 8,
+        fontSize: 12,
+        color: "rgba(200,220,240,.45)"
+      }
+    }, "List shared by Thomas Roccia (SecurityBreak). \u2605 stars are a Nov 2026 snapshot. Use only on systems you are authorised to test.")), React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 6,
+        marginBottom: 14,
+        flexWrap: "wrap"
+      }
+    }, AI_OFFENSIVE_CATS.map(c => {
+      const n = c === "All" ? AI_OFFENSIVE_TOOLS.length : AI_OFFENSIVE_TOOLS.filter(t => t.cat === c).length;
+      return React.createElement("button", {
+        key: c,
+        onClick: () => setToolCat(c),
+        style: {
+          padding: "6px 12px",
+          background: toolCat === c ? "rgba(255,68,68,.15)" : "transparent",
+          border: `1px solid ${toolCat === c ? "#ff4444" : "rgba(255,255,255,.12)"}`,
+          color: toolCat === c ? "#ff8a8a" : "rgba(200,220,240,.55)",
+          borderRadius: 14,
+          fontSize: 12,
+          cursor: "pointer",
+          fontFamily: "var(--mono)"
+        }
+      }, c, " (", n, ")");
+    })), React.createElement("div", {
+      style: {
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))",
+        gap: 10,
+        marginBottom: 20
+      }
+    }, tools.map(t => React.createElement("a", {
+      key: t.repo,
+      href: `https://github.com/${t.repo}`,
+      target: "_blank",
+      rel: "noopener noreferrer",
+      className: "genai-card",
+      style: {
+        display: "block",
+        background: "rgba(5,8,15,.92)",
+        border: "1px solid rgba(255,68,68,.18)",
+        borderLeft: "4px solid #ff4444",
+        borderRadius: 6,
+        padding: "14px 16px",
+        textDecoration: "none"
+      }
+    }, React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        alignItems: "center",
+        marginBottom: 4
+      }
+    }, React.createElement("span", {
+      className: "card-title",
+      style: {
+        fontSize: 14,
+        fontWeight: 700,
+        color: "#eef4ff"
+      }
+    }, t.name), React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: "#ffcc66",
+        marginLeft: "auto",
+        fontFamily: "var(--mono)",
+        whiteSpace: "nowrap"
+      }
+    }, "\u2605 ", t.stars)), React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "rgba(200,220,240,.35)",
+        fontFamily: "var(--mono)",
+        marginBottom: 8
+      }
+    }, t.repo, " \xB7 ", t.cat), React.createElement("div", {
+      className: "card-summary",
+      style: {
+        fontSize: 12,
+        color: "rgba(200,220,240,.55)",
+        lineHeight: 1.65
+      }
+    }, t.desc)))), React.createElement("div", {
+      className: "genai-card",
+      style: {
+        background: "rgba(0,166,81,.06)",
+        border: "1px solid rgba(0,166,81,.2)",
+        borderRadius: 8,
+        padding: "18px 22px"
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 11,
+        letterSpacing: 3,
+        color: "rgba(0,200,100,.7)",
+        marginBottom: 10,
+        fontFamily: "var(--mono)"
+      }
+    }, "\uD83D\uDEE1\uFE0F WHAT DEFENDERS SHOULD DO NOW"), [["Assume faster exploitation", "Patch windows shrink when exploit validation is automated — prioritise KEV and high-EPSS items in days, not weeks."], ["Test yourself first", "Run Strix / Shannon / PentAGI against staging under an authorised scope, and fix what they find before attackers run the same tools."], ["Detect agent-speed attacks", "Alert on bursts of recon, rapid parameter fuzzing and tool-chained activity from one source — AI agents leave a very regular, high-tempo pattern."], ["Lock down your own agents", "Inventory MCP servers and agent skills, scan them (Snyk Agent Scan, Cisco MCP Scanner), and give agents least-privilege, short-lived credentials."]].map(([h, d]) => React.createElement("div", {
+      key: h,
+      style: {
+        display: "flex",
+        gap: 12,
+        padding: "8px 0",
+        borderBottom: "1px solid rgba(0,200,100,.08)"
+      }
+    }, React.createElement("span", {
+      style: {
+        color: "#00e676",
+        flexShrink: 0
+      }
+    }, "\u25B8"), React.createElement("div", null, React.createElement("div", {
+      style: {
+        fontSize: 13,
+        fontWeight: 700,
+        color: "#00e676",
+        marginBottom: 2
+      }
+    }, h), React.createElement("div", {
+      className: "card-summary",
+      style: {
+        fontSize: 13,
+        color: "rgba(200,220,240,.5)",
+        lineHeight: 1.6
+      }
+    }, d))))));
+  })(), aiTab === "resources" && React.createElement("div", null, React.createElement("div", {
     style: {
       background: "rgba(255,255,255,.02)",
       border: "1px solid rgba(123,47,247,.2)",
@@ -2343,7 +2769,7 @@ function GenAISecurityView({
       color: ACCENT2,
       fontWeight: 600
     }
-  }, "Awesome AI Security \u2197"), " ", "\u2014 frameworks for governance and open tools for LLM red teaming, guardrails, and incident research. Use across BCyberAware, Threatforge, and SAR projects."), React.createElement("div", {
+  }, "Awesome AI Security \u2197"), " ", "\u2014 frameworks for governance and open tools for LLM and agent red teaming, MCP scanning, guardrails, and incident research. Use across BCyberAware, Threatforge, and SAR projects."), React.createElement("div", {
     style: {
       fontSize: 11,
       letterSpacing: 3,
@@ -2410,7 +2836,7 @@ function GenAISecurityView({
       marginBottom: 12,
       fontFamily: "var(--mono)"
     }
-  }, "TOOLS & RESEARCH"), React.createElement("div", {
+  }, "DEFENSIVE TOOLS & RESEARCH"), React.createElement("div", {
     style: {
       display: "grid",
       gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))",
@@ -4945,8 +5371,8 @@ function BCyberAwareDashboard() {
     name: "OWASP LLM Top 10",
     cat: "AI Security",
     flag: "🔟",
-    url: "https://owasp.org/www-project-top-10-for-large-language-model-applications/",
-    desc: "Top 10 critical risks for LLM applications — also built into GenAI tab."
+    url: "https://genai.owasp.org/llm-top-10/",
+    desc: "Top 10 critical risks for LLM applications (2025) — also built into GenAI tab with the Agentic Top 10."
   }];
   const healthByName = {};
   (feedMeta?.source_health || []).forEach(h => {
@@ -6445,7 +6871,7 @@ function BCyberAwareDashboard() {
       fontFamily: "var(--mono)",
       fontWeight: 700
     }
-  }, "PLATFORM CAPABILITIES"), ["🛡️ AI Threat Analyst — chat assistant grounded in the live feed (Cloudflare Workers AI)", "🤖 AI Situation Summary — executive brief regenerated with every feed refresh", "🧬 Knowledge Graph — ATT&CK heat matrix, relationship graph, actor encyclopedia, IOC hunt (OpenCTI ideas, native)", "⬇ STIX 2.1 export — OASIS bundle for OpenCTI / MISP / TAXII / SIEM", "💬 Social Intel — infosec.exchange, Bluesky, Hacker News, r/netsec", "48 live intelligence sources with real-time health telemetry", "🔴 Breaking-news ticker — incident-grade stories from the last 48 hours", "ZDI 0-Day Pipeline — vulnerabilities awaiting vendor disclosure", "GenAI tab — OWASP LLM Top 10, Standards & Tools (Awesome AI Security)", "CISO Brief — AI governance links (NIST AI RMF, MITRE ATLAS, AI Incident Database)", "CISA KEV · NVD · GHSA · CERT-In · NCSC UK · CERT-EU · JPCERT · Cisco / Palo Alto / FortiGuard PSIRT", "The Record · Unit 42 · Check Point · CrowdStrike · Mandiant · Talos · Project Zero · Krebs", "GCC / Middle East relevance scoring + OpenCTI-style confidence & TLP on every card", "Global threat heatmap — country-level risk visualisation", "Source verification link on every advisory card · auto-refresh every 2 hours"].map((f, i) => React.createElement("div", {
+  }, "PLATFORM CAPABILITIES"), ["🛡️ AI Threat Analyst — chat assistant grounded in the live feed (Cloudflare Workers AI)", "🤖 AI Situation Summary — executive brief regenerated with every feed refresh", "🧬 Knowledge Graph — ATT&CK heat matrix, relationship graph, actor encyclopedia, IOC hunt (OpenCTI ideas, native)", "⬇ STIX 2.1 export — OASIS bundle for OpenCTI / MISP / TAXII / SIEM", "💬 Social Intel — infosec.exchange, Bluesky, Hacker News, r/netsec", "55 live intelligence sources with real-time health telemetry", "🔴 Breaking-news ticker — incident-grade stories from the last 48 hours", "ZDI 0-Day Pipeline — vulnerabilities awaiting vendor disclosure", "GenAI tab — OWASP LLM Top 10 (2025) + Agentic Top 10, ⚔️ AI Offensive Tools tracker (20 autonomous pentest agents), Standards & Defences", "CISO Brief — AI governance links (NIST AI RMF, MITRE ATLAS, AI Incident Database)", "CISA KEV · NVD · GHSA · CERT-In · NCSC UK · CERT-EU · JPCERT · Cisco / Palo Alto / FortiGuard PSIRT", "The Record · Unit 42 · Check Point · CrowdStrike · Mandiant · Talos · Project Zero · Krebs", "GCC / Middle East relevance scoring + OpenCTI-style confidence & TLP on every card", "Global threat heatmap — country-level risk visualisation", "Source verification link on every advisory card · auto-refresh every 2 hours"].map((f, i) => React.createElement("div", {
     key: i,
     style: {
       fontSize: 14,
