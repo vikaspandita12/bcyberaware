@@ -21,7 +21,7 @@ const FETCH_TIMEOUT_MS = 9000;
 // full parallel refresh dies at the cap and the same feeds stay DOWN forever.
 // Instead: keep a per-source cache and refresh only the stalest/highest-priority
 // slice each request — every source stays live, news stays minutes-fresh.
-const FETCH_SLOTS = 30;
+const FETCH_SLOTS = 28;
 const SOURCE_TTL = { news: 12 * 60 * 1000, social: 10 * 60 * 1000, advisory: 30 * 60 * 1000, exploit: 30 * 60 * 1000 };
 const REFRESH_FIRST = ["cisa_kev", "ghsa", "thn", "bleeping", "secweek", "register", "secaffairs", "therecord", "darkreading", "helpnet", "gbhackers", "certin", "nvd", "cisa_alerts"];
 
@@ -133,6 +133,32 @@ export function getFeedContext(maxChars = 6000) {
 }
 
 // ── Main handler ──────────────────────────────────────────────────────────────
+const SHARED_KEY = "https://bcyberaware-internal.cache/feed-sources-v1";
+const edgeCache = () => (typeof caches !== "undefined" && caches.default) || null;
+
+async function loadSharedSources() {
+  const c = edgeCache();
+  if (!c) return;
+  try {
+    const r = await c.match(SHARED_KEY);
+    if (!r) return;
+    const shared = await r.json();
+    for (const [key, row] of Object.entries(shared || {})) {
+      if (!CACHE.sources[key] || CACHE.sources[key].ts < row.ts) CACHE.sources[key] = row;
+    }
+  } catch {}
+}
+
+async function saveSharedSources() {
+  const c = edgeCache();
+  if (!c) return;
+  try {
+    await c.put(SHARED_KEY, new Response(JSON.stringify(CACHE.sources), {
+      headers: { "content-type": "application/json", "cache-control": "public, max-age=86400" },
+    }));
+  } catch {}
+}
+
 export async function handleFeedRequest(request, env) {
   const url    = new URL(request.url);
   const action = url.searchParams.get("action");
@@ -145,6 +171,9 @@ export async function handleFeedRequest(request, env) {
     const now = Date.now();
     if (!bust && CACHE.feed && (now - CACHE.feed.ts) < CACHE_MS)
       return jsonResponse({ ...CACHE.feed.data, from_cache: true });
+
+    // Isolates don't share memory, so per-source results live in the edge cache too
+    await loadSharedSources();
 
     // Pick which sources to actually fetch this invocation (subrequest budget),
     // serving everything else from the per-source cache.
@@ -180,10 +209,17 @@ export async function handleFeedRequest(request, env) {
         const health = { key: src.key, name: src.name, flag: src.flag, cat: src.cat, ok: false, items: 0, ms: Date.now() - t0, error: String(e?.message || e).slice(0, 80) };
         const prev = CACHE.sources[src.key];
         // Keep serving the last good copy if a refresh fails (stale-while-error per source)
-        if (prev?.items?.length) return { src, items: prev.items, health: { ...prev.health, stale: true, error: health.error } };
+        if (prev?.items?.length) {
+          const staleHealth = { ...prev.health, stale: true, error: health.error };
+          CACHE.sources[src.key] = { ts: now, items: prev.items, health: staleHealth };
+          return { src, items: prev.items, health: staleHealth };
+        }
+        CACHE.sources[src.key] = { ts: now, items: [], health };
         return { src, items: [], health };
       }
     }));
+
+    await saveSharedSources();
 
     const byCat = { advisory: [], exploit: [], news: [], social: [] };
     runs.forEach(({ src, items }) => byCat[src.cat].push(...items));
