@@ -14,9 +14,24 @@
 
 import { jsonResponse } from "./http.js";
 
-const CACHE    = {};
-const CACHE_MS = 2 * 60 * 60 * 1000; // 2 hours
+const CACHE    = { sources: {} };
+const CACHE_MS = 2 * 60 * 1000; // assembled snapshot; individual sources keep longer TTLs below
 const FETCH_TIMEOUT_MS = 9000;
+// Cloudflare free Workers allow 50 subrequests per invocation. With 55 sources a
+// full parallel refresh dies at the cap and the same feeds stay DOWN forever.
+// Instead: keep a per-source cache and refresh only the stalest/highest-priority
+// slice each request — every source stays live, news stays minutes-fresh.
+const FETCH_SLOTS = 30;
+const SOURCE_TTL = { news: 12 * 60 * 1000, social: 10 * 60 * 1000, advisory: 30 * 60 * 1000, exploit: 30 * 60 * 1000 };
+const REFRESH_FIRST = ["cisa_kev", "ghsa", "thn", "bleeping", "secweek", "register", "secaffairs", "therecord", "darkreading", "helpnet", "gbhackers", "certin", "nvd", "cisa_alerts"];
+
+function sourcePriority(src) {
+  const i = REFRESH_FIRST.indexOf(src.key);
+  if (i >= 0) return 200 - i;
+  if (src.cat === "news") return 80;
+  if (src.cat === "social") return 70;
+  return 50;
+}
 
 const UA = { "User-Agent": "Mozilla/5.0 (compatible; BCyberAware/3.0; +https://advisory.bcyberaware.co.in)" };
 
@@ -47,6 +62,8 @@ const SOURCES = [
   { key: "pan_psirt",    name: "Palo Alto PSIRT",        flag: "🔥", cat: "advisory", fn: () => rss("https://security.paloaltonetworks.com/rss.xml", { id_prefix: "PANSA", source: "Palo Alto PSIRT", source_url: "https://security.paloaltonetworks.com", source_color: "#fa582d", source_flag: "🔥", category: "advisory", default_sev: "HIGH", patch_avail: true, limit: 12, countries: ["US", "GB", "AE", "SA", "IN"] }) },
   { key: "forti_psirt",  name: "FortiGuard PSIRT",       flag: "🧱", cat: "advisory", fn: () => rss("https://www.fortiguard.com/rss/ir.xml", { id_prefix: "FGIR", source: "FortiGuard PSIRT", source_url: "https://www.fortiguard.com/psirt", source_color: "#ee3124", source_flag: "🧱", category: "advisory", default_sev: "HIGH", patch_avail: true, limit: 12, countries: ["US", "GB", "DE", "AE", "SA", "IN"] }) },
   { key: "ms_security",  name: "Microsoft Security",     flag: "🇺🇸", cat: "advisory", fn: () => rss("https://www.microsoft.com/en-us/security/blog/feed/", { id_prefix: "MSSEC", source: "Microsoft Security", source_url: "https://www.microsoft.com/en-us/security/blog/", source_color: "#0078d4", source_flag: "🇺🇸", category: "advisory", default_sev: "HIGH", patch_avail: true, limit: 10, countries: ["US", "GB", "DE", "AE", "SA", "IN"] }) },
+  { key: "cccs_ca",      name: "CCCS (Canada)",          flag: "🇨🇦", cat: "advisory", fn: () => rss("https://www.cyber.gc.ca/api/cccs/atom/v1/get?feed=alerts_advisories&lang=en", { id_prefix: "CCCS", source: "CCCS (Canada)", source_url: "https://www.cyber.gc.ca/en/alerts-advisories", source_color: "#d52b1e", source_flag: "🇨🇦", category: "advisory", default_sev: "HIGH", patch_avail: true, limit: 12, countries: ["CA", "US", "GB"] }) },
+  { key: "cert_fr",      name: "CERT-FR (France)",       flag: "🇫🇷", cat: "advisory", fn: () => rss("https://cert.cyber.gouv.fr/feed/", { id_prefix: "CERTFR", source: "CERT-FR", source_url: "https://cert.cyber.gouv.fr", source_color: "#000091", source_flag: "🇫🇷", category: "advisory", default_sev: "HIGH", patch_avail: true, limit: 10, countries: ["FR", "DE", "BE"] }) },
 
   { key: "exploitdb",    name: "Exploit-DB",             flag: "⚡", cat: "exploit", fn: () => rss("https://www.exploit-db.com/rss.xml", { id_prefix: "EDBID", source: "Exploit-DB", source_url: "https://www.exploit-db.com", source_color: "#cc0000", source_flag: "⚡", category: "exploit", default_sev: "HIGH", exploit_wild: true, limit: 20, countries: ["US", "RU", "CN"] }) },
   { key: "zdi",          name: "ZDI 0-Day Pipeline",     flag: "🧨", cat: "exploit", fn: () => rss("https://www.zerodayinitiative.com/rss/upcoming/", { id_prefix: "ZDI", source: "ZDI 0-Day Pipeline", source_url: "https://www.zerodayinitiative.com/advisories/upcoming/", source_color: "#d32f2f", source_flag: "🧨", category: "exploit", default_sev: "HIGH", exploit_wild: false, limit: 20, countries: ["US", "GB", "DE", "JP"] }) },
@@ -69,6 +86,11 @@ const SOURCES = [
   { key: "sophos",       name: "Sophos X-Ops",           flag: "🛡️", cat: "news", fn: () => rss("https://news.sophos.com/en-us/category/threat-research/feed/", { id_prefix: "SOPHOS", source: "Sophos X-Ops", source_url: "https://news.sophos.com/en-us/category/threat-research/", source_color: "#005bc8", source_flag: "🛡️", category: "news", default_sev: "HIGH", limit: 10, countries: ["US", "GB", "IN", "AE"] }) },
   { key: "rapid7",       name: "Rapid7 Emergent Threats",flag: "🚀", cat: "news", fn: () => rss("https://blog.rapid7.com/rss/", { id_prefix: "R7", source: "Rapid7", source_url: "https://www.rapid7.com/blog/", source_color: "#e85d00", source_flag: "🚀", category: "news", default_sev: "HIGH", limit: 10, countries: ["US", "GB", "DE"] }) },
   { key: "darkreading",  name: "Dark Reading",           flag: "📰", cat: "news", fn: () => rss("https://www.darkreading.com/rss.xml", { id_prefix: "DARKRD", source: "Dark Reading", source_url: "https://www.darkreading.com", source_color: "#c62828", source_flag: "📰", category: "news", default_sev: "HIGH", limit: 12, countries: ["US", "GB", "DE"] }) },
+  { key: "securelist",   name: "Kaspersky Securelist",   flag: "🔬", cat: "news", fn: () => rss("https://securelist.com/feed/", { id_prefix: "SECLIST", source: "Securelist (Kaspersky)", source_url: "https://securelist.com", source_color: "#006d5c", source_flag: "🔬", category: "news", default_sev: "HIGH", limit: 10, countries: ["RU", "US", "GB", "DE"] }) },
+  { key: "welivesec",    name: "ESET WeLiveSecurity",    flag: "🛡️", cat: "news", fn: () => rss("https://www.welivesecurity.com/en/rss/feed/", { id_prefix: "ESET", source: "ESET WeLiveSecurity", source_url: "https://www.welivesecurity.com", source_color: "#0094d2", source_flag: "🛡️", category: "news", default_sev: "HIGH", limit: 10, countries: ["SK", "US", "GB", "DE"] }) },
+  { key: "sentinellabs", name: "SentinelLABS",           flag: "🔬", cat: "news", fn: () => rss("https://www.sentinelone.com/labs/feed/", { id_prefix: "S1LABS", source: "SentinelLABS", source_url: "https://www.sentinelone.com/labs/", source_color: "#6a0dad", source_flag: "🔬", category: "news", default_sev: "HIGH", limit: 10, countries: ["US", "GB", "IL"] }) },
+  { key: "watchtowr",    name: "watchTowr Labs",         flag: "🧨", cat: "news", fn: () => rss("https://labs.watchtowr.com/rss/", { id_prefix: "WTOWR", source: "watchTowr Labs", source_url: "https://labs.watchtowr.com", source_color: "#ff3d00", source_flag: "🧨", category: "news", default_sev: "HIGH", exploit_wild: true, limit: 8, countries: ["SG", "US", "GB"] }) },
+  { key: "tenable",      name: "Tenable Research",       flag: "🧿", cat: "news", fn: () => rss("https://www.tenable.com/blog/feed", { id_prefix: "TENBL", source: "Tenable Research", source_url: "https://www.tenable.com/blog", source_color: "#00263e", source_flag: "🧿", category: "news", default_sev: "HIGH", limit: 10, countries: ["US", "GB"] }) },
   { key: "gbhackers",    name: "GBHackers",              flag: "📰", cat: "news", fn: () => rss("https://gbhackers.com/feed/", { id_prefix: "GBH", source: "GBHackers", source_url: "https://gbhackers.com", source_color: "#1b5e20", source_flag: "📰", category: "news", default_sev: "MEDIUM", limit: 10, countries: ["US", "IN"] }) },
   { key: "p0",           name: "Google Project Zero",    flag: "🔬", cat: "news", fn: () => rss("https://googleprojectzero.blogspot.com/feeds/posts/default", { id_prefix: "P0", source: "Google Project Zero", source_url: "https://googleprojectzero.blogspot.com", source_color: "#4285f4", source_flag: "🔬", category: "news", default_sev: "HIGH", exploit_wild: true, limit: 8, countries: ["US", "GB"] }) },
   { key: "malwarebytes", name: "Malwarebytes Labs",      flag: "📰", cat: "news", fn: () => rss("https://www.malwarebytes.com/blog/feed/index.xml", { id_prefix: "MBAM", source: "Malwarebytes Labs", source_url: "https://www.malwarebytes.com/blog", source_color: "#0d47a1", source_flag: "📰", category: "news", default_sev: "MEDIUM", limit: 10, countries: ["US", "GB"] }) },
@@ -124,16 +146,42 @@ export async function handleFeedRequest(request, env) {
     if (!bust && CACHE.feed && (now - CACHE.feed.ts) < CACHE_MS)
       return jsonResponse({ ...CACHE.feed.data, from_cache: true });
 
-    // Run every source in parallel, each individually timed and fault-isolated
+    // Pick which sources to actually fetch this invocation (subrequest budget),
+    // serving everything else from the per-source cache.
+    const stale = SOURCES.filter(src => {
+      const row = CACHE.sources[src.key];
+      if (!row || bust) return true;
+      return (now - row.ts) >= (SOURCE_TTL[src.cat] || 20 * 60 * 1000);
+    }).sort((a, b) => {
+      const missA = CACHE.sources[a.key] ? 0 : 500; // never-fetched sources always go first
+      const missB = CACHE.sources[b.key] ? 0 : 500;
+      const diff = (sourcePriority(b) + missB) - (sourcePriority(a) + missA);
+      if (diff) return diff;
+      return (CACHE.sources[a.key]?.ts || 0) - (CACHE.sources[b.key]?.ts || 0); // oldest first
+    });
+    const fetchSet = new Set(stale.slice(0, FETCH_SLOTS).map(s => s.key));
+
+    // Run the selected slice in parallel, each individually timed and fault-isolated
     const runs = await Promise.all(SOURCES.map(async (src) => {
+      if (!fetchSet.has(src.key)) {
+        const row = CACHE.sources[src.key];
+        if (row) return { src, items: row.items, health: { ...row.health, cached: true } };
+        return { src, items: [], health: { key: src.key, name: src.name, flag: src.flag, cat: src.cat, ok: false, items: 0, ms: 0, error: "warming up" } };
+      }
       const t0 = Date.now();
       try {
         const items = (await src.fn()) || [];
         // Keyword-filtered mainstream feeds are "live" even when 0 items match this cycle
         const ok = items.length > 0 || !!src.filtered;
-        return { src, items, health: { key: src.key, name: src.name, flag: src.flag, cat: src.cat, ok, items: items.length, ms: Date.now() - t0 } };
+        const health = { key: src.key, name: src.name, flag: src.flag, cat: src.cat, ok, items: items.length, ms: Date.now() - t0 };
+        CACHE.sources[src.key] = { ts: now, items, health };
+        return { src, items, health };
       } catch (e) {
-        return { src, items: [], health: { key: src.key, name: src.name, flag: src.flag, cat: src.cat, ok: false, items: 0, ms: Date.now() - t0, error: String(e?.message || e).slice(0, 80) } };
+        const health = { key: src.key, name: src.name, flag: src.flag, cat: src.cat, ok: false, items: 0, ms: Date.now() - t0, error: String(e?.message || e).slice(0, 80) };
+        const prev = CACHE.sources[src.key];
+        // Keep serving the last good copy if a refresh fails (stale-while-error per source)
+        if (prev?.items?.length) return { src, items: prev.items, health: { ...prev.health, stale: true, error: health.error } };
+        return { src, items: [], health };
       }
     }));
 
@@ -327,7 +375,30 @@ async function fetchNVDCritical() {
 }
 
 // ── 4. GitHub Security Advisories (GHSA — reviewed critical/high CVEs) ────────
+// The REST API rate-limits unauthenticated calls per IP (60/h). Cloudflare egress
+// IPs are shared, so production often gets HTTP 403 — fall back to the public
+// Atom feed, which is not rate-limited the same way.
 async function fetchGitHubAdvisories() {
+  try {
+    return await fetchGitHubAdvisoriesAPI();
+  } catch {
+    const items = await rss("https://github.com/security-advisories.atom", {
+      id_prefix: "GHSA",
+      source: "GitHub Advisory (GHSA)",
+      source_url: "https://github.com/advisories",
+      source_color: "#8b5cf6",
+      source_flag: "🐙",
+      category: "advisory",
+      default_sev: "HIGH",
+      patch_avail: true,
+      limit: 20,
+      countries: ["US", "GB", "DE", "IN"],
+    });
+    return items;
+  }
+}
+
+async function fetchGitHubAdvisoriesAPI() {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort("timeout"), FETCH_TIMEOUT_MS);
   try {
@@ -496,8 +567,11 @@ async function fetchBluesky() {
     "schneier.com",
     "infosec.skyfleet.blue",
   ];
+  // Rotate 3 of 5 actors per cycle to conserve the Worker subrequest budget
+  const start = Math.floor(Date.now() / 600000) % actors.length;
+  const pick = [0, 1, 2].map(i => actors[(start + i) % actors.length]);
   const settled = await Promise.allSettled(
-    actors.map(actor =>
+    pick.map(actor =>
       fetchWithTimeout(`https://public.api.bsky.app/xrpc/app.bsky.feed.getAuthorFeed?actor=${encodeURIComponent(actor)}&limit=5&filter=posts_no_replies`, 6500)
         .then(r => (r.ok ? r.json() : { feed: [] }))
     )
