@@ -54,7 +54,7 @@
   </script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-  <script defer src="app.js?v=2.7"></script>
+  <script defer src="app.js?v=2.8"></script>
   <style>
     :root{
       --mono:'JetBrains Mono','SFMono-Regular',Menlo,Consolas,monospace;
@@ -92,6 +92,190 @@
     /* ══════════════════════════════════════════════════════════════════════
        LIGHT THEME SYSTEM
        ══════════════════════════════════════════════════════════════════════ */
+
+    /* Readability map: the UI sets dark-theme colours inline; remap each to an
+       accessible equivalent per theme. Class-based rules below still win. */
+    html[data-theme="light"] [style^="color: rgba(200, 220, 240,"],
+    html[data-theme="light"] [style*="; color: rgba(200, 220, 240,"],
+    body.light-theme [style^="color: rgba(200, 220, 240,"],
+    body.light-theme [style*="; color: rgba(200, 220, 240,"]{ color:#475569 !important; }
+    html[data-theme="light"] [style^="color: rgb(221, 238, 255)"],
+    html[data-theme="light"] [style*="; color: rgb(221, 238, 255)"],
+    body.light-theme [style^="color: rgb(221, 238, 255)"],
+    body.light-theme [style*="; color: rgb(221, 238, 255)"],
+    html[data-theme="light"] [style^="color: rgb(238, 244, 255)"],
+    html[data-theme="light"] [style*="; color: rgb(238, 244, 255)"],
+    body.light-theme [style^="color: rgb(238, 244, 255)"],
+    body.light-theme [style*="; color: rgb(238, 244, 255)"],
+    html[data-theme="light"] [style^="color: rgba(230, 238, 250,"],
+    html[data-theme="light"] [style*="; color: rgba(230, 238, 250,"],
+    body.light-theme [style^="color: rgba(230, 238, 250,"],
+    body.light-theme [style*="; color: rgba(230, 238, 250,"],
+    html[data-theme="light"] [style^="color: rgb(200, 216, 232)"],
+    html[data-theme="light"] [style*="; color: rgb(200, 216, 232)"],
+    body.light-theme [style^="color: rgb(200, 216, 232)"],
+    body.light-theme [style*="; color: rgb(200, 216, 232)"]{ color:#0f172a !important; }
+    html[data-theme="light"] [style^="color: rgb(224, 224, 224)"],
+    html[data-theme="light"] [style*="; color: rgb(224, 224, 224)"],
+    body.light-theme [style^="color: rgb(224, 224, 224)"],
+    body.light-theme [style*="; color: rgb(224, 224, 224)"]{ color:#374151 !important; }
+    html[data-theme="light"] [style^="color: rgb(0, 200, 255)"],
+    html[data-theme="light"] [style*="; color: rgb(0, 200, 255)"],
+    body.light-theme [style^="color: rgb(0, 200, 255)"],
+    body.light-theme [style*="; color: rgb(0, 200, 255)"],
+    html[data-theme="light"] [style^="color: rgba(0, 200, 255,"],
+    html[data-theme="light"] [style*="; color: rgba(0, 200, 255,"],
+    body.light-theme [style^="color: rgba(0, 200, 255,"],
+    body.light-theme [style*="; color: rgba(0, 200, 255,"],
+    html[data-theme="light"] [style^="color: rgb(0, 229, 255)"],
+    html[data-theme="light"] [style*="; color: rgb(0, 229, 255)"],
+    body.light-theme [style^="color: rgb(0, 229, 255)"],
+    body.light-theme [style*="; color: rgb(0, 229, 255)"],
+    html[data-theme="light"] [style^="color: rgb(41, 182, 246)"],
+    html[data-theme="light"] [style*="; color: rgb(41, 182, 246)"],
+    body.light-theme [style^="color: rgb(41, 182, 246)"],
+    body.light-theme [style*="; color: rgb(41, 182, 246)"],
+    html[data-theme="light"] [style^="color: rgb(100, 181, 246)"],
+    html[data-theme="light"] [style*="; color: rgb(100, 181, 246)"],
+    body.light-theme [style^="color: rgb(100, 181, 246)"],
+    body.light-theme [style*="; color: rgb(100, 181, 246)"],
+    html[data-theme="light"] [style^="color: rgb(2, 132, 199)"],
+    html[data-theme="light"] [style*="; color: rgb(2, 132, 199)"],
+    body.light-theme [style^="color: rgb(2, 132, 199)"],
+    body.light-theme [style*="; color: rgb(2, 132, 199)"]{ color:#0369a1 !important; }
+    html[data-theme="light"] [style^="color: rgb(0, 230, 118)"],
+    html[data-theme="light"] [style*="; color: rgb(0, 230, 118)"],
+    body.light-theme [style^="color: rgb(0, 230, 118)"],
+    body.light-theme [style*="; color: rgb(0, 230, 118)"],
+    html[data-theme="light"] [style^="color: rgba(0, 230, 118,"],
+    html[data-theme="light"] [style*="; color: rgba(0, 230, 118,"],
+    body.light-theme [style^="color: rgba(0, 230, 118,"],
+    body.light-theme [style*="; color: rgba(0, 230, 118,"],
+    html[data-theme="light"] [style^="color: rgba(0, 200, 100,"],
+    html[data-theme="light"] [style*="; color: rgba(0, 200, 100,"],
+    body.light-theme [style^="color: rgba(0, 200, 100,"],
+    body.light-theme [style*="; color: rgba(0, 200, 100,"]{ color:#047857 !important; }
+    html[data-theme="light"] [style^="color: rgb(255, 82, 82)"],
+    html[data-theme="light"] [style*="; color: rgb(255, 82, 82)"],
+    body.light-theme [style^="color: rgb(255, 82, 82)"],
+    body.light-theme [style*="; color: rgb(255, 82, 82)"],
+    html[data-theme="light"] [style^="color: rgb(255, 68, 68)"],
+    html[data-theme="light"] [style*="; color: rgb(255, 68, 68)"],
+    body.light-theme [style^="color: rgb(255, 68, 68)"],
+    body.light-theme [style*="; color: rgb(255, 68, 68)"],
+    html[data-theme="light"] [style^="color: rgb(255, 23, 68)"],
+    html[data-theme="light"] [style*="; color: rgb(255, 23, 68)"],
+    body.light-theme [style^="color: rgb(255, 23, 68)"],
+    body.light-theme [style*="; color: rgb(255, 23, 68)"],
+    html[data-theme="light"] [style^="color: rgb(255, 107, 107)"],
+    html[data-theme="light"] [style*="; color: rgb(255, 107, 107)"],
+    body.light-theme [style^="color: rgb(255, 107, 107)"],
+    body.light-theme [style*="; color: rgb(255, 107, 107)"],
+    html[data-theme="light"] [style^="color: rgb(255, 138, 138)"],
+    html[data-theme="light"] [style*="; color: rgb(255, 138, 138)"],
+    body.light-theme [style^="color: rgb(255, 138, 138)"],
+    body.light-theme [style*="; color: rgb(255, 138, 138)"],
+    html[data-theme="light"] [style^="color: rgb(255, 110, 110)"],
+    html[data-theme="light"] [style*="; color: rgb(255, 110, 110)"],
+    body.light-theme [style^="color: rgb(255, 110, 110)"],
+    body.light-theme [style*="; color: rgb(255, 110, 110)"],
+    html[data-theme="light"] [style^="color: rgb(255, 121, 97)"],
+    html[data-theme="light"] [style*="; color: rgb(255, 121, 97)"],
+    body.light-theme [style^="color: rgb(255, 121, 97)"],
+    body.light-theme [style*="; color: rgb(255, 121, 97)"],
+    html[data-theme="light"] [style^="color: rgba(200, 0, 0,"],
+    html[data-theme="light"] [style*="; color: rgba(200, 0, 0,"],
+    body.light-theme [style^="color: rgba(200, 0, 0,"],
+    body.light-theme [style*="; color: rgba(200, 0, 0,"],
+    html[data-theme="light"] [style^="color: rgba(255, 68, 68,"],
+    html[data-theme="light"] [style*="; color: rgba(255, 68, 68,"],
+    body.light-theme [style^="color: rgba(255, 68, 68,"],
+    body.light-theme [style*="; color: rgba(255, 68, 68,"]{ color:#b91c1c !important; }
+    html[data-theme="light"] [style^="color: rgb(255, 153, 68)"],
+    html[data-theme="light"] [style*="; color: rgb(255, 153, 68)"],
+    body.light-theme [style^="color: rgb(255, 153, 68)"],
+    body.light-theme [style*="; color: rgb(255, 153, 68)"],
+    html[data-theme="light"] [style^="color: rgb(255, 145, 0)"],
+    html[data-theme="light"] [style*="; color: rgb(255, 145, 0)"],
+    body.light-theme [style^="color: rgb(255, 145, 0)"],
+    body.light-theme [style*="; color: rgb(255, 145, 0)"],
+    html[data-theme="light"] [style^="color: rgb(255, 109, 0)"],
+    html[data-theme="light"] [style*="; color: rgb(255, 109, 0)"],
+    body.light-theme [style^="color: rgb(255, 109, 0)"],
+    body.light-theme [style*="; color: rgb(255, 109, 0)"],
+    html[data-theme="light"] [style^="color: rgba(220, 100, 0,"],
+    html[data-theme="light"] [style*="; color: rgba(220, 100, 0,"],
+    body.light-theme [style^="color: rgba(220, 100, 0,"],
+    body.light-theme [style*="; color: rgba(220, 100, 0,"]{ color:#c2410c !important; }
+    html[data-theme="light"] [style^="color: rgb(255, 215, 0)"],
+    html[data-theme="light"] [style*="; color: rgb(255, 215, 0)"],
+    body.light-theme [style^="color: rgb(255, 215, 0)"],
+    body.light-theme [style*="; color: rgb(255, 215, 0)"],
+    html[data-theme="light"] [style^="color: rgb(255, 179, 0)"],
+    html[data-theme="light"] [style*="; color: rgb(255, 179, 0)"],
+    body.light-theme [style^="color: rgb(255, 179, 0)"],
+    body.light-theme [style*="; color: rgb(255, 179, 0)"],
+    html[data-theme="light"] [style^="color: rgb(255, 204, 102)"],
+    html[data-theme="light"] [style*="; color: rgb(255, 204, 102)"],
+    body.light-theme [style^="color: rgb(255, 204, 102)"],
+    body.light-theme [style*="; color: rgb(255, 204, 102)"]{ color:#a16207 !important; }
+    html[data-theme="light"] [style^="color: rgb(216, 180, 254)"],
+    html[data-theme="light"] [style*="; color: rgb(216, 180, 254)"],
+    body.light-theme [style^="color: rgb(216, 180, 254)"],
+    body.light-theme [style*="; color: rgb(216, 180, 254)"],
+    html[data-theme="light"] [style^="color: rgb(192, 132, 252)"],
+    html[data-theme="light"] [style*="; color: rgb(192, 132, 252)"],
+    body.light-theme [style^="color: rgb(192, 132, 252)"],
+    body.light-theme [style*="; color: rgb(192, 132, 252)"],
+    html[data-theme="light"] [style^="color: rgba(192, 132, 252,"],
+    html[data-theme="light"] [style*="; color: rgba(192, 132, 252,"],
+    body.light-theme [style^="color: rgba(192, 132, 252,"],
+    body.light-theme [style*="; color: rgba(192, 132, 252,"],
+    html[data-theme="light"] [style^="color: rgba(123, 47, 247,"],
+    html[data-theme="light"] [style*="; color: rgba(123, 47, 247,"],
+    body.light-theme [style^="color: rgba(123, 47, 247,"],
+    body.light-theme [style*="; color: rgba(123, 47, 247,"],
+    html[data-theme="light"] [style^="color: rgb(124, 77, 255)"],
+    html[data-theme="light"] [style*="; color: rgb(124, 77, 255)"],
+    body.light-theme [style^="color: rgb(124, 77, 255)"],
+    body.light-theme [style*="; color: rgb(124, 77, 255)"]{ color:#6d28d9 !important; }
+    html[data-theme="light"] [style^="color: rgba(233, 30, 99,"],
+    html[data-theme="light"] [style*="; color: rgba(233, 30, 99,"],
+    body.light-theme [style^="color: rgba(233, 30, 99,"],
+    body.light-theme [style*="; color: rgba(233, 30, 99,"]{ color:#be185d !important; }
+    html[data-theme="dark"] [style^="color: rgba(200, 220, 240, 0.2)"],
+    html[data-theme="dark"] [style*="; color: rgba(200, 220, 240, 0.2)"],
+    html[data-theme="dark"] [style^="color: rgba(200, 220, 240, 0.22)"],
+    html[data-theme="dark"] [style*="; color: rgba(200, 220, 240, 0.22)"],
+    html[data-theme="dark"] [style^="color: rgba(200, 220, 240, 0.25)"],
+    html[data-theme="dark"] [style*="; color: rgba(200, 220, 240, 0.25)"],
+    html[data-theme="dark"] [style^="color: rgba(200, 220, 240, 0.28)"],
+    html[data-theme="dark"] [style*="; color: rgba(200, 220, 240, 0.28)"],
+    html[data-theme="dark"] [style^="color: rgba(200, 220, 240, 0.3)"],
+    html[data-theme="dark"] [style*="; color: rgba(200, 220, 240, 0.3)"],
+    html[data-theme="dark"] [style^="color: rgba(200, 220, 240, 0.32)"],
+    html[data-theme="dark"] [style*="; color: rgba(200, 220, 240, 0.32)"],
+    html[data-theme="dark"] [style^="color: rgba(200, 220, 240, 0.35)"],
+    html[data-theme="dark"] [style*="; color: rgba(200, 220, 240, 0.35)"],
+    html[data-theme="dark"] [style^="color: rgba(200, 220, 240, 0.38)"],
+    html[data-theme="dark"] [style*="; color: rgba(200, 220, 240, 0.38)"],
+    html[data-theme="dark"] [style^="color: rgba(200, 220, 240, 0.4)"],
+    html[data-theme="dark"] [style*="; color: rgba(200, 220, 240, 0.4)"]{ color:rgba(200, 220, 240, 0.6) !important; }
+    html[data-theme="dark"] [style^="color: rgb(123, 47, 247)"],
+    html[data-theme="dark"] [style*="; color: rgb(123, 47, 247)"],
+    html[data-theme="dark"] [style^="color: rgba(123, 47, 247,"],
+    html[data-theme="dark"] [style*="; color: rgba(123, 47, 247,"]{ color:#a78bfa !important; }
+    html[data-theme="dark"] [style^="color: rgba(200, 0, 0,"],
+    html[data-theme="dark"] [style*="; color: rgba(200, 0, 0,"]{ color:#ff6b6b !important; }
+    html[data-theme="dark"] [style^="color: rgba(233, 30, 99,"],
+    html[data-theme="dark"] [style*="; color: rgba(233, 30, 99,"]{ color:#f06292 !important; }
+
+    /* Dark inline panels (rgba(5,8,15,…)) become white cards in light mode */
+    html[data-theme="light"] [style^="background: rgba(5, 8, 15"],
+    html[data-theme="light"] [style*="; background: rgba(5, 8, 15"],
+    body.light-theme [style^="background: rgba(5, 8, 15"],
+    body.light-theme [style*="; background: rgba(5, 8, 15"]{ background:#ffffff !important; }
+
     html[data-theme="light"] .bca-app,
     body.light-theme .bca-app{
       background:#f4f6fb !important;
@@ -122,7 +306,7 @@
     body.light-theme .topnav button.nav-active{
       background:rgba(2,132,199,0.1) !important;
       border-color:rgba(2,132,199,0.35) !important;
-      color:#0284c7 !important;
+      color:#0369a1 !important;
     }
 
     /* Theme toggle button */
@@ -258,8 +442,8 @@
     html[data-theme="light"] .vendor-btn.active,
     body.light-theme .vendor-btn.active{
       background:rgba(2,132,199,0.12) !important;
-      border-color:#0284c7 !important;
-      color:#0284c7 !important;
+      border-color:#0369a1 !important;
+      color:#0369a1 !important;
     }
 
     /* Tabs & Filters */
@@ -273,8 +457,8 @@
     }
     html[data-theme="light"] .feed-tab-btn.tab-active,
     body.light-theme .feed-tab-btn.tab-active{
-      color:#0284c7 !important;
-      border-bottom-color:#0284c7 !important;
+      color:#0369a1 !important;
+      border-bottom-color:#0369a1 !important;
     }
     html[data-theme="light"] .filter-bar-wrap,
     body.light-theme .filter-bar-wrap{
@@ -294,8 +478,8 @@
     }
     html[data-theme="light"] .sort-btn.active,
     body.light-theme .sort-btn.active{
-      color:#0284c7 !important;
-      border-color:#0284c7 !important;
+      color:#0369a1 !important;
+      border-color:#0369a1 !important;
       background:rgba(2,132,199,0.08) !important;
     }
 
@@ -372,15 +556,16 @@
       box-shadow:0 1px 3px rgba(0,0,0,0.04) !important;
     }
 
-    /* GenAI tab in light mode — inline dark-theme text colours re-mapped for contrast */
-    html[data-theme="light"] .genai-view [style*="color: rgba(200, 220, 240"],
-    body.light-theme .genai-view [style*="color: rgba(200, 220, 240"]{ color:#475569 !important; }
-    html[data-theme="light"] .genai-view [style*="color: rgb(221, 238, 255)"],
-    html[data-theme="light"] .genai-view [style*="color: rgb(238, 244, 255)"],
-    body.light-theme .genai-view [style*="color: rgb(221, 238, 255)"],
-    body.light-theme .genai-view [style*="color: rgb(238, 244, 255)"]{ color:#0f172a !important; }
-    html[data-theme="light"] .genai-view [style*="background: rgba(5, 8, 15"],
-    body.light-theme .genai-view [style*="background: rgba(5, 8, 15"]{ background:#ffffff !important; }
+    /* Floating analyst launcher keeps its dark gradient, so keep its light text */
+    html[data-theme="light"] .chat-launcher,
+    body.light-theme .chat-launcher{ color:#eef4ff !important; }
+
+    /* ATT&CK heat cells: tinted backgrounds need dark text in light mode */
+    html[data-theme="light"] .attack-cell div,
+    body.light-theme .attack-cell div{ color:#0f172a !important; }
+    /* Small badges with a translucent black chip read as grey smudges on white */
+    html[data-theme="light"] [style*="background: rgba(0, 0, 0, 0.2)"],
+    body.light-theme [style*="background: rgba(0, 0, 0, 0.2)"]{ background:#ffffff !important; }
 
     /* Chat Panel in light mode */
     html[data-theme="light"] .chat-panel,

@@ -1239,7 +1239,7 @@ function ThreatAnalystChat({ externalPrompt, onConsumedPrompt, advisories, explo
     <>
       {/* Floating launcher */}
       {!open&&(
-        <button onClick={()=>{setOpen(true);setUnread(false);}} aria-label="Open AI Threat Analyst" style={{position:"fixed",right:20,bottom:20,zIndex:90,display:"flex",alignItems:"center",gap:10,padding:"12px 18px",borderRadius:30,border:`1px solid rgba(0,200,255,.45)`,background:"linear-gradient(135deg,rgba(0,40,70,.95),rgba(40,10,80,.95))",color:"#eef4ff",cursor:"pointer",boxShadow:"0 8px 32px rgba(0,200,255,.25)",fontFamily:"var(--mono)",fontWeight:700,fontSize:13,letterSpacing:.5,backdropFilter:"blur(8px)"}}>
+        <button className="chat-launcher" onClick={()=>{setOpen(true);setUnread(false);}} aria-label="Open AI Threat Analyst" style={{position:"fixed",right:20,bottom:20,zIndex:90,display:"flex",alignItems:"center",gap:10,padding:"12px 18px",borderRadius:30,border:`1px solid rgba(0,200,255,.45)`,background:"linear-gradient(135deg,rgba(0,40,70,.95),rgba(40,10,80,.95))",color:"#eef4ff",cursor:"pointer",boxShadow:"0 8px 32px rgba(0,200,255,.25)",fontFamily:"var(--mono)",fontWeight:700,fontSize:13,letterSpacing:.5,backdropFilter:"blur(8px)"}}>
           <span style={{fontSize:18}}>🛡️</span> Ask Threat Analyst
           {unread&&<span style={{width:9,height:9,borderRadius:"50%",background:"#00e676",boxShadow:"0 0 8px #00e676",animation:"pulse 1.4s infinite"}}/>}
         </button>
@@ -1460,9 +1460,9 @@ function KnowledgeView({ advisories, exploits, news, focus, onClearFocus, onAskA
                       const hot = selected?.type==="technique"&&selected.id===t.id;
                       const alpha = n?(.12+.55*(n/max)):0.03;
                       return (
-                        <button key={t.id} onClick={()=>setSelected(hot?null:{type:"technique",id:t.id})}
+                        <button key={t.id} className="attack-cell" onClick={()=>setSelected(hot?null:{type:"technique",id:t.id})}
                           style={{display:"block",width:"100%",textAlign:"left",marginBottom:5,padding:"8px 8px",borderRadius:5,cursor:"pointer",background:n?`${t.color}${Math.round(alpha*255).toString(16).padStart(2,"0")}`:"rgba(255,255,255,.03)",border:`1px solid ${hot?t.color:n?t.color+"66":"rgba(255,255,255,.06)"}`,boxShadow:hot?`0 0 10px ${t.color}55`:"none"}}>
-                          <div style={{fontSize:10,fontWeight:800,color:n?t.color:"rgba(200,220,240,.3)",fontFamily:"var(--mono)"}}>{t.id}{n?` · ${n}`:""}</div>
+                          <div style={{fontSize:10,fontWeight:800,color:n?(alpha>.4?"#ffffff":t.color):"rgba(200,220,240,.3)",fontFamily:"var(--mono)"}}>{t.id}{n?` · ${n}`:""}</div>
                           <div style={{fontSize:10,color:n?"rgba(230,238,250,.8)":"rgba(200,220,240,.28)",lineHeight:1.35}}>{t.name}</div>
                         </button>
                       );
