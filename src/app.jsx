@@ -1485,7 +1485,7 @@ function BCyberAwareDashboard() {
   const [filterExp, setFilterExp]  = useState(false);
   const [filterEpss,setFilterEpss] = useState(false);
   const [searchQ,   setSearchQ]    = useState("");
-  const [sortBy,    setSortBy]     = useState("sev"); // sev | epss | recent
+  const [sortBy,    setSortBy]     = useState("recent"); // recent | sev | epss
   const [watchlist, setWatchlist]  = useState(() => {
     try { return JSON.parse(localStorage.getItem("bca_watchlist") || "[]"); } catch { return []; }
   });
@@ -1678,7 +1678,7 @@ function BCyberAwareDashboard() {
     .sort((a,b)=>{
       if(sortBy==="epss") return (b.epss||0)-(a.epss||0) || (b.ts||0)-(a.ts||0);
       if(sortBy==="recent") return (b.ts||0)-(a.ts||0);
-      return SEV_ORDER.indexOf(a.severity)-SEV_ORDER.indexOf(b.severity) || (b.epss||0)-(a.epss||0);
+      return SEV_ORDER.indexOf(a.severity)-SEV_ORDER.indexOf(b.severity) || (b.ts||0)-(a.ts||0) || (b.epss||0)-(a.epss||0);
     });
 
   const fAdvisories = applyFilters(advisories);

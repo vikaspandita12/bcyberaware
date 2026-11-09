@@ -666,9 +666,13 @@ function parseRSS(xml, opts) {
     const desc = decodeEntities(decodeEntities(descRaw).replace(/<[^>]+>/g, " ")).replace(/\s{2,}/g, " ").trim(); // twice: feeds often double-encode
     let title = decodeEntities(decodeEntities(get("title"))).replace(/<[^>]+>/g, "").trim();
     if (!title && desc) title = desc.length > 120 ? desc.slice(0, 117) + "…" : desc; // Mastodon RSS has no <title>
-    const link = get("link")
+    let link = get("link")
       || block.match(/<link[^>]+href="([^"]+)"/)?.[1]
       || get("guid") || get("id") || opts.source_url;
+    if (link && link.startsWith("tag:github.com") && link.includes("GHSA-")) {
+      const ghsaMatch = link.match(/GHSA-[a-z0-9-]+/i);
+      if (ghsaMatch) link = `https://github.com/advisories/${ghsaMatch[0]}`;
+    }
     const date = get("pubDate") || get("dc:date") || get("updated") || get("published") || "";
     if (!title) return [];
     let ts = date ? parseFeedDate(date) : now;
