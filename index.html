@@ -54,7 +54,7 @@
   </script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-  <script defer src="app.js?v=2.3"></script>
+  <script defer src="app.js?v=2.4"></script>
   <style>
     :root{
       --mono:'JetBrains Mono','SFMono-Regular',Menlo,Consolas,monospace;
@@ -137,6 +137,31 @@
       background:#f8fafc !important;
       border:1px solid #cbd5e1 !important;
       color:#b45309 !important;
+    }
+    /* Export / RSS buttons — readable on light background */
+    html[data-theme="light"] .export-btn,
+    body.light-theme .export-btn{
+      background:#ffffff !important;
+      border:1px solid #cbd5e1 !important;
+      color:#334155 !important;
+    }
+    html[data-theme="light"] .export-btn:hover,
+    body.light-theme .export-btn:hover{
+      background:#f1f5f9 !important;
+      border-color:#94a3b8 !important;
+    }
+    /* Alerts bell — readable in both themes */
+    html[data-theme="light"] .alerts-btn,
+    body.light-theme .alerts-btn{
+      background:#f8fafc !important;
+      border:1px solid #cbd5e1 !important;
+      color:#475569 !important;
+    }
+    html[data-theme="light"] .alerts-btn.alerts-on,
+    body.light-theme .alerts-btn.alerts-on{
+      background:#ecfdf5 !important;
+      border:1px solid #10b981 !important;
+      color:#047857 !important;
     }
 
     /* Breaking Ticker */

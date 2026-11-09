@@ -40,17 +40,25 @@ async function loadFeed(force = false) {
   return r.json();
 }
 async function showAlert(title, body, url) {
+  const opts = {
+    body,
+    icon: "/logo.svg",
+    badge: "/logo.svg",
+    tag: (title + body).slice(0, 60),
+    data: {
+      url
+    }
+  };
   try {
-    const reg = "serviceWorker" in navigator ? await navigator.serviceWorker.getRegistration() : null;
-    if (reg && reg.showNotification) return reg.showNotification(title, {
-      body,
-      icon: "/logo.svg",
-      badge: "/logo.svg",
-      tag: title + body.slice(0, 40),
-      data: {
-        url
+    if ("serviceWorker" in navigator) {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg && reg.active && reg.showNotification) {
+        await reg.showNotification(title, opts);
+        return;
       }
-    });
+    }
+  } catch {}
+  try {
     new Notification(title, {
       body,
       icon: "/logo.svg"
@@ -4473,7 +4481,10 @@ function BCyberAwareDashboard() {
     const perm = await Notification.requestPermission();
     if (perm !== "granted") return;
     try {
-      if ("serviceWorker" in navigator) await navigator.serviceWorker.register("/sw.js");
+      if ("serviceWorker" in navigator) {
+        await navigator.serviceWorker.register("/sw.js");
+        await Promise.race([navigator.serviceWorker.ready, new Promise(r => setTimeout(r, 2000))]);
+      }
     } catch {}
     try {
       localStorage.setItem("bca_alerts", "1");
@@ -5109,11 +5120,12 @@ function BCyberAwareDashboard() {
     onClick: toggleAlerts,
     title: alertsOn ? "Alerts are ON — click to turn off" : "Get browser notifications when new CRITICAL or exploited-in-the-wild threats appear. No login, no email — nothing leaves your browser.",
     "aria-label": alertsOn ? "Disable threat alerts" : "Enable threat alerts",
+    className: `alerts-btn${alertsOn ? " alerts-on" : ""}`,
     style: {
       padding: "5px 11px",
-      background: alertsOn ? "rgba(0,230,118,0.1)" : theme === "dark" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)",
-      border: `1px solid ${alertsOn ? "rgba(0,230,118,0.45)" : theme === "dark" ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.12)"}`,
-      color: alertsOn ? "#00e676" : theme === "dark" ? "#9fb6cc" : "#475569",
+      background: alertsOn ? "rgba(0,230,118,0.1)" : "rgba(255,255,255,0.06)",
+      border: `1px solid ${alertsOn ? "rgba(0,230,118,0.45)" : "rgba(255,255,255,0.16)"}`,
+      color: alertsOn ? "#00e676" : "#9fb6cc",
       fontSize: 12,
       cursor: "pointer",
       fontFamily: "var(--mono)",

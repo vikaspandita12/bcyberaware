@@ -24,11 +24,15 @@ async function loadFeed(force=false) {
 
 // Browser notifications — local only: no login, no email, nothing stored server-side
 async function showAlert(title, body, url) {
+  const opts = { body, icon: "/logo.svg", badge: "/logo.svg", tag: (title + body).slice(0, 60), data: { url } };
+  // Prefer the service worker (required on Android); fall back to a page Notification
   try {
-    const reg = ("serviceWorker" in navigator) ? await navigator.serviceWorker.getRegistration() : null;
-    if (reg && reg.showNotification) return reg.showNotification(title, { body, icon: "/logo.svg", badge: "/logo.svg", tag: title + body.slice(0, 40), data: { url } });
-    new Notification(title, { body, icon: "/logo.svg" });
+    if ("serviceWorker" in navigator) {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg && reg.active && reg.showNotification) { await reg.showNotification(title, opts); return; }
+    }
   } catch {}
+  try { new Notification(title, { body, icon: "/logo.svg" }); } catch {}
 }
 
 function timeAgo(ts){
@@ -1607,7 +1611,13 @@ function BCyberAwareDashboard() {
     if (typeof Notification === "undefined") return;
     const perm = await Notification.requestPermission();
     if (perm !== "granted") return;
-    try { if ("serviceWorker" in navigator) await navigator.serviceWorker.register("/sw.js"); } catch {}
+    try {
+      if ("serviceWorker" in navigator) {
+        await navigator.serviceWorker.register("/sw.js");
+        // Wait for activation (bounded) so the welcome notification can actually fire
+        await Promise.race([navigator.serviceWorker.ready, new Promise(r => setTimeout(r, 2000))]);
+      }
+    } catch {}
     try { localStorage.setItem("bca_alerts", "1"); } catch {}
     setAlertsOn(true);
     showAlert("🔔 BCyberAware alerts enabled", "You'll be notified about new CRITICAL and exploited-in-the-wild threats while the site is open in a tab. Nothing is stored on any server.", "/");
@@ -1785,7 +1795,7 @@ function BCyberAwareDashboard() {
             <button onClick={()=>setTheme(theme==="dark"?"light":"dark")} title={theme==="dark"?"Switch to Light Mode":"Switch to Dark Mode"} aria-label={theme==="dark"?"Switch to Light Mode":"Switch to Dark Mode"} className="theme-toggle-btn" style={{padding:"5px 11px",background:theme==="dark"?"rgba(255,255,255,0.06)":"rgba(0,0,0,0.05)",border:`1px solid ${theme==="dark"?"rgba(255,255,255,0.16)":"rgba(0,0,0,0.12)"}`,color:theme==="dark"?"#ffd700":"#b45309",fontSize:12,cursor:"pointer",fontFamily:"var(--mono)",borderRadius:4,fontWeight:700,whiteSpace:"nowrap",display:"inline-flex",alignItems:"center",gap:5}}>
               {theme==="dark" ? "☀️ Light" : "🌙 Dark"}
             </button>
-            <button onClick={toggleAlerts} title={alertsOn?"Alerts are ON — click to turn off":"Get browser notifications when new CRITICAL or exploited-in-the-wild threats appear. No login, no email — nothing leaves your browser."} aria-label={alertsOn?"Disable threat alerts":"Enable threat alerts"} style={{padding:"5px 11px",background:alertsOn?"rgba(0,230,118,0.1)":(theme==="dark"?"rgba(255,255,255,0.06)":"rgba(0,0,0,0.05)"),border:`1px solid ${alertsOn?"rgba(0,230,118,0.45)":(theme==="dark"?"rgba(255,255,255,0.16)":"rgba(0,0,0,0.12)")}`,color:alertsOn?"#00e676":(theme==="dark"?"#9fb6cc":"#475569"),fontSize:12,cursor:"pointer",fontFamily:"var(--mono)",borderRadius:4,fontWeight:700,whiteSpace:"nowrap",display:"inline-flex",alignItems:"center",gap:5}}>
+            <button onClick={toggleAlerts} title={alertsOn?"Alerts are ON — click to turn off":"Get browser notifications when new CRITICAL or exploited-in-the-wild threats appear. No login, no email — nothing leaves your browser."} aria-label={alertsOn?"Disable threat alerts":"Enable threat alerts"} className={`alerts-btn${alertsOn?" alerts-on":""}`} style={{padding:"5px 11px",background:alertsOn?"rgba(0,230,118,0.1)":"rgba(255,255,255,0.06)",border:`1px solid ${alertsOn?"rgba(0,230,118,0.45)":"rgba(255,255,255,0.16)"}`,color:alertsOn?"#00e676":"#9fb6cc",fontSize:12,cursor:"pointer",fontFamily:"var(--mono)",borderRadius:4,fontWeight:700,whiteSpace:"nowrap",display:"inline-flex",alignItems:"center",gap:5}}>
               {alertsOn ? "🔔 On" : "🔔 Alerts"}
             </button>
           </div>
