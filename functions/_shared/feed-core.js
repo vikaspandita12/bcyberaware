@@ -22,6 +22,13 @@ import { jsonResponse } from "./http.js";
 const CACHE    = { sources: {} };
 const CACHE_MS = 2 * 60 * 1000; // assembled snapshot; individual sources keep longer TTLs below
 const FETCH_TIMEOUT_MS = 9000;
+// Hard cap for one source end-to-end (some chain two requests). Keeps the whole
+// refresh well inside the 30-second limit Cloudflare gives sub-hourly Cron Triggers.
+const SOURCE_DEADLINE_MS = 12000;
+const withDeadline = (promise, ms) => new Promise((resolve, reject) => {
+  const t = setTimeout(() => reject(new Error("timeout")), ms);
+  promise.then(v => { clearTimeout(t); resolve(v); }, e => { clearTimeout(t); reject(e); });
+});
 // ── Durable storage (Workers KV) ──────────────────────────────────────────────
 const KV_SNAPSHOT = "feed:snapshot:v1";   // assembled payload served to visitors
 const KV_SOURCES  = "feed:sources:v1";    // per-source cache carried between cron runs
@@ -232,6 +239,7 @@ export async function handleFeedRequest(request, env) {
 
   if (action === "brief") { await loadSharedFeed(env); return handleBrief(env); }
   if (action === "history") return handleHistory(env);
+  if (action === "status") return handleStatus(env);
   if (action !== "feed") return jsonResponse({ error: "Unknown action" }, 400);
 
   try {
@@ -288,27 +296,58 @@ export async function runScheduledRefresh(env) {
   if (!healthy) return { ok: false, reason: prev?.advisories ? "refresh collapsed — kept previous snapshot" : "refresh collapsed — nothing stored" };
 
   payload.scheduled = true;
+  payload.refresh_ms = Date.now() - now;
   CACHE.feed = { ts: now, data: payload, loaded: now };
 
-  let brief = prev?.brief || null;
-  if (env?.AI && (!brief || (now - (brief.generated_at || 0)) > BRIEF_TTL_MS)) {
-    const fresh = await generateBrief(env, payload);
-    if (fresh) brief = fresh;
-  }
-  // If the AI has been unavailable for hours, show no summary rather than an outdated one
-  if (brief && (now - (brief.generated_at || 0)) < 6 * 60 * 60 * 1000) payload.brief = brief;
+  // Carry the current AI summary forward; if the AI has been unavailable for hours,
+  // show no summary rather than an outdated one.
+  const prevBrief = prev?.brief || null;
+  if (prevBrief && (now - (prevBrief.generated_at || 0)) < 6 * 60 * 60 * 1000) payload.brief = prevBrief;
 
   // Daily history row, refreshed once an hour (one extra KV write per hour)
   const hour = new Date(now).toISOString().slice(0, 13);
   const recordNow = prev?.history_hour !== hour;
-  payload.history_hour = recordNow ? hour : prev.history_hour;
+  payload.history_hour = hour;
 
+  // Persist BEFORE the (slower, optional) AI call so a slow model can never cost us the refresh
+  let stored = false, storeError = null;
   if (store) {
-    await store.put(KV_SNAPSHOT, JSON.stringify(payload));
-    if (recordNow) { try { await recordHistory(store, payload, now); } catch {} }
+    try { await store.put(KV_SNAPSHOT, JSON.stringify(payload)); stored = true; }
+    catch (e) { storeError = String(e?.message || e).slice(0, 120); }
+    if (stored && recordNow) { try { await recordHistory(store, payload, now); } catch {} }
   }
   await saveSharedFeed(payload);
-  return { ok: true, items: payload.advisories.length + payload.exploits.length + payload.news.length, sources_live: payload.sources_live, stored: !!store };
+
+  let briefRefreshed = false;
+  if (env?.AI && (!prevBrief || (now - (prevBrief.generated_at || 0)) > BRIEF_TTL_MS)) {
+    const fresh = await generateBrief(env, payload);
+    if (fresh) {
+      payload.brief = fresh; briefRefreshed = true;
+      if (store) { try { await store.put(KV_SNAPSHOT, JSON.stringify(payload)); } catch {} }
+    }
+  }
+  return { ok: true, items: payload.advisories.length + payload.exploits.length + payload.news.length, sources_live: payload.sources_live, stored, store_error: storeError, brief_refreshed: briefRefreshed, ms: Date.now() - now };
+}
+
+// ── Health/status (used by the scheduled GitHub health check) ─────────────────
+async function handleStatus(env) {
+  const now = Date.now();
+  const store = kv(env);
+  let snap = null, readError = null;
+  if (store) { try { snap = await store.get(KV_SNAPSHOT, { type: "json" }); } catch (e) { readError = String(e?.message || e).slice(0, 120); } }
+  const age = snap?.fetched_at ? Math.round((now - snap.fetched_at) / 1000) : null;
+  return jsonResponse({
+    storage_bound: !!store,
+    snapshot_stored: !!snap?.advisories,
+    snapshot_age_seconds: age,
+    scheduled_refresh_healthy: age != null && age * 1000 < SNAPSHOT_MAX_AGE_MS,
+    serving: age != null && age * 1000 < SNAPSHOT_MAX_AGE_MS ? "stored snapshot" : "live build (fallback)",
+    refresh_ms: snap?.refresh_ms ?? null,
+    items: snap ? (snap.advisories?.length || 0) + (snap.exploits?.length || 0) + (snap.news?.length || 0) : null,
+    sources_live: snap?.sources_live ?? null, sources_total: SOURCES.length,
+    brief_age_seconds: snap?.brief?.generated_at ? Math.round((now - snap.brief.generated_at) / 1000) : null,
+    read_error: readError, checked_at: new Date(now).toISOString(),
+  });
 }
 
 async function recordHistory(store, d, now) {
@@ -368,7 +407,7 @@ async function buildSnapshot(env, { now, bust, persist }) {
       }
       const t0 = Date.now();
       try {
-        const items = (await src.fn()) || [];
+        const items = (await withDeadline(Promise.resolve().then(() => src.fn()), SOURCE_DEADLINE_MS)) || [];
         // Keyword-filtered mainstream feeds are "live" even when 0 items match this cycle
         const ok = items.length > 0 || !!src.filtered;
         const health = { key: src.key, name: src.name, flag: src.flag, cat: src.cat, ok, items: items.length, ms: Date.now() - t0 };

@@ -54,6 +54,7 @@ The floating **🛡️ Ask Threat Analyst** chat runs on [Cloudflare Workers AI]
 - A **Cron Trigger** runs every 5 minutes (`triggers.crons` in `wrangler.jsonc`). It refreshes the stalest sources, rebuilds the feed, regenerates the AI summary when due, and stores the result in **Workers KV** (binding `FEED_KV`) — even when nobody is visiting.
 - Visitors are served that stored snapshot, so no page load waits on upstream sources. If the stored snapshot is ever more than 20 minutes old (cron unhealthy) or KV is not bound, the Worker falls back to building the feed live, as before.
 - A refresh that collapses (sources down) never overwrites the last good snapshot.
+- `GET /api/proxy?action=status` reports whether the scheduled refresh is healthy (snapshot age, sources live, refresh duration). The **Site health check** GitHub workflow calls it every hour and fails — which emails the repo owner — if the refresh has stopped.
 - `GET /api/proxy?action=history` returns daily totals (critical, exploited, advisories, news, sources live) for the last 90 days, recorded hourly.
 - The KV namespace needs no manual setup: the binding has no `id`, so `wrangler deploy` creates it on first deploy. The deploy token needs **Workers KV Storage → Edit**. Free-plan budget: about 600 of the 1,000 daily KV writes.
 - In the browser: the first feed request starts before the scripts finish loading, the last feed is kept in `localStorage` so a returning visitor sees content instantly, and an open tab refreshes silently every 5 minutes.

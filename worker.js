@@ -43,9 +43,12 @@ export default {
   // Cron Trigger (see wrangler.jsonc) — keeps the stored feed snapshot fresh so
   // visitors never wait on upstream sources.
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(runScheduledRefresh(env).then(
-      r => console.log("scheduled refresh", JSON.stringify(r)),
-      e => console.error("scheduled refresh failed", e?.message || e),
-    ));
+    try {
+      const r = await runScheduledRefresh(env);
+      console.log("scheduled refresh", JSON.stringify(r));
+    } catch (e) {
+      console.error("scheduled refresh failed", e?.message || e);
+      throw e; // surface the failure in Cloudflare's Cron Trigger history
+    }
   },
 };

@@ -1,0 +1,33 @@
+# Hourly check that the live site is healthy and the scheduled feed refresh is running.
+# A failed run emails the repository owner (GitHub's default for failed scheduled workflows).
+
+name: Site health check
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check feed status
+        run: |
+          set -euo pipefail
+          BASE="https://advisory.bcyberaware.co.in"
+          status=$(curl -sf --max-time 30 "$BASE/api/proxy?action=status")
+          echo "$status" | jq .
+          # Time a normal feed request, as a visitor would make it
+          curl -sf --max-time 40 -o /tmp/feed.json -w 'feed: HTTP %{http_code} in %{time_total}s, %{size_download} bytes\n' "$BASE/api/proxy?action=feed"
+          jq -r '"items: \((.advisories|length)+(.exploits|length)+(.news|length)) · sources live: \(.sources_live)/\(.sources_total) · built: \(.fetched_at_human) · scheduled: \(.scheduled // false) · AI brief: \(.brief.brief != null)"' /tmp/feed.json
+          curl -sf --max-time 20 -o /dev/null -w 'home page: HTTP %{http_code} in %{time_total}s\n' "$BASE/"
+          healthy=$(echo "$status" | jq -r '.scheduled_refresh_healthy')
+          if [ "$healthy" != "true" ]; then
+            echo "::error::Scheduled refresh is not healthy — the site is falling back to slow live builds. See the status JSON above."
+            exit 1
+          fi
+          echo "✓ Scheduled refresh healthy"
