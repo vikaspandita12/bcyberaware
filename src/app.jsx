@@ -16,10 +16,32 @@ const SEV_S = {
 const SEV_ORDER = ["CRITICAL","HIGH","MEDIUM","LOW"];
 
 async function loadFeed(force=false) {
+  // index.html starts the first feed request before this script has even downloaded
+  if (!force && window.__bcaFeed) {
+    const early = window.__bcaFeed; window.__bcaFeed = null;
+    try { const d = await early; if (d && d.advisories) return d; } catch {}
+  }
   const url = force ? `${PROXY}?action=feed&bust=1` : `${PROXY}?action=feed`;
   const r   = await fetch(url, { cache: "no-store" });
   if (!r.ok) throw new Error(`Feed error ${r.status}`);
   return r.json();
+}
+
+// Last feed kept in the browser so a returning visitor sees content instantly,
+// while the latest snapshot loads in the background.
+const FEED_CACHE_KEY = "bca_feed_cache_v1";
+const FEED_CACHE_MAX_AGE = 24 * 60 * 60 * 1000;
+const AUTO_REFRESH_MS = 5 * 60 * 1000; // matches the server's scheduled refresh
+function readCachedFeed() {
+  try {
+    const d = JSON.parse(localStorage.getItem(FEED_CACHE_KEY) || "null");
+    if (d && d.advisories && d.fetched_at && (Date.now() - d.fetched_at) < FEED_CACHE_MAX_AGE) return d;
+  } catch {}
+  return null;
+}
+function writeCachedFeed(d) {
+  try { localStorage.setItem(FEED_CACHE_KEY, JSON.stringify(d)); }
+  catch { try { localStorage.removeItem(FEED_CACHE_KEY); } catch {} }
 }
 
 // Browser notifications — local only: no login, no email, nothing stored server-side
@@ -33,6 +55,13 @@ async function showAlert(title, body, url) {
     }
   } catch {}
   try { new Notification(title, { body, icon: "/logo.svg" }); } catch {}
+}
+
+function updatedAgo(ts, now){
+  const m = Math.max(0, Math.round(((now||Date.now()) - (ts||0)) / 60000));
+  if (m < 1) return "just now";
+  if (m < 60) return `${m} min ago`;
+  return `${Math.round(m/60)}h ago`;
 }
 
 function timeAgo(ts){
@@ -751,7 +780,7 @@ function CISOBriefView({ advisories, exploits, news }) {
       {watchList.map(a=><ActionRow key={a.id} item={a} label="WATCH" labelColor="#64b5f6" labelBg="rgba(25,118,210,.12)"/>)}
 
       <div style={{padding:"14px 16px",background:"rgba(0,200,255,.03)",border:"1px solid rgba(0,200,255,.08)",borderRadius:6,marginTop:16,fontSize:12,color:"rgba(200,220,240,.35)",lineHeight:1.7}}>
-        📋 Auto-generated from {advisories.length+exploits.length+news.length} live sources · BCyberAware by Vikas Pandita (Global Head of Security Architecture · TOGAF 9.2 · IIM Kozhikode EPGP) · Sources refresh every 2 hours
+        📋 Auto-generated from {advisories.length+exploits.length+news.length} live sources · BCyberAware by Vikas Pandita (Global Head of Security Architecture · TOGAF 9.2 · IIM Kozhikode EPGP) · Feed rebuilt automatically every 5 minutes
       </div>
     </div>
   );
@@ -1586,15 +1615,17 @@ function KnowledgeView({ advisories, exploits, news, focus, onClearFocus, onAskA
 }
 
 function BCyberAwareDashboard() {
-  const [advisories,setAdvisories] = useState([]);
-  const [exploits,  setExploits]   = useState([]);
-  const [news,      setNews]       = useState([]);
-  const [breaking,  setBreaking]   = useState([]);
-  const [social,    setSocial]     = useState([]);
-  const [brief,     setBrief]      = useState(null);
-  const [heatmap,   setHeatmap]    = useState([]);
-  const [feedMeta,  setFeedMeta]   = useState(null);
+  const [cached] = useState(readCachedFeed);
+  const [advisories,setAdvisories] = useState(cached?.advisories||[]);
+  const [exploits,  setExploits]   = useState(cached?.exploits||[]);
+  const [news,      setNews]       = useState(cached?.news||[]);
+  const [breaking,  setBreaking]   = useState(cached?.breaking||[]);
+  const [social,    setSocial]     = useState(cached?.social||[]);
+  const [brief,     setBrief]      = useState(cached?.brief||null);
+  const [heatmap,   setHeatmap]    = useState(cached?.heatmap||[]);
+  const [feedMeta,  setFeedMeta]   = useState(cached);
   const [loading,   setLoading]    = useState(true);
+  const [nowTick,   setNowTick]    = useState(Date.now());
   const [feedError, setFeedError]  = useState(null);
   const [filterSev, setFilterSev]  = useState("All");
   const [filterME,  setFilterME]   = useState(false);
@@ -1696,10 +1727,13 @@ function BCyberAwareDashboard() {
     }
   }, []);
 
-  const refreshFeed = useCallback(async(force=false)=>{
-    setLoading(true); setFeedError(null);
+  const lastFetchRef = React.useRef(0);
+  const refreshFeed = useCallback(async(force=false, silent=false)=>{
+    if(!silent){ setLoading(true); setFeedError(null); }
     try {
       const data = await loadFeed(force);
+      if(!data||!data.advisories) throw new Error(data?.error||"empty response");
+      lastFetchRef.current = Date.now();
       setAdvisories(data.advisories||[]);
       setExploits(data.exploits||[]);
       setNews(data.news||[]);
@@ -1707,11 +1741,22 @@ function BCyberAwareDashboard() {
       setSocial(data.social||[]);
       setHeatmap(data.heatmap||[]);
       setFeedMeta(data);
-    } catch(e) { setFeedError("Could not reach live feed: "+e.message); }
-    setLoading(false);
+      setFeedError(null);
+      writeCachedFeed(data);
+    } catch(e) { if(!silent) setFeedError("Could not reach live feed: "+e.message); }
+    if(!silent) setLoading(false);
   },[]);
 
   useEffect(()=>{ refreshFeed(); },[]);
+
+  // Keep an open tab current: silent refresh every 5 min, and when the tab regains focus
+  useEffect(()=>{
+    const due = () => document.visibilityState==="visible" && (Date.now()-lastFetchRef.current) >= AUTO_REFRESH_MS-5000;
+    const t = setInterval(()=>{ setNowTick(Date.now()); if(due()) refreshFeed(false,true); }, 30*1000);
+    const onVis = () => { if(due()) refreshFeed(false,true); };
+    document.addEventListener("visibilitychange", onVis);
+    return ()=>{ clearInterval(t); document.removeEventListener("visibilitychange", onVis); };
+  },[refreshFeed]);
 
   // ── 🔔 Alerts (no-login browser notifications for new CRITICAL / exploited items)
   const [alertsOn, setAlertsOn] = useState(() => {
@@ -1762,15 +1807,16 @@ function BCyberAwareDashboard() {
       } catch {}
     };
     check();
-    const t = setInterval(check, 10 * 60 * 1000); // poll every 10 min while a tab is open
+    const t = setInterval(check, 5 * 60 * 1000); // poll every 5 min while a tab is open (matches the server refresh)
     return () => clearInterval(t);
   }, [alertsOn]);
 
   // AI Situation Summary — generated server-side once per feed snapshot
   useEffect(()=>{
     if(!feedMeta) return;
+    if(feedMeta.brief?.brief){ setBrief(feedMeta.brief); return; }
     let cancelled=false;
-    setBrief({loading:true});
+    setBrief(b=>b?.brief?b:{loading:true});
     fetch(`${PROXY}?action=brief`,{cache:"no-store"}).then(r=>r.json()).then(d=>{ if(!cancelled) setBrief(d); }).catch(()=>{ if(!cancelled) setBrief(null); });
     return ()=>{cancelled=true;};
   },[feedMeta?.fetched_at]);
@@ -1903,7 +1949,7 @@ function BCyberAwareDashboard() {
             ):(
               <>
                 <span title={defcon.desc} style={{fontSize:10.5,padding:"4px 9px",background:defcon.bg,border:`1px solid ${defcon.color}88`,color:defcon.color,fontFamily:"var(--mono)",borderRadius:4,fontWeight:800,letterSpacing:.8,whiteSpace:"nowrap"}}>● {defcon.label}</span>
-                {feedMeta&&<span className="feed-meta" style={{fontSize:10,color:"rgba(200,220,240,.28)",fontFamily:"var(--mono)",whiteSpace:"nowrap"}}>{feedMeta.from_cache?"⚡":"🔄"} {feedMeta.fetched_at_human}</span>}
+                {feedMeta&&<span className="feed-meta" style={{fontSize:10,color:"rgba(200,220,240,.28)",fontFamily:"var(--mono)",whiteSpace:"nowrap"}} title={`Feed built ${feedMeta.fetched_at_human} · rebuilt automatically every 5 minutes`}>⚡ Updated {updatedAgo(feedMeta.fetched_at, nowTick)} · auto</span>}
               </>
             )}
             <button onClick={()=>refreshFeed(false)} disabled={loading} style={{padding:"5px 12px",background:"transparent",border:`1px solid rgba(0,200,255,.3)`,color:ACCENT,fontSize:12,cursor:loading?"not-allowed":"pointer",fontFamily:"var(--mono)",opacity:loading?.4:1,borderRadius:4,fontWeight:600,whiteSpace:"nowrap"}}>⟳ Refresh</button>
@@ -1940,7 +1986,7 @@ function BCyberAwareDashboard() {
                 <div style={{position:"absolute",height:"100%",width:"55%",background:`linear-gradient(90deg,transparent,${ACCENT},transparent)`,animation:"shimmer 1.4s infinite"}}/>
               </div>
             )}
-            {feedError&&<div style={{padding:"14px 18px",background:"rgba(200,0,0,.1)",border:"1px solid rgba(200,0,0,.3)",borderRadius:6,marginBottom:16,fontSize:14,color:"#ff6666"}}>⚠ {feedError}</div>}
+            {feedError&&<div style={{padding:"14px 18px",background:"rgba(200,0,0,.1)",border:"1px solid rgba(200,0,0,.3)",borderRadius:6,marginBottom:16,fontSize:14,color:"#ff6666"}}>⚠ {feedError}{feedMeta?` — showing the last saved copy (updated ${updatedAgo(feedMeta.fetched_at, nowTick)})`:""}</div>}
             <AIBriefCard brief={brief}/>
 
             {/* ── Global Command Search + Velocity + Vendor Matrix ── */}
@@ -2025,7 +2071,7 @@ function BCyberAwareDashboard() {
           <div style={{animation:"fadeIn .3s ease"}}>
             <div style={{textAlign:"center",marginBottom:20}}>
               <div style={{fontSize:13,letterSpacing:4,color:ACCENT,marginBottom:8,fontFamily:"var(--mono)"}}>🌍 GLOBAL THREAT HEATMAP</div>
-              <div style={{fontSize:14,color:"rgba(200,220,240,.45)",marginBottom:4}}>Countries ranked by threat activity · Refreshed every 2 hours</div>
+              <div style={{fontSize:14,color:"rgba(200,220,240,.45)",marginBottom:4}}>Countries ranked by threat activity · Updated every 5 minutes</div>
               <div style={{fontSize:12,color:"rgba(200,220,240,.25)"}}>CRITICAL=4pts · HIGH=3pts · MEDIUM=2pts · LOW=1pt</div>
             </div>
             <div style={{background:"rgba(5,8,15,.97)",border:"1px solid rgba(0,200,255,.15)",borderRadius:8,padding:"20px",marginBottom:16,overflowX:"auto"}}>
@@ -2117,7 +2163,7 @@ function BCyberAwareDashboard() {
               })}
             </div>
             <div style={{padding:"12px 16px",background:"rgba(0,200,255,.04)",border:"1px solid rgba(0,200,255,.1)",borderRadius:6,fontSize:12,color:"rgba(200,220,240,.4)",lineHeight:1.7}}>
-              ℹ️ Scores derived from advisory geographic metadata — not real-time attack traffic. Refreshes every 2 hours.
+              ℹ️ Scores derived from advisory geographic metadata — not real-time attack traffic. Updated every 5 minutes.
             </div>
           </div>
         )}
@@ -2130,7 +2176,7 @@ function BCyberAwareDashboard() {
               <div style={{fontSize:15,color:"rgba(200,220,240,.4)"}}>
                 {feedMeta?.sources_live!=null
                   ?<><strong style={{color:"#00e676"}}>{feedMeta.sources_live}</strong> of <strong style={{color:ACCENT}}>{feedMeta.sources_total}</strong> feeds responding this cycle · per-source latency measured on every refresh</>
-                  :"Live RSS feeds · AI Security references · refreshed every 2 hours"}
+                  :"Live RSS feeds · AI Security references · refreshed every 5 minutes"}
               </div>
             </div>
             {["Advisory","Exploit","News","Social","AI Security"].map(cat=>(
@@ -2208,7 +2254,7 @@ function BCyberAwareDashboard() {
             </div>
             <div style={{background:"rgba(255,255,255,.025)",border:"1px solid rgba(0,200,255,.12)",borderRadius:6,padding:"22px 24px"}}>
               <div style={{fontSize:12,letterSpacing:3,color:"rgba(0,200,255,.55)",marginBottom:12,fontFamily:"var(--mono)",fontWeight:700}}>PLATFORM CAPABILITIES</div>
-              {["🛡️ AI Threat Analyst — chat assistant grounded in the live feed (Cloudflare Workers AI)","🤖 AI Situation Summary — executive brief regenerated with every feed refresh","🧬 Knowledge Graph — ATT&CK heat matrix, relationship graph, actor encyclopedia, IOC hunt (OpenCTI ideas, native)","⬇ STIX 2.1 export — OASIS bundle for OpenCTI / MISP / TAXII / SIEM","💬 Social Intel — infosec.exchange, Bluesky, Hacker News, r/netsec","55 live intelligence sources with real-time health telemetry","🔴 Breaking-news ticker — incident-grade stories from the last 48 hours","ZDI 0-Day Pipeline — vulnerabilities awaiting vendor disclosure","GenAI tab — OWASP LLM Top 10 (2025) + Agentic Top 10, ⚔️ AI Offensive Tools tracker (20 autonomous pentest agents), Standards & Defences","CISO Brief — AI governance links (NIST AI RMF, MITRE ATLAS, AI Incident Database)","CISA KEV · NVD · GHSA · CERT-In · NCSC UK · CERT-EU · JPCERT · Cisco / Palo Alto / FortiGuard PSIRT","The Record · Unit 42 · Check Point · CrowdStrike · Mandiant · Talos · Project Zero · Krebs","GCC / Middle East relevance scoring + OpenCTI-style confidence & TLP on every card","Global threat heatmap — country-level risk visualisation","Source verification link on every advisory card · auto-refresh every 2 hours"].map((f,i)=>(
+              {["🛡️ AI Threat Analyst — chat assistant grounded in the live feed (Cloudflare Workers AI)","🤖 AI Situation Summary — executive brief regenerated with every feed refresh","🧬 Knowledge Graph — ATT&CK heat matrix, relationship graph, actor encyclopedia, IOC hunt (OpenCTI ideas, native)","⬇ STIX 2.1 export — OASIS bundle for OpenCTI / MISP / TAXII / SIEM","💬 Social Intel — infosec.exchange, Bluesky, Hacker News, r/netsec","55 live intelligence sources with real-time health telemetry","🔴 Breaking-news ticker — incident-grade stories from the last 48 hours","ZDI 0-Day Pipeline — vulnerabilities awaiting vendor disclosure","GenAI tab — OWASP LLM Top 10 (2025) + Agentic Top 10, ⚔️ AI Offensive Tools tracker (20 autonomous pentest agents), Standards & Defences","CISO Brief — AI governance links (NIST AI RMF, MITRE ATLAS, AI Incident Database)","CISA KEV · NVD · GHSA · CERT-In · NCSC UK · CERT-EU · JPCERT · Cisco / Palo Alto / FortiGuard PSIRT","The Record · Unit 42 · Check Point · CrowdStrike · Mandiant · Talos · Project Zero · Krebs","GCC / Middle East relevance scoring + OpenCTI-style confidence & TLP on every card","Global threat heatmap — country-level risk visualisation","Source verification link on every advisory card · feed rebuilt automatically every 5 minutes, even with no visitors"].map((f,i)=>(
                 <div key={i} style={{fontSize:14,color:"rgba(200,220,240,.55)",padding:"7px 0",borderBottom:"1px solid rgba(255,255,255,.05)",display:"flex",gap:10,lineHeight:1.5}}>
                   <span style={{color:ACCENT,flexShrink:0}}>▸</span>{f}
                 </div>

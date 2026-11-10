@@ -1,9 +1,10 @@
 /**
  * BCyberAware — Cloudflare Worker entry (workers.dev + custom domains)
  * Routes /api/* to feed handlers; everything else from static assets.
+ * A Cron Trigger refreshes the feed every 5 minutes and stores it in KV.
  */
 import { corsPreflightResponse, methodNotAllowed } from "./functions/_shared/http.js";
-import { handleFeedRequest, handleRssRequest } from "./functions/_shared/feed-core.js";
+import { handleFeedRequest, handleRssRequest, runScheduledRefresh } from "./functions/_shared/feed-core.js";
 import { handleDarkwebRequest } from "./functions/_shared/darkweb-core.js";
 import { handleChatRequest } from "./functions/_shared/chat-core.js";
 
@@ -37,5 +38,14 @@ export default {
     }
 
     return env.ASSETS.fetch(request);
+  },
+
+  // Cron Trigger (see wrangler.jsonc) — keeps the stored feed snapshot fresh so
+  // visitors never wait on upstream sources.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(runScheduledRefresh(env).then(
+      r => console.log("scheduled refresh", JSON.stringify(r)),
+      e => console.error("scheduled refresh failed", e?.message || e),
+    ));
   },
 };

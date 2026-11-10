@@ -19,11 +19,12 @@
   <meta name="twitter:card" content="summary" />
   <meta name="twitter:title" content="BCyberAware – Live Threat Intelligence" />
   <meta name="twitter:description" content="Real-time cybersecurity advisories from CISA, NVD, NCSC UK, CERT-In, Exploit-DB, The Hacker News and more." />
-  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
   <link rel="preconnect" href="https://www.googletagmanager.com" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <!-- Web fonts load without blocking first paint (system fonts show until they arrive) -->
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;700;800&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;700;800&display=swap" rel="stylesheet" /></noscript>
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -52,9 +53,17 @@
     gtag('js', new Date());
     gtag('config', 'G-PBVW753RXZ');
   </script>
-  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-  <script defer src="app.js?v=2.8"></script>
+  <!-- Start the feed request now, in parallel with the scripts below (app.js picks it up) -->
+  <script>
+    try{
+      window.__bcaFeed=fetch("/api/proxy?action=feed",{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error("Feed error "+r.status);return r.json();});
+      window.__bcaFeed.catch(function(){});
+    }catch(e){}
+  </script>
+  <!-- React is served from this origin: no extra DNS/TLS handshake, no third-party dependency -->
+  <script defer src="vendor/react-18.2.0.production.min.js"></script>
+  <script defer src="vendor/react-dom-18.2.0.production.min.js"></script>
+  <script defer src="app.js?v=2.9"></script>
   <style>
     :root{
       --mono:'JetBrains Mono','SFMono-Regular',Menlo,Consolas,monospace;
