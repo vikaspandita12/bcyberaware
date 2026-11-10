@@ -3,6 +3,10 @@
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
 
-# API routes: no browser cache — Worker in-memory cache handles 2-hour refresh
+# API routes: no browser cache — the Worker serves a KV snapshot refreshed every 5 minutes
 /api/*
   Cache-Control: no-store
+
+# Versioned vendor files never change — cache for a year
+/vendor/*
+  Cache-Control: public, max-age=31536000, immutable

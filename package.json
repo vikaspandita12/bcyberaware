@@ -2,14 +2,12 @@
   "name": "bcyberaware",
   "private": true,
   "scripts": {
-    "build": "babel src/app.jsx --presets @babel/preset-react --out-file app.js --no-comments",
+    "build": "esbuild src/app.jsx --minify --format=iife --target=es2020 --legal-comments=none --outfile=app.js",
     "dev": "npm run build && wrangler dev",
     "deploy": "npm run build && wrangler deploy"
   },
   "devDependencies": {
-    "@babel/cli": "^7.29.7",
-    "@babel/core": "^7.29.7",
-    "@babel/preset-react": "^7.29.7",
+    "esbuild": "^0.25.12",
     "wrangler": "^4.0.0"
   }
 }

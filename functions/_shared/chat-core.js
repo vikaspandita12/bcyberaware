@@ -82,7 +82,7 @@ export async function handleChatRequest(request, env) {
 
   if (!history.length || history[history.length - 1].role !== "user") return err(400, "Last message must be from the user");
 
-  await loadSharedFeed();
+  await loadSharedFeed(env);
   const clientCtx = typeof body.context === "string" ? body.context.trim().slice(0, 6000) : "";
   const ctx = clientCtx || getFeedContext();
   const messages = [{ role: "system", content: systemPrompt(ctx) }, ...history];

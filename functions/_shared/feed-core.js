@@ -9,7 +9,12 @@
  *  - stale-while-error: if a refresh collapses (<10 items), the previous good
  *    snapshot is served instead of a broken page.
  *
- * Cache: 2 hours (in-memory per isolate)
+ * Refresh model:
+ *  - A Cron Trigger (every 5 min) rebuilds the snapshot and stores it in Workers KV
+ *    (binding FEED_KV). Visitors are served that stored snapshot instantly — no
+ *    visitor ever waits on 55 upstream feeds.
+ *  - If KV is not bound, or the stored snapshot is too old (cron unhealthy), requests
+ *    fall back to building the snapshot live, exactly as before.
  */
 
 import { jsonResponse } from "./http.js";
@@ -17,6 +22,15 @@ import { jsonResponse } from "./http.js";
 const CACHE    = { sources: {} };
 const CACHE_MS = 2 * 60 * 1000; // assembled snapshot; individual sources keep longer TTLs below
 const FETCH_TIMEOUT_MS = 9000;
+// ── Durable storage (Workers KV) ──────────────────────────────────────────────
+const KV_SNAPSHOT = "feed:snapshot:v1";   // assembled payload served to visitors
+const KV_SOURCES  = "feed:sources:v1";    // per-source cache carried between cron runs
+const KV_HISTORY  = "feed:history:v1";    // daily aggregate counts (90 days)
+const SNAPSHOT_MAX_AGE_MS = 20 * 60 * 1000; // older than this → cron is unhealthy, build live
+const MEMO_MS      = 45 * 1000;             // per-isolate memo of the KV snapshot
+const BRIEF_TTL_MS = 30 * 60 * 1000;        // AI summary regenerated at most every 30 min
+const HISTORY_DAYS = 90;
+const kv = env => env?.FEED_KV || null;
 // Cloudflare free Workers allow 50 subrequests per invocation. With 55 sources a
 // full parallel refresh dies at the cap and the same feeds stay DOWN forever.
 // Instead: keep a per-source cache and refresh only the stalest/highest-priority
@@ -136,32 +150,59 @@ export function getFeedContext(maxChars = 6000) {
 const SHARED_KEY = "https://bcyberaware-internal.cache/feed-sources-v1";
 const edgeCache = () => (typeof caches !== "undefined" && caches.default) || null;
 
-async function loadSharedSources() {
+const mergeSources = shared => {
+  for (const [key, row] of Object.entries(shared || {})) {
+    if (!CACHE.sources[key] || CACHE.sources[key].ts < row.ts) CACHE.sources[key] = row;
+  }
+};
+
+async function loadSharedSources(env) {
+  // KV is global and survives isolate restarts; the edge cache is per-datacentre
+  const store = kv(env);
+  if (store) {
+    try { mergeSources(await store.get(KV_SOURCES, { type: "json" })); } catch {}
+  }
   const c = edgeCache();
   if (!c) return;
   try {
     const r = await c.match(SHARED_KEY);
-    if (!r) return;
-    const shared = await r.json();
-    for (const [key, row] of Object.entries(shared || {})) {
-      if (!CACHE.sources[key] || CACHE.sources[key].ts < row.ts) CACHE.sources[key] = row;
-    }
+    if (r) mergeSources(await r.json());
   } catch {}
 }
 
-async function saveSharedSources() {
+async function saveSharedSources(env, persist = false) {
+  const body = JSON.stringify(CACHE.sources);
+  // Only the scheduled refresh writes to KV (bounded writes/day on the free plan)
+  const store = persist ? kv(env) : null;
+  if (store) { try { await store.put(KV_SOURCES, body); } catch {} }
   const c = edgeCache();
   if (!c) return;
   try {
-    await c.put(SHARED_KEY, new Response(JSON.stringify(CACHE.sources), {
+    await c.put(SHARED_KEY, new Response(body, {
       headers: { "content-type": "application/json", "cache-control": "public, max-age=86400" },
     }));
   } catch {}
 }
 
+const adoptSnapshot = (snap, now = Date.now()) => {
+  if (!snap?.advisories) return false;
+  if (!CACHE.feed || (snap.fetched_at || 0) >= CACHE.feed.ts) CACHE.feed = { ts: snap.fetched_at || now, data: snap };
+  CACHE.feed.loaded = now;
+  return true;
+};
+
+async function loadKvSnapshot(env) {
+  const store = kv(env);
+  if (!store) return null;
+  try { return await store.get(KV_SNAPSHOT, { type: "json", cacheTtl: 60 }); } catch { return null; }
+}
+
 const FEED_KEY = "https://bcyberaware-internal.cache/feed-snapshot-v1";
 
-export async function loadSharedFeed() {
+export async function loadSharedFeed(env) {
+  const now = Date.now();
+  if (CACHE.feed?.data && CACHE.feed.loaded && (now - CACHE.feed.loaded) < MEMO_MS) return CACHE.feed.data;
+  if (adoptSnapshot(await loadKvSnapshot(env), now)) return CACHE.feed.data;
   if (CACHE.feed?.data) return CACHE.feed.data;
   const c = edgeCache();
   if (!c) return null;
@@ -189,16 +230,119 @@ export async function handleFeedRequest(request, env) {
   const action = url.searchParams.get("action");
   const bust   = url.searchParams.get("bust") === "1";
 
-  if (action === "brief") { await loadSharedFeed(); return handleBrief(env); }
+  if (action === "brief") { await loadSharedFeed(env); return handleBrief(env); }
+  if (action === "history") return handleHistory(env);
   if (action !== "feed") return jsonResponse({ error: "Unknown action" }, 400);
 
   try {
     const now = Date.now();
-    if (!bust && CACHE.feed && (now - CACHE.feed.ts) < CACHE_MS)
-      return jsonResponse({ ...CACHE.feed.data, from_cache: true });
+    if (!bust) {
+      // 1. Per-isolate memo of the stored snapshot
+      if (CACHE.feed?.loaded && (now - CACHE.feed.loaded) < MEMO_MS)
+        return jsonResponse({ ...CACHE.feed.data, from_cache: true });
+      // 2. Snapshot kept fresh by the scheduled refresh (the normal path)
+      const snap = await loadKvSnapshot(env);
+      if (snap?.advisories && (now - (snap.fetched_at || 0)) < SNAPSHOT_MAX_AGE_MS) {
+        adoptSnapshot(snap, now);
+        return jsonResponse({ ...CACHE.feed.data, from_cache: true });
+      }
+      // Stored snapshot exists but is too old: keep it only as a fallback baseline
+      if (snap?.advisories && !CACHE.feed) CACHE.feed = { ts: snap.fetched_at || 0, data: snap };
+      // 3. No KV / cron unhealthy → short in-memory cache, then build live below
+      if (CACHE.feed && (now - CACHE.feed.ts) < CACHE_MS)
+        return jsonResponse({ ...CACHE.feed.data, from_cache: true });
+    }
 
-    // Isolates don't share memory, so per-source results live in the edge cache too
-    await loadSharedSources();
+    const { payload, healthy } = await buildSnapshot(env, { now, bust, persist: false });
+    if (!healthy && CACHE.feed)
+      return jsonResponse({ ...CACHE.feed.data, from_cache: true, degraded: true });
+
+    // A live build never has a fresher AI brief than the stored one — carry it forward
+    const prevBrief = CACHE.feed?.data?.brief;
+    if (!payload.brief && prevBrief && (now - (prevBrief.generated_at || 0)) < 2 * BRIEF_TTL_MS) payload.brief = prevBrief;
+    CACHE.feed = { ts: now, data: payload };
+    await saveSharedFeed(payload);
+    return jsonResponse(payload);
+
+  } catch (e) {
+    if (CACHE.feed) return jsonResponse({ ...CACHE.feed.data, from_cache: true, degraded: true });
+    return jsonResponse({ error: e.message }, 500);
+  }
+}
+
+// ── Scheduled refresh (Cron Trigger) ──────────────────────────────────────────
+// Rebuilds the snapshot, refreshes the AI brief, and persists both to KV so every
+// visitor (in every datacentre) gets a ready-made feed.
+export async function runScheduledRefresh(env) {
+  const now   = Date.now();
+  const store = kv(env);
+
+  // Previous snapshot: fallback if this refresh collapses + AI brief carry-forward
+  let prev = null;
+  if (store) { try { prev = await store.get(KV_SNAPSHOT, { type: "json" }); } catch {} }
+  if (prev?.advisories) adoptSnapshot(prev, now);
+
+  const { payload, healthy } = await buildSnapshot(env, { now, bust: false, persist: true });
+  // Never store a collapsed snapshot: visitors keep the previous good one, or (if there
+  // is none yet) fall back to a live build.
+  if (!healthy) return { ok: false, reason: prev?.advisories ? "refresh collapsed — kept previous snapshot" : "refresh collapsed — nothing stored" };
+
+  payload.scheduled = true;
+  CACHE.feed = { ts: now, data: payload, loaded: now };
+
+  let brief = prev?.brief || null;
+  if (env?.AI && (!brief || (now - (brief.generated_at || 0)) > BRIEF_TTL_MS)) {
+    const fresh = await generateBrief(env, payload);
+    if (fresh) brief = fresh;
+  }
+  // If the AI has been unavailable for hours, show no summary rather than an outdated one
+  if (brief && (now - (brief.generated_at || 0)) < 6 * 60 * 60 * 1000) payload.brief = brief;
+
+  // Daily history row, refreshed once an hour (one extra KV write per hour)
+  const hour = new Date(now).toISOString().slice(0, 13);
+  const recordNow = prev?.history_hour !== hour;
+  payload.history_hour = recordNow ? hour : prev.history_hour;
+
+  if (store) {
+    await store.put(KV_SNAPSHOT, JSON.stringify(payload));
+    if (recordNow) { try { await recordHistory(store, payload, now); } catch {} }
+  }
+  await saveSharedFeed(payload);
+  return { ok: true, items: payload.advisories.length + payload.exploits.length + payload.news.length, sources_live: payload.sources_live, stored: !!store };
+}
+
+async function recordHistory(store, d, now) {
+  const hist = (await store.get(KV_HISTORY, { type: "json" })) || { days: {} };
+  const all  = [...(d.advisories || []), ...(d.exploits || [])];
+  hist.days[new Date(now).toISOString().slice(0, 10)] = {
+    advisories: d.advisories?.length || 0,
+    exploits:   d.exploits?.length || 0,
+    news:       d.news?.length || 0,
+    critical:   all.filter(a => a.severity === "CRITICAL").length,
+    exploited:  all.filter(a => a.exploit_in_wild).length,
+    breaking:   d.breaking?.length || 0,
+    sources_live: d.sources_live, sources_total: d.sources_total,
+    updated_at: now,
+  };
+  const keep = Object.keys(hist.days).sort().slice(-HISTORY_DAYS);
+  hist.days = Object.fromEntries(keep.map(k => [k, hist.days[k]]));
+  hist.updated_at = now;
+  await store.put(KV_HISTORY, JSON.stringify(hist));
+}
+
+async function handleHistory(env) {
+  const store = kv(env);
+  if (!store) return jsonResponse({ days: {}, available: false });
+  try {
+    const hist = await store.get(KV_HISTORY, { type: "json", cacheTtl: 300 });
+    return jsonResponse({ days: hist?.days || {}, updated_at: hist?.updated_at || null, available: true });
+  } catch { return jsonResponse({ days: {}, available: false }); }
+}
+
+// ── Snapshot builder (shared by the cron and the live fallback) ───────────────
+async function buildSnapshot(env, { now, bust, persist }) {
+    // Isolates don't share memory, so per-source results live in KV / the edge cache
+    await loadSharedSources(env);
 
     // Pick which sources to actually fetch this invocation (subrequest budget),
     // serving everything else from the per-source cache.
@@ -244,7 +388,7 @@ export async function handleFeedRequest(request, env) {
       }
     }));
 
-    await saveSharedSources();
+    await saveSharedSources(env, persist);
 
     const byCat = { advisory: [], exploit: [], news: [], social: [] };
     runs.forEach(({ src, items }) => byCat[src.cat].push(...items));
@@ -284,19 +428,9 @@ export async function handleFeedRequest(request, env) {
       from_cache:       false,
     };
 
-    // Stale-while-error: refuse to replace a good snapshot with a collapsed one
+    // Stale-while-error: callers refuse to replace a good snapshot with a collapsed one
     const totalItems = advisories.length + exploits.length + news.length;
-    if (totalItems < 10 && CACHE.feed)
-      return jsonResponse({ ...CACHE.feed.data, from_cache: true, degraded: true });
-
-    CACHE.feed = { ts: now, data: payload };
-    await saveSharedFeed(payload);
-    return jsonResponse(payload);
-
-  } catch (e) {
-    if (CACHE.feed) return jsonResponse({ ...CACHE.feed.data, from_cache: true, degraded: true });
-    return jsonResponse({ error: e.message }, 500);
-  }
+    return { payload, healthy: totalItems >= 10 };
 }
 
 // ── RSS 2.0 feed (/feed.xml) — subscribe without login, email, or tracking ────
@@ -304,7 +438,7 @@ const xmlEsc = s => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;")
 
 export async function handleRssRequest(request, env) {
   // Warm the feed cache if this is the first request on a cold isolate
-  if (!CACHE.feed) await loadSharedFeed();
+  await loadSharedFeed(env);
   if (!CACHE.feed) {
     const u = new URL(request.url);
     try { await handleFeedRequest(new Request(`${u.origin}/api/proxy?action=feed`), env); } catch {}
@@ -347,33 +481,41 @@ ${items.map(a => `<item>
   });
 }
 
-// ── AI Situation Summary (Workers AI, cached per feed snapshot) ───────────────
-// Generated at most once per feed refresh (~2h) → negligible neuron usage.
-async function handleBrief(env) {
-  const feed = CACHE.feed;
-  if (!feed) return jsonResponse({ brief: null, pending: true, reason: "feed not loaded yet" });
-  if (CACHE.brief && CACHE.brief.feedTs === feed.ts) return jsonResponse({ ...CACHE.brief.data, from_cache: true });
-  if (!env?.AI) return jsonResponse({ brief: null, pending: false, reason: "AI binding not available" });
-
-  const d = feed.data;
+// ── AI Situation Summary (Workers AI) ─────────────────────────────────────────
+// Normally generated by the scheduled refresh (at most every 30 min) and stored with
+// the snapshot; generated on demand only when no scheduled brief exists.
+async function generateBrief(env, d) {
+  if (!env?.AI) return null;
   const prompt = `You are a senior cyber threat intelligence analyst writing the opening "Situation Summary" for a CISO dashboard.
 Using ONLY the live feed snapshot below, write 3–4 tight sentences (max 110 words) covering: (1) the most important actively-exploited or critical vulnerabilities to patch now (name products and CVEs from the data), (2) the most significant breach/incident headlines, (3) one line on the overall risk posture. Plain prose, no bullet points, no headers, no preamble, no markdown. Do not invent CVEs or facts not in the data.
 
 ${getFeedContext(4500)}`;
-
   try {
-    const res = await env.AI.run(env.AI_MODEL || "@cf/meta/llama-3.1-8b-instruct-fast", {
+    const model = env.AI_MODEL || "@cf/meta/llama-3.1-8b-instruct-fast";
+    const res = await env.AI.run(model, {
       messages: [{ role: "user", content: prompt }], max_tokens: 260, temperature: 0.2,
     });
     const brief = String(res?.response || "").replace(/\s+/g, " ").trim();
-    if (!brief) throw new Error("empty response");
-    const data = { brief, generated_at: Date.now(), generated_at_human: new Date().toUTCString(), sources: d.sources_live, items: (d.advisories?.length || 0) + (d.exploits?.length || 0) + (d.news?.length || 0), model: env.AI_MODEL || "@cf/meta/llama-3.1-8b-instruct-fast" };
+    if (!brief) return null;
+    return { brief, generated_at: Date.now(), generated_at_human: new Date().toUTCString(), sources: d.sources_live, items: (d.advisories?.length || 0) + (d.exploits?.length || 0) + (d.news?.length || 0), model };
+  } catch { return null; }
+}
+
+async function handleBrief(env) {
+  const feed = CACHE.feed;
+  if (!feed) return jsonResponse({ brief: null, pending: true, reason: "feed not loaded yet" });
+  if (feed.data.brief?.brief) return jsonResponse({ ...feed.data.brief, from_cache: true });
+  if (CACHE.brief && (CACHE.brief.feedTs === feed.ts || (Date.now() - CACHE.brief.data.generated_at) < BRIEF_TTL_MS))
+    return jsonResponse({ ...CACHE.brief.data, from_cache: true });
+  if (!env?.AI) return jsonResponse({ brief: null, pending: false, reason: "AI binding not available" });
+
+  const data = await generateBrief(env, feed.data);
+  if (data) {
     CACHE.brief = { feedTs: feed.ts, data };
     return jsonResponse({ ...data, from_cache: false });
-  } catch (e) {
-    if (CACHE.brief) return jsonResponse({ ...CACHE.brief.data, from_cache: true, stale: true });
-    return jsonResponse({ brief: null, pending: false, reason: String(e?.message || e).slice(0, 120) });
   }
+  if (CACHE.brief) return jsonResponse({ ...CACHE.brief.data, from_cache: true, stale: true });
+  return jsonResponse({ brief: null, pending: false, reason: "AI summary unavailable" });
 }
 
 // ── Breaking-incident detector ────────────────────────────────────────────────
