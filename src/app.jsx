@@ -1,4 +1,4 @@
-const { useState, useEffect, useCallback } = React;
+const { useState, useEffect, useCallback, useMemo } = React;
 
 // ── API (Cloudflare Pages Functions: /api/proxy, /api/darkweb) ───────────────
 const PROXY   = "/api/proxy";
@@ -566,6 +566,271 @@ function AIBriefCard({ brief }) {
         <div className="brief-meta" style={{fontSize:10,color:"rgba(200,220,240,.35)",fontFamily:"var(--mono)"}}>Generated from {brief.items} items · {brief.sources} sources · Workers AI{brief.stale?" · cached":""}</div>
       </div>
       <div className="brief-text" style={{fontSize:15,color:"rgba(230,238,250,.9)",lineHeight:1.8,fontWeight:400}}>{brief.brief}</div>
+    </div>
+  );
+}
+
+// ── Top Priorities Panel (Priority scoring & action boxes) ───────────────────
+function computePriority(item, allItems) {
+  let score = 0;
+  const reasons = [];
+
+  // Active exploitation (CISA KEV, Exploit-DB, in-the-wild)
+  if (item.exploit_in_wild || item.source === "CISA KEV" || item.category === "exploit") {
+    score += 35;
+    reasons.push("On CISA's Known Exploited Vulnerabilities list");
+  }
+
+  // EPSS score
+  const epss = item.epss || 0;
+  if (epss >= 50) {
+    score += 25;
+    reasons.push(`EPSS ${epss}%`);
+  } else if (epss >= 10) {
+    score += 18;
+    reasons.push(`EPSS ${epss}%`);
+  } else if (epss >= 1) {
+    score += 10;
+    reasons.push(`EPSS ${epss}%`);
+  }
+
+  // Severity / CVSS
+  if (item.severity === "CRITICAL" || (item.cvss && item.cvss >= 9.0)) {
+    score += 20;
+    reasons.push(item.cvss ? "Rated critical by the source" : "Rated critical");
+  } else if (item.severity === "HIGH") {
+    score += 12;
+  }
+
+  // Exposure / Vulnerability class
+  const text = (item.title + " " + (item.summary || "")).toLowerCase();
+  if (/\b(remote code|code injection|command injection|authentication bypass|auth bypass|privilege escalation|deserialization|sql injection|rce)\b/i.test(text)) {
+    score += 10;
+    reasons.push("Remote code execution / authentication bypass class");
+  }
+
+  // Multi-source corroboration
+  if (item.cve_ids && item.cve_ids.length > 0) {
+    const cve = item.cve_ids[0];
+    const count = allItems.filter(x => (x.cve_ids || []).includes(cve)).length;
+    if (count > 1) {
+      score += Math.min(10, count * 2);
+      reasons.push(`Reported by ${count} sources`);
+    }
+  }
+
+  score = Math.min(99, Math.max(10, score));
+  const tier = score >= 70 ? "ACT NOW" : score >= 55 ? "THIS WEEK" : "MONITOR";
+  const tierColor = score >= 70 ? "#ff4d4f" : score >= 55 ? "#ff9100" : "#00e5ff";
+  const tierBg = score >= 70 ? "rgba(255,23,68,0.12)" : score >= 55 ? "rgba(255,145,0,0.12)" : "rgba(0,200,255,0.08)";
+  const tierBorder = score >= 70 ? "rgba(255,23,68,0.45)" : score >= 55 ? "rgba(255,145,0,0.45)" : "rgba(0,200,255,0.3)";
+  const tierDot = score >= 70 ? "🔴" : score >= 55 ? "🟠" : "🔵";
+
+  return {
+    score,
+    tier,
+    tierColor,
+    tierBg,
+    tierBorder,
+    tierDot,
+    reasonsLine: reasons.slice(0, 3).join(" · ") + (item.source ? ` — ${item.source}` : "")
+  };
+}
+
+function TopPrioritiesPanel({ advisories, exploits, onAskAI }) {
+  const [expandedId, setExpandedId] = useState(null);
+  const all = useMemo(() => [...(advisories || []), ...(exploits || [])], [advisories, exploits]);
+
+  const scored = useMemo(() => {
+    return all
+      .map(item => ({ item, pri: computePriority(item, all) }))
+      .sort((a, b) => b.pri.score - a.pri.score);
+  }, [all]);
+
+  const actNowCount = useMemo(() => scored.filter(s => s.pri.tier === "ACT NOW").length, [scored]);
+  const thisWeekCount = useMemo(() => scored.filter(s => s.pri.tier === "THIS WEEK").length, [scored]);
+  const topItems = useMemo(() => scored.slice(0, 5), [scored]);
+
+  if (!topItems.length) return null;
+
+  return (
+    <div className="top-priorities-card" style={{
+      background: "rgba(20, 10, 15, 0.45)",
+      border: "1px solid rgba(255, 60, 60, 0.22)",
+      borderRadius: 10,
+      padding: "16px 20px",
+      marginBottom: 20,
+      boxShadow: "0 4px 20px rgba(255, 0, 0, 0.05)"
+    }}>
+      <div style={{display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 14}}>
+        <div style={{display: "flex", alignItems: "center", gap: 8}}>
+          <span style={{fontSize: 10}}>🔴</span>
+          <span style={{fontSize: 11, letterSpacing: 3, color: "#ff5252", fontFamily: "var(--mono)", fontWeight: 700}}>
+            TOP PRIORITIES RIGHT NOW
+          </span>
+        </div>
+        <div style={{fontSize: 11, color: "rgba(200,220,240,0.45)", fontFamily: "var(--mono)"}}>
+          <span style={{color: "#ff5252", fontWeight: 700}}>{actNowCount} act now</span> · {thisWeekCount} this week · scored on exploitation, EPSS, CVSS, exposure and corroboration
+        </div>
+      </div>
+
+      <div style={{display: "flex", flexDirection: "column"}}>
+        {topItems.map(({ item, pri }, idx) => {
+          const isExpanded = expandedId === item.id;
+          const cve = (item.cve_ids && item.cve_ids[0]) || "";
+          return (
+            <div key={item.id} className="top-priority-row" style={{
+              padding: "12px 0",
+              borderBottom: idx === topItems.length - 1 ? "none" : "1px solid rgba(255,255,255,0.06)"
+            }}>
+              <div style={{display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap"}}>
+                <div style={{
+                  padding: "4px 9px",
+                  background: pri.tierBg,
+                  border: `1px solid ${pri.tierBorder}`,
+                  borderRadius: 4,
+                  fontSize: 11,
+                  fontFamily: "var(--mono)",
+                  fontWeight: 800,
+                  color: pri.tierColor,
+                  letterSpacing: 0.8,
+                  whiteSpace: "nowrap",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5
+                }}>
+                  <span style={{fontSize: 9}}>{pri.tierDot}</span>
+                  <span>{pri.score} · {pri.tier}</span>
+                </div>
+
+                <div style={{flex: "1 1 360px", minWidth: 260}}>
+                  <div className="top-priority-title" style={{fontSize: 13.5, fontWeight: 700, color: "#eef4ff", lineHeight: 1.35, marginBottom: 3}}>
+                    {item.title}
+                  </div>
+                  <div className="top-priority-sub" style={{fontSize: 11.5, color: "rgba(200,220,240,0.5)", lineHeight: 1.4}}>
+                    {pri.reasonsLine}
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setExpandedId(isExpanded ? null : item.id)}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    color: "#00e5ff",
+                    fontSize: 12,
+                    fontFamily: "var(--mono)",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    padding: "4px 8px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4
+                  }}
+                >
+                  What to do {isExpanded ? "↑" : "↓"}
+                </button>
+              </div>
+
+              {isExpanded && (
+                <div className="top-priority-action-box" style={{
+                  marginTop: 12,
+                  padding: "14px 16px",
+                  background: "rgba(0,0,0,0.35)",
+                  border: "1px solid rgba(0,200,255,0.2)",
+                  borderRadius: 6,
+                  fontSize: 12.5,
+                  lineHeight: 1.6,
+                  animation: "fadeIn .2s ease"
+                }}>
+                  <div style={{display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 10}}>
+                    <div style={{flex: "1 1 280px"}}>
+                      <div style={{color: "#ff5252", fontWeight: 700, fontFamily: "var(--mono)", marginBottom: 4, fontSize: 11, letterSpacing: 1}}>
+                        ⚡ IMMEDIATE ACTION ({pri.tier === "ACT NOW" ? "NEXT 24 HOURS" : "THIS WEEK"}):
+                      </div>
+                      <div style={{color: "rgba(230,238,250,0.85)"}}>
+                        {item.summary && item.summary.includes("Required action:")
+                          ? item.summary.split("Required action:")[1].trim()
+                          : `Apply vendor patches immediately. If hotfixes cannot be deployed within 24h, isolate vulnerable ${item.affected_products?.[0] || "services"} and restrict public inbound access.`}
+                      </div>
+                    </div>
+                    <div style={{flex: "1 1 220px"}}>
+                      <div style={{color: "#00e5ff", fontWeight: 700, fontFamily: "var(--mono)", marginBottom: 4, fontSize: 11, letterSpacing: 1}}>
+                        🎯 ATTACK VECTOR & EXPOSURE:
+                      </div>
+                      <div style={{color: "rgba(200,220,240,0.75)"}}>
+                        {item.affected_products?.length ? `Targets: ${item.affected_products.slice(0, 3).join(", ")}. ` : ""}
+                        {cve ? `${cve}. ` : ""}
+                        {item.exploit_in_wild ? "Active exploitation in the wild confirmed." : "High risk of exploitation."}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.06)"}}>
+                    {onAskAI && (
+                      <button
+                        onClick={() => onAskAI(item)}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                          fontSize: 11.5,
+                          color: "#d8b4fe",
+                          fontFamily: "var(--mono)",
+                          background: "rgba(123,47,247,0.15)",
+                          border: "1px solid rgba(123,47,247,0.4)",
+                          padding: "5px 12px",
+                          borderRadius: 4,
+                          cursor: "pointer",
+                          fontWeight: 700
+                        }}
+                      >
+                        🛡️ AI Triage This Threat
+                      </button>
+                    )}
+                    {item.source_url && (
+                      <a
+                        href={item.source_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          fontSize: 11.5,
+                          color: "#00e5ff",
+                          fontFamily: "var(--mono)",
+                          background: "rgba(0,200,255,0.08)",
+                          border: "1px solid rgba(0,200,255,0.3)",
+                          padding: "5px 12px",
+                          borderRadius: 4,
+                          textDecoration: "none",
+                          fontWeight: 600
+                        }}
+                      >
+                        {item.source_flag || "🔗"} View on {item.source} ↗
+                      </a>
+                    )}
+                    {cve && (
+                      <a
+                        href={`https://nvd.nist.gov/vuln/detail/${cve}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          fontSize: 11.5,
+                          color: "rgba(200,220,240,0.7)",
+                          fontFamily: "var(--mono)",
+                          padding: "5px 8px",
+                          textDecoration: "none"
+                        }}
+                      >
+                        NVD Entry ↗
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1988,6 +2253,7 @@ function BCyberAwareDashboard() {
             )}
             {feedError&&<div style={{padding:"14px 18px",background:"rgba(200,0,0,.1)",border:"1px solid rgba(200,0,0,.3)",borderRadius:6,marginBottom:16,fontSize:14,color:"#ff6666"}}>⚠ {feedError}{feedMeta?` — showing the last saved copy (updated ${updatedAgo(feedMeta.fetched_at, nowTick)})`:""}</div>}
             <AIBriefCard brief={brief}/>
+            <TopPrioritiesPanel advisories={advisories} exploits={exploits} onAskAI={askAIAboutItem}/>
 
             {/* ── Global Command Search + Velocity + Vendor Matrix ── */}
             <div className="search-bar-wrap" style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",marginBottom:14,background:"rgba(255,255,255,0.02)",border:"1px solid rgba(0,200,255,0.18)",borderRadius:8,padding:"10px 14px"}}>
