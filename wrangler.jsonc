@@ -23,7 +23,7 @@
     // Swap to "@cf/meta/llama-3.3-70b-instruct-fp8-fast" for higher quality (uses ~6x more neurons)
     "AI_MODEL": "@cf/meta/llama-3.1-8b-instruct-fast",
     // AI-written "In short" line inside action boxes. "hidden": generated and stored but not
-    // shown; "visible": shown on the site. Keep hidden until samples have been reviewed.
-    "AI_ACTION_DETAILS": "hidden"
+    // shown; "visible": shown on the site. Samples were reviewed on 12 Nov 2026 and switched on.
+    "AI_ACTION_DETAILS": "visible"
   }
 }
