@@ -18,6 +18,7 @@
  */
 
 import { jsonResponse } from "./http.js";
+import { prepareStories, scoreAndAdvise } from "./intel-core.js";
 
 const CACHE    = { sources: {} };
 const CACHE_MS = 2 * 60 * 1000; // assembled snapshot; individual sources keep longer TTLs below
@@ -136,7 +137,11 @@ export function getFeedContext(maxChars = 6000) {
   const d = CACHE.feed?.data;
   if (!d) return null;
   const line = a => `- [${a.severity}] ${a.title}${a.cve_ids?.length ? " (" + a.cve_ids.slice(0, 2).join(", ") + ")" : ""} — ${a.source}, ${a.date}${a.exploit_in_wild ? " · EXPLOITED IN WILD" : ""}${a.threat_actor ? " · " + a.threat_actor : ""}`;
+  const top = [...(d.advisories || []), ...(d.exploits || []), ...(d.news || [])]
+    .filter(a => (a.priority?.score || 0) >= 50)
+    .sort((x, y) => y.priority.score - x.priority.score).slice(0, 8);
   const sections = [
+    ["TOP PRIORITIES (BCyberAware score 0-100, with the evidence behind it)", top.map(a => `- [${a.priority.score} ${a.priority.label}] ${a.title}${a.cve_ids?.length ? " (" + a.cve_ids.slice(0, 2).join(", ") + ")" : ""} — ${a.source}. Why: ${a.priority.reasons.slice(0, 4).join("; ")}`)],
     ["BREAKING (last 48h)", (d.breaking || []).slice(0, 8).map(b => `- ${b.title} — ${b.source}`)],
     ["TOP ADVISORIES", (d.advisories || []).slice(0, 14).map(line)],
     ["EXPLOITS / 0-DAY PIPELINE", (d.exploits || []).slice(0, 8).map(line)],
@@ -266,6 +271,8 @@ export async function handleFeedRequest(request, env) {
       return jsonResponse({ ...CACHE.feed.data, from_cache: true, degraded: true });
 
     // A live build never has a fresher AI brief than the stored one — carry it forward
+    carryAiDetails(payload, CACHE.feed?.data);
+    payload.ai_details_visible = aiDetailsVisible(env);
     const prevBrief = CACHE.feed?.data?.brief;
     if (!payload.brief && prevBrief && (now - (prevBrief.generated_at || 0)) < 2 * BRIEF_TTL_MS) payload.brief = prevBrief;
     CACHE.feed = { ts: now, data: payload };
@@ -303,6 +310,8 @@ export async function runScheduledRefresh(env) {
   // show no summary rather than an outdated one.
   const prevBrief = prev?.brief || null;
   if (prevBrief && (now - (prevBrief.generated_at || 0)) < 6 * 60 * 60 * 1000) payload.brief = prevBrief;
+  carryAiDetails(payload, prev);
+  payload.ai_details_visible = aiDetailsVisible(env);
 
   // Daily history row, refreshed once an hour (one extra KV write per hour)
   const hour = new Date(now).toISOString().slice(0, 13);
@@ -318,15 +327,84 @@ export async function runScheduledRefresh(env) {
   }
   await saveSharedFeed(payload);
 
-  let briefRefreshed = false;
-  if (env?.AI && (!prevBrief || (now - (prevBrief.generated_at || 0)) > BRIEF_TTL_MS)) {
-    const fresh = await generateBrief(env, payload);
-    if (fresh) {
-      payload.brief = fresh; briefRefreshed = true;
-      if (store) { try { await store.put(KV_SNAPSHOT, JSON.stringify(payload)); } catch {} }
+  // Optional AI work, strictly time-boxed (sub-hourly Cron Triggers get 30 seconds in total)
+  let briefRefreshed = false, detailsAdded = 0;
+  const elapsed = () => Date.now() - now;
+  if (env?.AI && elapsed() < AI_PHASE_START_LIMIT_MS) {
+    if (!prevBrief || (now - (prevBrief.generated_at || 0)) > BRIEF_TTL_MS) {
+      const fresh = await withDeadline(generateBrief(env, payload), 6000).catch(() => null);
+      if (fresh) { payload.brief = fresh; briefRefreshed = true; }
     }
+    const todo = [...payload.advisories, ...payload.exploits, ...payload.news]
+      .filter(a => a.action && !a.action.ai && (a.action.ai_failed || 0) < 2)
+      .sort((x, y) => (y.priority?.score || 0) - (x.priority?.score || 0))
+      .slice(0, AI_DETAILS_PER_RUN);
+    for (const item of todo) {
+      if (elapsed() > AI_PHASE_END_LIMIT_MS) break;
+      const ai = await withDeadline(generateActionDetail(env, item), 4000).catch(() => null);
+      if (ai) { item.action.ai = ai; detailsAdded++; }
+      else item.action.ai_failed = (item.action.ai_failed || 0) + 1; // two attempts, then stop trying
+    }
+    if ((briefRefreshed || todo.length) && store) { try { await store.put(KV_SNAPSHOT, JSON.stringify(payload)); } catch {} }
   }
-  return { ok: true, items: payload.advisories.length + payload.exploits.length + payload.news.length, sources_live: payload.sources_live, stored, store_error: storeError, brief_refreshed: briefRefreshed, ms: Date.now() - now };
+  return { ok: true, items: payload.advisories.length + payload.exploits.length + payload.news.length, sources_live: payload.sources_live, stored, store_error: storeError, brief_refreshed: briefRefreshed, ai_details_added: detailsAdded, ms: Date.now() - now };
+}
+
+// ── AI detail for action boxes ────────────────────────────────────────────────
+// A short plain-English line per actionable item, generated once and carried forward
+// between snapshots by item id. Output is rejected unless it is grounded in the input.
+const AI_PHASE_START_LIMIT_MS = 17000;
+const AI_PHASE_END_LIMIT_MS   = 21000;
+const AI_DETAILS_PER_RUN      = 3;
+const aiDetailsVisible = env => String(env?.AI_ACTION_DETAILS || "hidden").toLowerCase() === "visible";
+
+function carryAiDetails(payload, prev) {
+  if (!prev) return;
+  const old = new Map();
+  for (const a of [...(prev.advisories || []), ...(prev.exploits || []), ...(prev.news || [])]) {
+    if (a.action?.ai || a.action?.ai_failed) old.set(a.id, a.action);
+  }
+  if (!old.size) return;
+  for (const a of [...payload.advisories, ...payload.exploits, ...payload.news]) {
+    const o = a.action && old.get(a.id);
+    if (!o) continue;
+    if (o.ai) a.action.ai = o.ai;
+    else if (o.ai_failed) a.action.ai_failed = o.ai_failed;
+  }
+}
+
+export function parseActionDetail(raw, item) {
+  const out = String(raw || "");
+  const line = k => (out.match(new RegExp(`^\\s*\\**${k}\\**\\s*[:\\-]\\s*(.+)$`, "im"))?.[1] || "").replace(/\*\*/g, "").trim();
+  let inShort = line("IN SHORT"), affected = line("AFFECTED");
+  if (inShort.length < 25 || inShort.length > 320) return null;
+  if (/as an ai|i cannot|i can't|language model|not stated|no information/i.test(inShort)) return null;
+  if (/^(not stated|unknown|n\/a|none)\b/i.test(affected) || affected.length > 160) affected = "";
+  // Grounding: every CVE id and version-like number in the output must appear in the input
+  const source = `${item.title} ${item.summary} ${(item.cve_ids || []).join(" ")} ${(item.also || []).map(o => o.title).join(" ")}`;
+  const facts = s => [...new Set(s.match(/CVE-\d{4}-\d{4,7}|\b\d+(?:\.\d+)+[a-z0-9]*\b|\b\d{3,}\b/gi) || [])];
+  for (const part of [inShort, affected]) for (const fact of facts(part)) if (!source.toLowerCase().includes(fact.toLowerCase())) return null;
+  return { in_short: inShort, ...(affected ? { affected } : {}) };
+}
+
+async function generateActionDetail(env, item) {
+  if (!env?.AI) return null;
+  const others = (item.also || []).slice(0, 4).map(o => `- ${o.source}: ${o.title}`).join("\n");
+  const prompt = `You brief busy security managers. Using ONLY the text below, explain this item in plain English.
+Do not add facts, versions, CVE numbers or product names that are not in the text. Do not give generic advice.
+Reply with exactly these two lines and nothing else:
+IN SHORT: <one sentence, at most 35 words: what is happening and why it matters to an organisation>
+AFFECTED: <products and versions exactly as named in the text, or "Not stated">
+
+TITLE: ${item.title}
+SOURCE: ${item.source}${item.cve_ids?.length ? "\nCVES: " + item.cve_ids.slice(0, 4).join(", ") : ""}
+TEXT: ${String(item.summary || "").slice(0, 500)}${others ? "\nOTHER HEADLINES ON THE SAME STORY:\n" + others : ""}`;
+  try {
+    const model = env.AI_MODEL || "@cf/meta/llama-3.1-8b-instruct-fast";
+    const res = await env.AI.run(model, { messages: [{ role: "user", content: prompt }], max_tokens: 140, temperature: 0.1 });
+    const parsed = parseActionDetail(res?.response, item);
+    return parsed ? { ...parsed, model, at: Date.now() } : null;
+  } catch { return null; }
 }
 
 // ── Health/status (used by the scheduled GitHub health check) ─────────────────
@@ -346,6 +424,7 @@ async function handleStatus(env) {
     items: snap ? (snap.advisories?.length || 0) + (snap.exploits?.length || 0) + (snap.news?.length || 0) : null,
     sources_live: snap?.sources_live ?? null, sources_total: SOURCES.length,
     brief_age_seconds: snap?.brief?.generated_at ? Math.round((now - snap.brief.generated_at) / 1000) : null,
+    intel: snap ? intelStats(snap) : null,
     read_error: readError, checked_at: new Date(now).toISOString(),
   });
 }
@@ -367,6 +446,22 @@ async function recordHistory(store, d, now) {
   hist.days = Object.fromEntries(keep.map(k => [k, hist.days[k]]));
   hist.updated_at = now;
   await store.put(KV_HISTORY, JSON.stringify(hist));
+}
+
+function intelStats(d) {
+  const all = [...(d.advisories || []), ...(d.exploits || []), ...(d.news || [])];
+  const bands = {};
+  for (const a of all) if (a.priority) bands[a.priority.label] = (bands[a.priority.label] || 0) + 1;
+  return {
+    scored: all.filter(a => a.priority).length, bands,
+    exploited_in_wild: all.filter(a => a.exploit_in_wild).length,
+    public_exploit: all.filter(a => a.exploit_public && !a.exploit_in_wild).length,
+    action_boxes: all.filter(a => a.action).length,
+    ai_details: all.filter(a => a.action?.ai).length,
+    ai_details_visible: !!d.ai_details_visible,
+    merged_stories: (d.news || []).filter(a => (a.sources_count || 1) > 1).length,
+    news_cards: (d.news || []).length,
+  };
 }
 
 async function handleHistory(env) {
@@ -430,7 +525,8 @@ async function buildSnapshot(env, { now, bust, persist }) {
     await saveSharedSources(env, persist);
 
     const byCat = { advisory: [], exploit: [], news: [], social: [] };
-    runs.forEach(({ src, items }) => byCat[src.cat].push(...items));
+    // Shallow copies: enrichment below must never leak into the per-source cache
+    runs.forEach(({ src, items }) => byCat[src.cat].push(...items.map(a => ({ ...a }))));
     // Social hygiene: drop job ads/promos, require security relevance in the post body
     // for hashtag streams (hashtag abusers), and strip Reddit's RSS boilerplate.
     byCat.social = byCat.social
@@ -447,13 +543,23 @@ async function buildSnapshot(env, { now, bust, persist }) {
       return dedup(arr);
     };
 
-    const advisories = sortAndDedup(byCat.advisory).slice(0, 80);
-    const exploits   = sortAndDedup(byCat.exploit).slice(0, 40);
-    const news       = sortAndDedup(byCat.news).slice(0, 110);
+    // Intelligence layer, step 1: evidence-based exploitation flags, then merge the same
+    // story reported by several outlets into one card (see intel-core.js).
+    const kevCves = new Set(byCat.advisory.filter(a => a.source === "CISA KEV").flatMap(a => a.cve_ids || []));
+    const stories = prepareStories({
+      advisories: sortAndDedup(byCat.advisory), exploits: sortAndDedup(byCat.exploit),
+      news: sortAndDedup(byCat.news), kevCves,
+    });
+    const advisories = stories.advisories.slice(0, 80);
+    const exploits   = stories.exploits.slice(0, 40);
+    const news       = stories.news.slice(0, 110);
     const social     = sortAndDedup(byCat.social).slice(0, 60);
 
     // Enrich all CVE-bearing items with FIRST.org EPSS (Exploit Prediction Scoring System)
     await enrichWithEPSS([...advisories, ...exploits, ...news, ...social]);
+
+    // Step 2: priority score (0-100, with reasons) + action guidance for what needs action
+    scoreAndAdvise({ advisories, exploits, news, now });
 
     const payload = {
       advisories, exploits, news, social,
@@ -590,6 +696,7 @@ async function fetchCISAKEV() {
       affected_products: [v.vendorProject + " " + v.product],
       summary: v.shortDescription + " Required action: " + v.requiredAction,
       threat_actor: (v.knownRansomwareCampaignUse && v.knownRansomwareCampaignUse !== "Unknown") ? "Ransomware: " + v.knownRansomwareCampaignUse : null,
+      kev_due: v.dueDate ? fmtDate(v.dueDate) : null,
       countries: ["US", "GB", "DE", "AU", "CA"],
       middle_east_relevance: getMERelevance([v.vendorProject, v.product], v.vulnerabilityName, v.shortDescription),
       patch_available: true, exploit_in_wild: true,
@@ -973,14 +1080,33 @@ function getMERelevance(products, title, desc) {
 }
 
 // Dedup on CVE-set OR normalized title (kills cross-source duplicates of the same story)
+// Exact duplicates (same CVE set or same headline). The first listed is kept and the
+// other sources are remembered on it, so corroboration is not thrown away. A CISA KEV
+// entry always wins the card, because it carries the authoritative exploitation status.
 function dedup(arr) {
-  const seen = new Set();
-  return arr.filter(a => {
+  const byKey = new Map(), out = [];
+  const ref = a => ({ source: a.source, source_flag: a.source_flag, source_url: a.source_url, title: a.title });
+  for (const a of arr) {
     const cveKey   = a.cve_ids?.length ? "cve:" + [...a.cve_ids].sort().join(",") : null;
     const titleKey = "t:" + a.title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 70);
-    if ((cveKey && seen.has(cveKey)) || seen.has(titleKey)) return false;
-    if (cveKey) seen.add(cveKey);
-    seen.add(titleKey);
-    return true;
-  });
+    const rec = (cveKey && byKey.get(cveKey)) || byKey.get(titleKey);
+    if (!rec) {
+      const r = { idx: out.length };
+      out.push(a);
+      if (cveKey) byKey.set(cveKey, r);
+      byKey.set(titleKey, r);
+      continue;
+    }
+    let lead = out[rec.idx], other = a;
+    if (lead.source === other.source) continue;
+    if (other.source === "CISA KEV" && lead.source !== "CISA KEV") {
+      const { also, ...leadOnly } = lead;
+      out[rec.idx] = { ...other, also: also || [] };
+      other = leadOnly; lead = out[rec.idx];
+    }
+    lead.also = lead.also || [];
+    if (!lead.also.some(o => o.source === other.source)) lead.also.push(ref(other));
+  }
+  for (const a of out) if (a.also) { if (a.also.length) a.sources_count = 1 + a.also.length; else delete a.also; }
+  return out;
 }

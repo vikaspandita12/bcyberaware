@@ -143,8 +143,8 @@ const MITRE_MATRIX = [
   ]},
   { tactic: "Credential Access", code: "TA0006", techniques: [
     { id: "T1555", name: "Credentials from Password Stores", color: "#ab47bc", re: /credential|password|infostealer|stealer|lumma|redline|vidar|keychain|browser data/i },
-    { id: "T1003", name: "OS Credential Dumping", color: "#9c27b0", re: /lsass|mimikatz|ntds|kerberos|ntlm|active directory|hash dump|sam database/i },
-    { id: "T1539", name: "Steal Web Session Cookie / Token", color: "#8e24aa", re: /session hijack|cookie|token theft|aitm|mfa bypass|oauth token|jwt/i },
+    { id: "T1003", name: "OS Credential Dumping", color: "#ba68c8", re: /lsass|mimikatz|ntds|kerberos|ntlm|active directory|hash dump|sam database/i },
+    { id: "T1539", name: "Steal Web Session Cookie / Token", color: "#ba68c8", re: /session hijack|cookie|token theft|aitm|mfa bypass|oauth token|jwt/i },
   ]},
   { tactic: "Lateral Movement", code: "TA0008", techniques: [
     { id: "T1021", name: "Remote Services (SMB/SSH/RDP)", color: "#42a5f5", re: /lateral movement|\bsmb\b|wmi|winrm|ssh|rdp|psexec|internal network/i },
@@ -252,7 +252,7 @@ function buildStixBundle(items) {
           external_references: [{ source_name: "cve", external_id: cve, url: `https://nvd.nist.gov/vuln/detail/${cve}` }],
           x_opencti_cvss_base_score: adv.cvss || null,
           x_opencti_epss_score: adv.epss != null ? adv.epss / 100 : null,
-          x_opencti_cisa_kev: !!adv.exploit_in_wild,
+          x_opencti_cisa_kev: adv.kev!=null ? !!adv.kev : !!adv.exploit_in_wild,
           object_marking_refs: [tlpClearId],
         });
       }
@@ -363,6 +363,79 @@ function computeDefcon(advisories, exploits) {
   return { level: 4, label: "DEFCON 4 · GUARDED", color: "#00e676", bg: "rgba(0,230,118,0.12)", desc: "Baseline global threat activity — standard patch cadence" };
 }
 
+// Text colours that come from data (ATT&CK techniques, sources, entity kinds) can be any
+// hue. On the light theme, darken them until they are readable on white (WCAG 4.5:1).
+let THEME_LIGHT = false;
+const _toneCache = {};
+function tone(hex) {
+  if (!THEME_LIGHT || !/^#[0-9a-f]{6}$/i.test(hex || "")) return hex;
+  if (_toneCache[hex]) return _toneCache[hex];
+  let rgb = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+  const lum = c => { const f = v => { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); }; return .2126 * f(c[0]) + .7152 * f(c[1]) + .0722 * f(c[2]); };
+  for (let i = 0; i < 40 && 1.05 / (lum(rgb) + .05) < 4.6; i++) rgb = rgb.map(v => v * .92);
+  return (_toneCache[hex] = "#" + rgb.map(v => Math.round(v).toString(16).padStart(2, "0")).join(""));
+}
+
+// ── Priority, action guidance, merged stories (computed server-side, see intel-core.js)
+const BAND_COLOR = { "ACT NOW":"#ff4444", "THIS WEEK":"#ff9944", "PLAN":"#ffd700", "MONITOR":"rgba(200,220,240,0.6)" };
+let AI_DETAILS_VISIBLE = false; // set from the feed: AI "in short" lines stay hidden until reviewed
+
+function PriorityBadge({ p, small }) {
+  if (!p) return null;
+  const c = BAND_COLOR[p.label] || BAND_COLOR.MONITOR;
+  return (
+    <span className="priority-badge" title={`BCyberAware priority ${p.score}/100 — ${p.reasons.join(" · ")}`}
+      style={{fontSize:small?10.5:12,padding:small?"3px 8px":"4px 11px",background:"rgba(255,255,255,0.04)",border:`1px solid ${c}`,color:c,letterSpacing:.6,fontFamily:"var(--mono)",borderRadius:3,fontWeight:800,whiteSpace:"nowrap"}}>
+      🎯 {p.score} · {p.label}
+    </span>
+  );
+}
+
+function AlsoReported({ adv }) {
+  if (!adv.also?.length) return null;
+  return (
+    <div className="also-reported" style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center",marginBottom:12}}>
+      <span style={{fontSize:11,color:"rgba(200,220,240,0.6)",fontFamily:"var(--mono)",letterSpacing:.5}}>🗞️ {adv.sources_count||adv.also.length+1} SOURCES · ALSO REPORTED BY</span>
+      {adv.also.slice(0,8).map(o=>(
+        <a key={o.source} href={o.source_url||"#"} target="_blank" rel="noopener noreferrer" title={o.title}
+          style={{fontSize:11,color:"#64b5f6",fontFamily:"var(--mono)",background:"rgba(25,118,210,0.1)",padding:"3px 9px",border:"1px solid rgba(25,118,210,0.3)",borderRadius:3,whiteSpace:"nowrap"}}>{o.source_flag} {o.source} ↗</a>
+      ))}
+    </div>
+  );
+}
+
+function ActionBox({ adv }) {
+  const a = adv.action, p = adv.priority;
+  if (!a) return null;
+  const c = BAND_COLOR[p?.label] || BAND_COLOR["THIS WEEK"];
+  const Row = ({ label, children }) => (
+    <div style={{display:"flex",gap:10,padding:"5px 0",alignItems:"baseline"}}>
+      <span style={{flex:"0 0 92px",fontSize:10.5,letterSpacing:1,color:ACCENT,fontFamily:"var(--mono)",fontWeight:700}}>{label}</span>
+      <span style={{fontSize:13.5,color:"#eef4ff",lineHeight:1.6}}>{children}</span>
+    </div>
+  );
+  return (
+    <div className="action-box" style={{background:"rgba(255,255,255,0.03)",border:`1px solid ${c}`,borderLeft:`4px solid ${c}`,borderRadius:6,padding:"12px 16px",marginBottom:14}}>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",marginBottom:6}}>
+        <span style={{fontSize:11,letterSpacing:2,color:c,fontFamily:"var(--mono)",fontWeight:800}}>🎯 WHAT TO DO</span>
+        {p&&<span style={{fontSize:11,color:"rgba(200,220,240,0.6)",fontFamily:"var(--mono)"}}>priority {p.score}/100</span>}
+      </div>
+      {AI_DETAILS_VISIBLE&&a.ai?.in_short&&<Row label="IN SHORT">{a.ai.in_short} <span title="Written by AI from this item's own text" style={{fontSize:10,color:"#c084fc",fontFamily:"var(--mono)",whiteSpace:"nowrap"}}>· AI</span></Row>}
+      {(a.affected||(AI_DETAILS_VISIBLE&&a.ai?.affected))&&<Row label="AFFECTED">{(AI_DETAILS_VISIBLE&&a.ai?.affected)||a.affected}</Row>}
+      <Row label="DO NOW">{a.do_now}</Row>
+      <Row label="HUNT FOR">{a.hunt}</Row>
+      {a.deadline&&<Row label="DEADLINE">CISA requires US federal agencies to fix this by <strong style={{color:"#ff9944"}}>{a.deadline}</strong> — a sensible outer limit for everyone else.</Row>}
+      {p?.reasons?.length>0&&(
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center",marginTop:8,paddingTop:8,borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+          <span style={{fontSize:10.5,letterSpacing:1,color:"rgba(200,220,240,0.6)",fontFamily:"var(--mono)"}}>WHY</span>
+          {p.reasons.map(r=><span key={r} style={{fontSize:11,color:"rgba(200,220,240,0.7)",fontFamily:"var(--mono)",background:"rgba(255,255,255,0.04)",padding:"2px 8px",border:"1px solid rgba(255,255,255,0.1)",borderRadius:3}}>{r}</span>)}
+        </div>
+      )}
+      <div style={{fontSize:10.5,color:"rgba(200,220,240,0.6)",marginTop:8,lineHeight:1.5}}>General guidance for this type of issue, based on the evidence above — confirm versions and fixes in the source advisory.</div>
+    </div>
+  );
+}
+
 function AdvisoryCard({ adv, onAskAI, onToggleWatch, isWatched, onOpenKnowledge }) {
   const s=SEV_S[adv.severity]||SEV_S.LOW;
   const isNews=adv.category==="news";
@@ -372,15 +445,20 @@ function AdvisoryCard({ adv, onAskAI, onToggleWatch, isWatched, onOpenKnowledge 
   const mitre = mapMitreTactics(adv);
   const { confidence, tlp } = computeOpenCTIMeta(adv);
   const epssColor = (adv.epss||0)>=50 ? "#ff1744" : (adv.epss||0)>=15 ? "#ff9100" : "#00e5ff";
+  // Older cached snapshots have no exploit_public flag: fall back to the category
+  const publicExploit = adv.exploit_public!=null ? (adv.exploit_public&&!adv.exploit_in_wild) : isExploit;
+  const showPriority = adv.priority && (!isNews || adv.priority.score>=30);
+  const goodProduct = p => /^[A-Z0-9]/.test(p) && !/^(attacks?|admin access|systems?|users?|products?|multiple)\b/i.test(p);
   return (
     <div className="card advisory-card" style={{background:"rgba(5,8,15,0.92)",border:`1px solid ${borderCol}33`,borderLeft:`4px solid ${borderCol}`,borderRadius:6,padding:"18px 20px",marginBottom:12,boxShadow:adv.exploit_in_wild?`0 0 14px ${borderCol}12`:"none"}}>
       <div style={{display:"flex",gap:7,flexWrap:"wrap",alignItems:"center",marginBottom:10}}>
+        {showPriority&&<PriorityBadge p={adv.priority}/>}
         {!isNews&&<SevBadge sev={adv.severity}/>}
         {adv.cvss&&<span className="cvss-tag" style={{fontSize:11,padding:"4px 9px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.15)",color:"#eef4ff",fontFamily:"var(--mono)",borderRadius:3,fontWeight:700}}>CVSS {adv.cvss}</span>}
         {adv.epss!=null&&<span title={`FIRST.org EPSS: ${adv.epss}% probability of exploitation in the next 30 days (${adv.epss_percentile||0}th percentile)`} style={{fontSize:11,padding:"4px 10px",background:`${epssColor}18`,border:`1px solid ${epssColor}66`,color:epssColor,letterSpacing:.8,fontFamily:"var(--mono)",borderRadius:3,fontWeight:800}}>🎯 EPSS {adv.epss}%{adv.epss_percentile>=90?` (P${adv.epss_percentile})`:""}</span>}
         {isNews&&<span style={{fontSize:12,padding:"4px 12px",background:"rgba(25,118,210,0.15)",border:"1px solid #1976d255",color:"#64b5f6",letterSpacing:1,fontFamily:"var(--mono)",borderRadius:3}}>📰 NEWS</span>}
-        {isExploit&&<span style={{fontSize:12,padding:"4px 12px",background:"rgba(200,0,0,0.15)",border:"1px solid #c0000055",color:"#ff4444",letterSpacing:1,fontFamily:"var(--mono)",borderRadius:3}}>⚡ PUBLIC EXPLOIT</span>}
-        {adv.exploit_in_wild&&!isExploit&&<span style={{fontSize:12,padding:"4px 12px",background:"rgba(200,0,0,0.15)",border:"1px solid #c0000055",color:"#ff4444",letterSpacing:1,fontFamily:"var(--mono)",borderRadius:3}}>⚡ EXPLOIT IN WILD</span>}
+        {publicExploit&&<span title="Working exploit code is public. No confirmed attacks reported yet." style={{fontSize:12,padding:"4px 12px",background:"rgba(220,100,0,0.13)",border:"1px solid #dd660055",color:"#ff9944",letterSpacing:1,fontFamily:"var(--mono)",borderRadius:3}}>🧪 PUBLIC EXPLOIT</span>}
+        {adv.exploit_in_wild&&<span title={adv.kev?"Confirmed: on CISA's Known Exploited Vulnerabilities list":adv.exploit_reported_by?`Exploitation reported by ${adv.exploit_reported_by}`:"The source reports attacks in the wild"} style={{fontSize:12,padding:"4px 12px",background:"rgba(200,0,0,0.15)",border:"1px solid #c0000055",color:"#ff4444",letterSpacing:1,fontFamily:"var(--mono)",borderRadius:3}}>⚡ EXPLOIT IN WILD</span>}
         {adv.middle_east_relevance==="HIGH"&&<span style={{fontSize:12,padding:"4px 12px",background:"rgba(0,166,81,0.1)",border:"1px solid #00a65155",color:"#00e676",letterSpacing:1,fontFamily:"var(--mono)",borderRadius:3}}>🌍 GCC RISK</span>}
         {isFresh&&<span style={{fontSize:11,padding:"4px 10px",background:"rgba(0,200,255,0.1)",border:"1px solid rgba(0,200,255,.4)",color:"#00c8ff",letterSpacing:1,fontFamily:"var(--mono)",borderRadius:3,fontWeight:800}}>● FRESH</span>}
         <span title="Source confidence (OpenCTI-style)" style={{fontSize:10,padding:"3px 8px",background:"rgba(0,200,255,0.07)",border:"1px solid rgba(0,200,255,0.22)",color:ACCENT,fontFamily:"var(--mono)",borderRadius:3,fontWeight:700}}>{confidence}%</span>
@@ -394,18 +472,20 @@ function AdvisoryCard({ adv, onAskAI, onToggleWatch, isWatched, onOpenKnowledge 
       </div>
       <div className="card-title" style={{fontSize:17,fontWeight:700,color:"#eef4ff",marginBottom:10,lineHeight:1.45}}>{adv.title}</div>
       <div className="card-summary" style={{fontSize:14,color:"rgba(200,220,240,0.6)",lineHeight:1.75,marginBottom:12}}>{adv.summary}</div>
+      <AlsoReported adv={adv}/>
+      <ActionBox adv={adv}/>
       <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
         {adv.cve_ids?.map(c=>(
           <a key={c} href={`https://nvd.nist.gov/vuln/detail/${c}`} target="_blank" rel="noopener noreferrer"
             style={{fontSize:12,color:ACCENT,fontFamily:"var(--mono)",background:"rgba(0,200,255,0.07)",padding:"4px 11px",border:`1px solid rgba(0,200,255,0.22)`,borderRadius:3}}>{c} ↗</a>
         ))}
-        {adv.affected_products?.slice(0,3).map(p=>(
+        {adv.affected_products?.filter(goodProduct).slice(0,3).map(p=>(
           <span key={p} className="product-tag" style={{fontSize:11,color:"rgba(200,220,240,0.7)",fontFamily:"var(--mono)",background:"rgba(255,255,255,0.04)",padding:"4px 10px",border:"1px solid rgba(255,255,255,0.1)",borderRadius:3}}>📦 {p}</span>
         ))}
         {mitre.map(m=>(
           <button key={m.id} type="button" onClick={()=>onOpenKnowledge?onOpenKnowledge({type:"technique",id:m.id}):window.open(`https://attack.mitre.org/techniques/${m.id}/`,"_blank")}
             title={`Open Knowledge · MITRE ATT&CK ${m.tactic}: ${m.name}`}
-            style={{fontSize:11,color:m.color,fontFamily:"var(--mono)",background:`${m.color}14`,padding:"4px 10px",border:`1px solid ${m.color}44`,borderRadius:3,fontWeight:600,cursor:"pointer"}}>⚔️ {m.id} · {m.name}</button>
+            style={{fontSize:11,color:tone(m.color),fontFamily:"var(--mono)",background:`${m.color}14`,padding:"4px 10px",border:`1px solid ${m.color}44`,borderRadius:3,fontWeight:600,cursor:"pointer"}}>⚔️ {m.id} · {m.name}</button>
         ))}
         {adv.threat_actor&&<button type="button" onClick={()=>onOpenKnowledge&&onOpenKnowledge({type:"entity",id:adv.threat_actor})} style={{fontSize:12,color:"#c084fc",fontFamily:"var(--mono)",background:"rgba(123,47,247,0.09)",padding:"4px 11px",border:"1px solid rgba(123,47,247,0.25)",borderRadius:3,cursor:"pointer"}}>🎯 {adv.threat_actor}</button>}
         {adv.patch_available&&!isNews&&<span style={{fontSize:12,color:"#00e676",fontFamily:"var(--mono)",background:"rgba(0,200,100,0.07)",padding:"4px 11px",border:"1px solid rgba(0,200,100,0.22)",borderRadius:3}}>✔ PATCH AVAILABLE</span>}
@@ -435,7 +515,7 @@ function SocialCard({ post }) {
   return (
     <a href={post.source_url} target="_blank" rel="noopener noreferrer" className="card social-card" style={{display:"block",background:"rgba(5,8,15,0.92)",border:`1px solid ${col}33`,borderLeft:`4px solid ${col}`,borderRadius:6,padding:"14px 18px",marginBottom:10}}>
       <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",marginBottom:8}}>
-        <span style={{fontSize:11,padding:"3px 10px",background:`${col}1f`,border:`1px solid ${col}66`,color:col,letterSpacing:1,fontFamily:"var(--mono)",borderRadius:3,fontWeight:700}}>{post.source_flag} {post.source.toUpperCase()}</span>
+        <span style={{fontSize:11,padding:"3px 10px",background:`${col}1f`,border:`1px solid ${col}66`,color:tone(col),letterSpacing:1,fontFamily:"var(--mono)",borderRadius:3,fontWeight:700}}>{post.source_flag} {post.source.toUpperCase()}</span>
         {post.author&&<span className="social-author" style={{fontSize:12,color:"rgba(200,220,240,.55)",fontFamily:"var(--mono)"}}>{post.author}</span>}
         {post.exploit_in_wild&&<span style={{fontSize:11,padding:"3px 8px",background:"rgba(200,0,0,.15)",border:"1px solid #c0000055",color:"#ff4444",borderRadius:3,fontFamily:"var(--mono)"}}>⚡</span>}
         {isFresh&&<span style={{fontSize:10,padding:"3px 8px",background:"rgba(0,200,255,0.1)",border:"1px solid rgba(0,200,255,.4)",color:"#00c8ff",letterSpacing:1,fontFamily:"var(--mono)",borderRadius:3,fontWeight:800}}>● FRESH</span>}
@@ -576,9 +656,15 @@ function computePriority(item, allItems) {
   const reasons = [];
 
   // Active exploitation (CISA KEV, Exploit-DB, in-the-wild)
-  if (item.exploit_in_wild || item.source === "CISA KEV" || item.category === "exploit") {
+  if (item.source === "CISA KEV" || item.kev) {
     score += 35;
     reasons.push("On CISA's Known Exploited Vulnerabilities list");
+  } else if (item.exploit_in_wild) {
+    score += 30;
+    reasons.push("Exploitation reported in the wild");
+  } else if (item.category === "exploit") {
+    score += 15;
+    reasons.push("Public exploit or 0-day pipeline entry");
   }
 
   // EPSS score
@@ -637,19 +723,45 @@ function computePriority(item, allItems) {
   };
 }
 
-function TopPrioritiesPanel({ advisories, exploits, onAskAI }) {
+// The feed's own evidence-based score (intel-core.js on the server), shaped for this panel
+function serverPriority(item) {
+  const p = item.priority, act = p.label === "ACT NOW", week = p.label === "THIS WEEK";
+  return {
+    score: p.score, tier: p.label, server: true,
+    tierColor: BAND_COLOR[p.label] || BAND_COLOR.MONITOR,
+    tierBg: act ? "rgba(255,23,68,0.12)" : week ? "rgba(255,145,0,0.12)" : "rgba(0,200,255,0.08)",
+    tierBorder: act ? "rgba(255,23,68,0.45)" : week ? "rgba(255,145,0,0.45)" : "rgba(0,200,255,0.3)",
+    tierDot: act ? "🔴" : week ? "🟠" : "🔵",
+    reasonsLine: p.reasons.slice(0, 3).join(" · ") + (item.source ? ` — ${item.source}` : ""),
+  };
+}
+
+function TopPrioritiesPanel({ advisories, exploits, news, onAskAI }) {
   const [expandedId, setExpandedId] = useState(null);
-  const all = useMemo(() => [...(advisories || []), ...(exploits || [])], [advisories, exploits]);
+  const fromServer = useMemo(() => [...(advisories || []), ...(exploits || [])].some(a => a.priority), [advisories, exploits]);
+  // Server-scored feeds also rank news stories; the browser fallback only knows advisories and exploits
+  const all = useMemo(() => [...(advisories || []), ...(exploits || []), ...(fromServer ? (news || []) : [])], [advisories, exploits, news, fromServer]);
 
   const scored = useMemo(() => {
     return all
-      .map(item => ({ item, pri: computePriority(item, all) }))
-      .sort((a, b) => b.pri.score - a.pri.score);
-  }, [all]);
+      .map(item => ({ item, pri: item.priority ? serverPriority(item) : computePriority(item, all) }))
+      .filter(s => !fromServer || s.pri.score >= 50)
+      .sort((a, b) => b.pri.score - a.pri.score || (b.item.ts || 0) - (a.item.ts || 0));
+  }, [all, fromServer]);
 
   const actNowCount = useMemo(() => scored.filter(s => s.pri.tier === "ACT NOW").length, [scored]);
   const thisWeekCount = useMemo(() => scored.filter(s => s.pri.tier === "THIS WEEK").length, [scored]);
-  const topItems = useMemo(() => scored.slice(0, 5), [scored]);
+  const topItems = useMemo(() => {
+    const picked = [], seenCve = new Set();
+    for (const s of scored) {
+      const cves = s.item.cve_ids || [];
+      if (cves.some(c => seenCve.has(c))) continue; // one row per vulnerability
+      cves.forEach(c => seenCve.add(c));
+      picked.push(s);
+      if (picked.length === 5) break;
+    }
+    return picked;
+  }, [scored]);
 
   if (!topItems.length) return null;
 
@@ -749,19 +861,31 @@ function TopPrioritiesPanel({ advisories, exploits, onAskAI }) {
                         ⚡ IMMEDIATE ACTION ({pri.tier === "ACT NOW" ? "NEXT 24 HOURS" : "THIS WEEK"}):
                       </div>
                       <div style={{color: "rgba(230,238,250,0.85)"}}>
-                        {item.summary && item.summary.includes("Required action:")
+                        {item.action
+                          ? <>{item.action.do_now}{item.action.deadline ? <> <strong style={{color:"#ff9944"}}>CISA deadline for US federal agencies: {item.action.deadline}.</strong></> : null}</>
+                          : item.summary && item.summary.includes("Required action:")
                           ? item.summary.split("Required action:")[1].trim()
                           : `Apply vendor patches immediately. If hotfixes cannot be deployed within 24h, isolate vulnerable ${item.affected_products?.[0] || "services"} and restrict public inbound access.`}
                       </div>
+                      {item.action?.hunt && (
+                        <>
+                          <div style={{color: "#00e676", fontWeight: 700, fontFamily: "var(--mono)", margin: "10px 0 4px", fontSize: 11, letterSpacing: 1}}>🔎 HUNT FOR:</div>
+                          <div style={{color: "rgba(230,238,250,0.85)"}}>{item.action.hunt}</div>
+                        </>
+                      )}
                     </div>
                     <div style={{flex: "1 1 220px"}}>
                       <div style={{color: "#00e5ff", fontWeight: 700, fontFamily: "var(--mono)", marginBottom: 4, fontSize: 11, letterSpacing: 1}}>
                         🎯 ATTACK VECTOR & EXPOSURE:
                       </div>
                       <div style={{color: "rgba(200,220,240,0.75)"}}>
-                        {item.affected_products?.length ? `Targets: ${item.affected_products.slice(0, 3).join(", ")}. ` : ""}
+                        {item.action?.affected ? `Affected: ${item.action.affected}. ` : item.affected_products?.length ? `Targets: ${item.affected_products.slice(0, 3).join(", ")}. ` : ""}
                         {cve ? `${cve}. ` : ""}
-                        {item.exploit_in_wild ? "Active exploitation in the wild confirmed." : "High risk of exploitation."}
+                        {item.kev ? "Confirmed exploited: on CISA's Known Exploited Vulnerabilities list."
+                          : item.exploit_in_wild ? (item.exploit_reported_by ? `Exploitation in the wild reported by ${item.exploit_reported_by}.` : "Exploitation in the wild reported.")
+                          : item.exploit_public ? "Working exploit code is public; no confirmed attacks reported yet."
+                          : pri.server ? "No exploitation reported yet." : "High risk of exploitation."}
+                        {item.sources_count > 1 ? ` Reported by ${item.sources_count} sources.` : ""}
                       </div>
                     </div>
                   </div>
@@ -935,7 +1059,10 @@ function CISOBriefView({ advisories, exploits, news }) {
   const wildExploits=allItems.filter(a=>a.exploit_in_wild);
   const meItems=allItems.filter(a=>a.middle_east_relevance==="HIGH").slice(0,3);
   const threatActors=[...new Set(allItems.filter(a=>a.threat_actor).map(a=>a.threat_actor))];
-  const patchNow=[...new Map(allItems.filter(a=>a.exploit_in_wild||a.severity==="CRITICAL").map(a=>[a.id,a])).values()].slice(0,5);
+  const scored=allItems.some(a=>a.priority);
+  const patchNow=scored
+    ? [...new Map(allItems.filter(a=>(a.priority?.score||0)>=50).sort((x,y)=>y.priority.score-x.priority.score).map(a=>[a.id,a])).values()].slice(0,5)
+    : [...new Map(allItems.filter(a=>a.exploit_in_wild||a.severity==="CRITICAL").map(a=>[a.id,a])).values()].slice(0,5);
   const monitor=advisories.filter(a=>a.severity==="HIGH"&&!a.exploit_in_wild).slice(0,4);
   const watchList=news.slice(0,4);
 
@@ -957,6 +1084,7 @@ function CISOBriefView({ advisories, exploits, news }) {
     <div style={{background:"rgba(5,8,15,.92)",border:"1px solid rgba(255,255,255,.07)",borderLeft:`4px solid ${SEV_S[item.severity]?.border||"#444"}`,borderRadius:5,padding:"14px 16px",marginBottom:10}}>
       <div style={{display:"flex",gap:7,flexWrap:"wrap",alignItems:"center",marginBottom:8}}>
         <span style={{fontSize:11,fontWeight:800,padding:"3px 10px",background:labelBg,border:`1px solid ${labelColor}`,color:labelColor,borderRadius:3,fontFamily:"var(--mono)",letterSpacing:1}}>{label}</span>
+        <PriorityBadge p={item.priority} small/>
         <SevBadge sev={item.severity}/>
         {item.exploit_in_wild&&<span style={{fontSize:11,padding:"3px 8px",background:"rgba(200,0,0,.15)",border:"1px solid #c00000",color:"#ff4444",borderRadius:3,fontFamily:"var(--mono)"}}>⚡ WILD</span>}
         <span style={{fontSize:11,color:"rgba(200,220,240,.35)"}}>{item.source_flag} {item.source}</span>
@@ -964,6 +1092,7 @@ function CISOBriefView({ advisories, exploits, news }) {
       <div style={{fontSize:14,fontWeight:700,color:"#eef4ff",marginBottom:6,lineHeight:1.4}}>{item.title}</div>
       {item.cve_ids?.length>0&&<div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}}>{item.cve_ids.slice(0,3).map(c=><a key={c} href={`https://nvd.nist.gov/vuln/detail/${c}`} target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:ACCENT,fontFamily:"var(--mono)",background:"rgba(0,200,255,.07)",padding:"3px 9px",border:"1px solid rgba(0,200,255,.22)",borderRadius:3}}>{c} ↗</a>)}</div>}
       <div style={{fontSize:13,color:"rgba(200,220,240,.55)",lineHeight:1.6}}>{(item.summary||"").slice(0,180)}{(item.summary||"").length>180?"…":""}</div>
+      {item.action&&<div style={{fontSize:13,color:"#eef4ff",lineHeight:1.6,marginTop:8,paddingTop:8,borderTop:"1px solid rgba(255,255,255,.06)"}}><span style={{fontSize:10.5,letterSpacing:1,color:ACCENT,fontFamily:"var(--mono)",fontWeight:700,marginRight:8}}>DO NOW</span>{item.action.do_now}{item.action.deadline?` (CISA deadline ${item.action.deadline})`:""}</div>}
     </div>
   );
 
@@ -985,7 +1114,7 @@ function CISOBriefView({ advisories, exploits, news }) {
       <div style={{background:"rgba(123,47,247,.06)",border:"1px solid rgba(123,47,247,.2)",borderRadius:8,padding:"20px 22px",marginBottom:16}}>
         <div style={{fontSize:11,letterSpacing:3,color:"rgba(123,47,247,.8)",marginBottom:10,fontFamily:"var(--mono)"}}>SITUATION OVERVIEW</div>
         <div style={{fontSize:14,color:"rgba(200,220,240,.75)",lineHeight:1.85}}>
-          This week's threat intelligence from <strong style={{color:ACCENT}}>{advisories.length+exploits.length+news.length} sources</strong> identifies <strong style={{color:"#ff4444"}}>{criticals.length} critical vulnerabilities</strong>, with <strong style={{color:"#ff9944"}}>{wildExploits.length} actively exploited in the wild</strong>.{threatActors.length>0&&<> Active ransomware / APT campaigns confirmed: <strong style={{color:"#c084fc"}}>{threatActors.slice(0,3).join(", ")}</strong>.</>}{" "}<strong style={{color:"#00e676"}}>{meItems.length} advisories</strong> carry direct GCC / Middle East risk.{topSectors.length>0&&<> Highest-exposure sectors: <strong style={{color:ACCENT}}>{topSectors.slice(0,3).map(s=>s[0]).join(", ")}</strong>.</>}
+          This week's threat intelligence from <strong style={{color:ACCENT}}>{advisories.length+exploits.length+news.length} tracked items</strong> identifies <strong style={{color:"#ff4444"}}>{criticals.length} critical vulnerabilities</strong>, with <strong style={{color:"#ff9944"}}>{wildExploits.length} actively exploited in the wild</strong>.{threatActors.length>0&&<> Active ransomware / APT campaigns confirmed: <strong style={{color:"#c084fc"}}>{threatActors.slice(0,3).join(", ")}</strong>.</>}{" "}<strong style={{color:"#00e676"}}>{meItems.length} advisories</strong> carry direct GCC / Middle East risk.{topSectors.length>0&&<> Highest-exposure sectors: <strong style={{color:ACCENT}}>{topSectors.slice(0,3).map(s=>s[0]).join(", ")}</strong>.</>}
         </div>
       </div>
 
@@ -1045,7 +1174,7 @@ function CISOBriefView({ advisories, exploits, news }) {
       {watchList.map(a=><ActionRow key={a.id} item={a} label="WATCH" labelColor="#64b5f6" labelBg="rgba(25,118,210,.12)"/>)}
 
       <div style={{padding:"14px 16px",background:"rgba(0,200,255,.03)",border:"1px solid rgba(0,200,255,.08)",borderRadius:6,marginTop:16,fontSize:12,color:"rgba(200,220,240,.35)",lineHeight:1.7}}>
-        📋 Auto-generated from {advisories.length+exploits.length+news.length} live sources · BCyberAware by Vikas Pandita (Global Head of Security Architecture · TOGAF 9.2 · IIM Kozhikode EPGP) · Feed rebuilt automatically every 5 minutes
+        📋 Auto-generated from {advisories.length+exploits.length+news.length} live items · BCyberAware by Vikas Pandita (Global Head of Security Architecture · TOGAF 9.2 · IIM Kozhikode EPGP) · Feed rebuilt automatically every 5 minutes
       </div>
     </div>
   );
@@ -1470,7 +1599,8 @@ function renderMd(text){
 
 function compactFeedContext(advisories, exploits, news){
   const line=a=>`- [${a.severity||""}] ${a.title}${a.cve_ids?.length?" ("+a.cve_ids.slice(0,2).join(", ")+")":""} — ${a.source}${a.exploit_in_wild?" · EXPLOITED IN WILD":""}`;
-  const parts=["TOP ADVISORIES",...(advisories||[]).slice(0,14).map(line),"EXPLOITS / 0-DAY",...(exploits||[]).slice(0,8).map(line),"SECURITY NEWS",...(news||[]).slice(0,12).map(a=>`- ${a.title} — ${a.source}`)];
+  const top=[...(advisories||[]),...(exploits||[]),...(news||[])].filter(a=>(a.priority?.score||0)>=50).sort((x,y)=>y.priority.score-x.priority.score).slice(0,8);
+  const parts=["TOP PRIORITIES (BCyberAware score 0-100)",...top.map(a=>`- [${a.priority.score} ${a.priority.label}] ${a.title}${a.cve_ids?.length?" ("+a.cve_ids.slice(0,2).join(", ")+")":""} — ${a.source}. Why: ${a.priority.reasons.slice(0,3).join("; ")}`),"TOP ADVISORIES",...(advisories||[]).slice(0,14).map(line),"EXPLOITS / 0-DAY",...(exploits||[]).slice(0,8).map(line),"SECURITY NEWS",...(news||[]).slice(0,12).map(a=>`- ${a.title} — ${a.source}`)];
   return parts.join("\n").slice(0,6000);
 }
 
@@ -1599,11 +1729,11 @@ const KNOWN_ENTITIES = [
   { name: "RansomHub", kind: "ransomware", color: "#d32f2f", re: /ransomhub/i },
   { name: "Play", kind: "ransomware", color: "#c62828", re: /play ransomware|\bplay\b.*ransom/i },
   { name: "Scattered Spider", kind: "intrusion-set", color: "#ab47bc", re: /scattered spider|unc3944|octo tempest/i },
-  { name: "Lazarus", kind: "intrusion-set", color: "#8e24aa", re: /\blazarus\b|hidden cobra|apt38/i },
-  { name: "APT29", kind: "intrusion-set", color: "#7b1fa2", re: /\bapt29\b|cozy bear|midnight blizzard/i },
-  { name: "APT28", kind: "intrusion-set", color: "#6a1b9a", re: /\bapt28\b|fancy bear|forest blizzard/i },
-  { name: "Volt Typhoon", kind: "intrusion-set", color: "#9c27b0", re: /volt typhoon/i },
-  { name: "Salt Typhoon", kind: "intrusion-set", color: "#8e24aa", re: /salt typhoon/i },
+  { name: "Lazarus", kind: "intrusion-set", color: "#ba68c8", re: /\blazarus\b|hidden cobra|apt38/i },
+  { name: "APT29", kind: "intrusion-set", color: "#ab47bc", re: /\bapt29\b|cozy bear|midnight blizzard/i },
+  { name: "APT28", kind: "intrusion-set", color: "#ab47bc", re: /\bapt28\b|fancy bear|forest blizzard/i },
+  { name: "Volt Typhoon", kind: "intrusion-set", color: "#ba68c8", re: /volt typhoon/i },
+  { name: "Salt Typhoon", kind: "intrusion-set", color: "#ba68c8", re: /salt typhoon/i },
   { name: "Kimsuky", kind: "intrusion-set", color: "#7e57c2", re: /\bkimsuky\b/i },
   { name: "Lumma Stealer", kind: "malware", color: "#26c6da", re: /\blumma\b/i },
   { name: "RedLine", kind: "malware", color: "#00acc1", re: /\bredline\b/i },
@@ -1753,11 +1883,14 @@ function KnowledgeView({ advisories, exploits, news, focus, onClearFocus, onAskA
                       const n = hit?.count||0;
                       const hot = selected?.type==="technique"&&selected.id===t.id;
                       const alpha = n?(.12+.55*(n/max)):0.03;
+                      // Strongly filled cells: dark text on light colours, white on dark ones
+                      const lum = (()=>{ const h=t.color.replace("#",""); const f=i=>{const v=parseInt(h.slice(i,i+2),16)/255; return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4);}; return .2126*f(0)+.7152*f(2)+.0722*f(4); })();
+                      const strong = alpha>.4, cellText = strong ? (lum*alpha>.16?"#05080f":"#ffffff") : null;
                       return (
                         <button key={t.id} className="attack-cell" onClick={()=>setSelected(hot?null:{type:"technique",id:t.id})}
                           style={{display:"block",width:"100%",textAlign:"left",marginBottom:5,padding:"8px 8px",borderRadius:5,cursor:"pointer",background:n?`${t.color}${Math.round(alpha*255).toString(16).padStart(2,"0")}`:"rgba(255,255,255,.03)",border:`1px solid ${hot?t.color:n?t.color+"66":"rgba(255,255,255,.06)"}`,boxShadow:hot?`0 0 10px ${t.color}55`:"none"}}>
-                          <div style={{fontSize:10,fontWeight:800,color:n?(alpha>.4?"#ffffff":t.color):"rgba(200,220,240,.3)",fontFamily:"var(--mono)"}}>{t.id}{n?` · ${n}`:""}</div>
-                          <div style={{fontSize:10,color:n?"rgba(230,238,250,.8)":"rgba(200,220,240,.28)",lineHeight:1.35}}>{t.name}</div>
+                          <div style={{fontSize:10,fontWeight:800,color:n?(cellText||t.color):"rgba(200,220,240,.3)",fontFamily:"var(--mono)"}}>{t.id}{n?` · ${n}`:""}</div>
+                          <div style={{fontSize:10,color:n?(cellText||"rgba(230,238,250,.8)"):"rgba(200,220,240,.28)",lineHeight:1.35}}>{t.name}</div>
                         </button>
                       );
                     })}
@@ -1816,7 +1949,7 @@ function KnowledgeView({ advisories, exploits, news, focus, onClearFocus, onAskA
               <button key={e.name} onClick={()=>setSelected({type:"entity",id:e.name})} style={{textAlign:"left",background:"rgba(5,8,15,.92)",border:`1px solid ${selected?.id===e.name?e.color:e.color+"33"}`,borderLeft:`4px solid ${e.color}`,borderRadius:6,padding:"14px 16px",cursor:"pointer"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
                   <span style={{fontSize:14,fontWeight:800,color:"#eef4ff"}}>{e.name}</span>
-                  <span style={{fontSize:10,fontFamily:"var(--mono)",color:e.color,border:`1px solid ${e.color}55`,padding:"2px 7px",borderRadius:3}}>{e.kind}</span>
+                  <span style={{fontSize:10,fontFamily:"var(--mono)",color:tone(e.color),border:`1px solid ${e.color}55`,padding:"2px 7px",borderRadius:3}}>{e.kind}</span>
                 </div>
                 <div style={{fontSize:22,fontWeight:900,color:e.color,fontFamily:"var(--mono)",lineHeight:1}}>{e.count}</div>
                 <div style={{fontSize:11,color:"rgba(200,220,240,.4)"}}>linked live items</div>
@@ -1880,7 +2013,7 @@ function KnowledgeView({ advisories, exploits, news, focus, onClearFocus, onAskA
 }
 
 function BCyberAwareDashboard() {
-  const [cached] = useState(readCachedFeed);
+  const [cached] = useState(()=>{ const c=readCachedFeed(); AI_DETAILS_VISIBLE=!!c?.ai_details_visible; return c; });
   const [advisories,setAdvisories] = useState(cached?.advisories||[]);
   const [exploits,  setExploits]   = useState(cached?.exploits||[]);
   const [news,      setNews]       = useState(cached?.news||[]);
@@ -1897,7 +2030,8 @@ function BCyberAwareDashboard() {
   const [filterExp, setFilterExp]  = useState(false);
   const [filterEpss,setFilterEpss] = useState(false);
   const [searchQ,   setSearchQ]    = useState("");
-  const [sortBy,    setSortBy]     = useState("recent"); // recent | sev | epss
+  const [sortBy,    setSortBy]     = useState("recent"); // recent | priority | sev | epss
+  const [filterAct, setFilterAct]  = useState(false);
   const [watchlist, setWatchlist]  = useState(() => {
     try { return JSON.parse(localStorage.getItem("bca_watchlist") || "[]"); } catch { return []; }
   });
@@ -1978,12 +2112,13 @@ function BCyberAwareDashboard() {
       const a = document.createElement("a"); a.href = u; a.download = `bcyberaware-intel-${stamp}.json`; a.click();
       URL.revokeObjectURL(u);
     } else {
-      const header = ["ID","Severity","CVSS","EPSS_%","Exploit_In_Wild","GCC_Relevance","Date","Source","CVEs","Title","URL"];
+      const header = ["ID","Priority_Score","Priority","Severity","CVSS","EPSS_%","Exploit_In_Wild","CISA_KEV","Public_Exploit","Sources","GCC_Relevance","Date","Source","CVEs","Title","Do_Now","URL"];
       const esc = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
       const rows = items.map(x => [
-        x.id, x.severity, x.cvss || "", x.epss ?? "", x.exploit_in_wild ? "YES" : "NO",
+        x.id, x.priority?.score ?? "", x.priority?.label || "", x.severity, x.cvss || "", x.epss ?? "", x.exploit_in_wild ? "YES" : "NO",
+        x.kev ? "YES" : "NO", x.exploit_public ? "YES" : "NO", x.sources_count || 1,
         x.middle_east_relevance || "", x.date || "", x.source || "",
-        (x.cve_ids || []).join(";"), x.title || "", x.source_url || ""
+        (x.cve_ids || []).join(";"), x.title || "", x.action?.do_now || "", x.source_url || ""
       ].map(esc).join(","));
       const blob = new Blob([[header.join(","), ...rows].join("\n")], { type: "text/csv;charset=utf-8" });
       const u = URL.createObjectURL(blob);
@@ -1999,6 +2134,7 @@ function BCyberAwareDashboard() {
       const data = await loadFeed(force);
       if(!data||!data.advisories) throw new Error(data?.error||"empty response");
       lastFetchRef.current = Date.now();
+      AI_DETAILS_VISIBLE = !!data.ai_details_visible;
       setAdvisories(data.advisories||[]);
       setExploits(data.exploits||[]);
       setNews(data.news||[]);
@@ -2100,9 +2236,11 @@ function BCyberAwareDashboard() {
       if(filterME&&a.middle_east_relevance!=="HIGH") return false;
       if(filterExp&&!a.exploit_in_wild)              return false;
       if(filterEpss&&(a.epss||0)<10)                 return false;
+      if(filterAct&&!a.action)                       return false;
       return true;
     })
     .sort((a,b)=>{
+      if(sortBy==="priority") return (b.priority?.score||0)-(a.priority?.score||0) || (b.ts||0)-(a.ts||0);
       if(sortBy==="epss") return (b.epss||0)-(a.epss||0) || (b.ts||0)-(a.ts||0);
       if(sortBy==="recent") return (b.ts||0)-(a.ts||0);
       return SEV_ORDER.indexOf(a.severity)-SEV_ORDER.indexOf(b.severity) || (b.ts||0)-(a.ts||0) || (b.epss||0)-(a.epss||0);
@@ -2182,6 +2320,7 @@ function BCyberAwareDashboard() {
   const healthByName={};
   (feedMeta?.source_health||[]).forEach(h=>{healthByName[h.name]=h;});
 
+  THEME_LIGHT = theme === "light";
   return (
     <div className={`bca-app ${theme === "light" ? "light-theme" : "dark-theme"}`} style={{minHeight:"100vh",background:theme==="light"?"#f4f6fb":"#05080f",color:theme==="light"?"#1e293b":"#c8d8e8"}}>
       <style>{`
@@ -2253,7 +2392,7 @@ function BCyberAwareDashboard() {
             )}
             {feedError&&<div style={{padding:"14px 18px",background:"rgba(200,0,0,.1)",border:"1px solid rgba(200,0,0,.3)",borderRadius:6,marginBottom:16,fontSize:14,color:"#ff6666"}}>⚠ {feedError}{feedMeta?` — showing the last saved copy (updated ${updatedAgo(feedMeta.fetched_at, nowTick)})`:""}</div>}
             <AIBriefCard brief={brief}/>
-            <TopPrioritiesPanel advisories={advisories} exploits={exploits} onAskAI={askAIAboutItem}/>
+            <TopPrioritiesPanel advisories={advisories} exploits={exploits} news={news} onAskAI={askAIAboutItem}/>
 
             {/* ── Global Command Search + Velocity + Vendor Matrix ── */}
             <div className="search-bar-wrap" style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",marginBottom:14,background:"rgba(255,255,255,0.02)",border:"1px solid rgba(0,200,255,0.18)",borderRadius:8,padding:"10px 14px"}}>
@@ -2301,9 +2440,10 @@ function BCyberAwareDashboard() {
                 <button onClick={()=>setFilterME(!filterME)} className={`filter-btn ${filterME?"active":""}`} style={{padding:"5px 14px",fontSize:13,cursor:"pointer",fontFamily:"var(--mono)",background:filterME?"rgba(0,166,81,.12)":"transparent",border:`1px solid ${filterME?"#00a651":"rgba(255,255,255,.1)"}`,color:filterME?"#00e676":"rgba(200,220,240,.45)",borderRadius:4,fontWeight:filterME?700:400}}>🌍 GCC / Middle East</button>
                 <button onClick={()=>setFilterExp(!filterExp)} className={`filter-btn ${filterExp?"active":""}`} style={{padding:"5px 14px",fontSize:13,cursor:"pointer",fontFamily:"var(--mono)",background:filterExp?"rgba(200,0,0,.12)":"transparent",border:`1px solid ${filterExp?"#c00000":"rgba(255,255,255,.1)"}`,color:filterExp?"#ff4444":"rgba(200,220,240,.45)",borderRadius:4,fontWeight:filterExp?700:400}}>⚡ Exploit in Wild</button>
                 <button onClick={()=>setFilterEpss(!filterEpss)} className={`filter-btn ${filterEpss?"active":""}`} style={{padding:"5px 14px",fontSize:13,cursor:"pointer",fontFamily:"var(--mono)",background:filterEpss?"rgba(255,145,0,.14)":"transparent",border:`1px solid ${filterEpss?"#ff9100":"rgba(255,255,255,.1)"}`,color:filterEpss?"#ff9100":"rgba(200,220,240,.45)",borderRadius:4,fontWeight:filterEpss?700:400}}>🎯 EPSS ≥ 10%</button>
+                <button onClick={()=>setFilterAct(!filterAct)} className={`filter-btn ${filterAct?"active":""}`} title="Only items with a What-to-do box" style={{padding:"5px 14px",fontSize:13,cursor:"pointer",fontFamily:"var(--mono)",background:filterAct?"rgba(255,68,68,.12)":"transparent",border:`1px solid ${filterAct?"#ff4444":"rgba(255,255,255,.1)"}`,color:filterAct?"#ff4444":"rgba(200,220,240,.45)",borderRadius:4}}>🎯 Needs action</button>
                 <div style={{marginLeft:"auto",display:"flex",gap:5,alignItems:"center"}}>
                   <span style={{fontSize:11,color:"rgba(200,220,240,.3)",fontFamily:"var(--mono)"}}>SORT:</span>
-                  {[["sev","Severity"],["epss","EPSS Risk"],["recent","Newest"]].map(([k,lbl])=>(
+                  {[["priority","🎯 Priority"],["sev","Severity"],["epss","EPSS Risk"],["recent","Newest"]].map(([k,lbl])=>(
                     <button key={k} onClick={()=>setSortBy(k)} className={`sort-btn ${sortBy===k?"active":""}`} style={{padding:"4px 10px",fontSize:11.5,cursor:"pointer",fontFamily:"var(--mono)",background:sortBy===k?"rgba(0,200,255,.12)":"transparent",border:`1px solid ${sortBy===k?ACCENT:"rgba(255,255,255,.1)"}`,color:sortBy===k?ACCENT:"rgba(200,220,240,.45)",borderRadius:4,fontWeight:sortBy===k?700:400}}>{lbl}</button>
                   ))}
                 </div>

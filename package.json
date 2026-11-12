@@ -4,7 +4,8 @@
   "scripts": {
     "build": "esbuild src/app.jsx --minify --format=iife --target=es2020 --legal-comments=none --outfile=app.js",
     "dev": "npm run build && wrangler dev",
-    "deploy": "npm run build && wrangler deploy"
+    "deploy": "npm run build && wrangler deploy",
+    "test": "node --no-warnings --test tests/*.test.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.25.12",

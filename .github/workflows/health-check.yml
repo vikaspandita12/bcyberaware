@@ -25,6 +25,13 @@ jobs:
           curl -sf --max-time 40 -o /tmp/feed.json -w 'feed: HTTP %{http_code} in %{time_total}s, %{size_download} bytes\n' "$BASE/api/proxy?action=feed"
           jq -r '"items: \((.advisories|length)+(.exploits|length)+(.news|length)) · sources live: \(.sources_live)/\(.sources_total) · built: \(.fetched_at_human) · scheduled: \(.scheduled // false) · AI brief: \(.brief.brief != null)"' /tmp/feed.json
           curl -sf --max-time 20 -o /dev/null -w 'home page: HTTP %{http_code} in %{time_total}s\n' "$BASE/"
+          # Intelligence layer: what is ranked highest, and a few AI detail lines for review
+          echo "--- top priorities"
+          jq -r '[.advisories[], .exploits[], .news[]] | map(select(.priority != null)) | sort_by(-.priority.score) | .[0:8][] | "\(.priority.score) \(.priority.label) | \(.source) | \(.title[0:90]) | \(.priority.reasons | join("; "))"' /tmp/feed.json
+          echo "--- merged stories"
+          jq -r '.news | map(select((.sources_count // 1) > 1)) | sort_by(-.sources_count) | .[0:6][] | "[\(.sources_count)] \(.source): \(.title[0:80]) + \([.also[].source] | join(", "))"' /tmp/feed.json
+          echo "--- AI detail samples (shown on the site only when ai_details_visible is true: $(jq -r '.ai_details_visible // false' /tmp/feed.json))"
+          jq -r '[.advisories[], .exploits[], .news[]] | map(select(.action.ai != null)) | .[0:12][] | "TITLE: \(.title[0:110])\n  IN SHORT: \(.action.ai.in_short)\n  AFFECTED: \(.action.ai.affected // "-")"' /tmp/feed.json
           healthy=$(echo "$status" | jq -r '.scheduled_refresh_healthy')
           if [ "$healthy" != "true" ]; then
             echo "::error::Scheduled refresh is not healthy — the site is falling back to slow live builds. See the status JSON above."
