@@ -63,7 +63,7 @@
   <!-- React is served from this origin: no extra DNS/TLS handshake, no third-party dependency -->
   <script defer src="vendor/react-18.2.0.production.min.js"></script>
   <script defer src="vendor/react-dom-18.2.0.production.min.js"></script>
-  <script defer src="app.js?v=3.0"></script>
+  <script defer src="app.js?v=3.1"></script>
   <style>
     :root{
       --mono:'JetBrains Mono','SFMono-Regular',Menlo,Consolas,monospace;
@@ -589,6 +589,9 @@
     /* Floating analyst launcher keeps its dark gradient, so keep its light text */
     html[data-theme="light"] .chat-launcher,
     body.light-theme .chat-launcher{ color:#eef4ff !important; }
+
+    html[data-theme="light"] [style*="color: rgba(255, 145, 0,"],
+    body.light-theme [style*="color: rgba(255, 145, 0,"]{ color:#c2410c !important; }
 
     /* ATT&CK heat cells: tinted backgrounds need dark text in light mode */
     html[data-theme="light"] .attack-cell div,
