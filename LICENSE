@@ -1,0 +1,29 @@
+BCyberAware — Proprietary Licence
+
+Copyright (c) 2026 Vikas Pandita. All rights reserved.
+
+This repository and the BCyberAware website (advisory.bcyberaware.co.in),
+including its source code, scoring and story-merging logic, action guidance,
+text, design, logo and name, are the property of Vikas Pandita.
+
+No permission is granted to copy, modify, merge, publish, distribute,
+sublicense, sell, host, or create derivative works from this software or any
+part of it, in source or compiled form, without the prior written permission
+of the copyright holder.
+
+You may view this repository and use the public website for your own
+information. Viewing the code does not grant any licence to reuse it.
+
+"BCyberAware" and the BCyberAware logo are marks of Vikas Pandita and may not
+be used to name, brand or promote another product or service.
+
+Third-party components keep their own licences and are not covered by this
+notice. These include React and React DOM in the vendor/ directory (MIT
+Licence, Copyright (c) Facebook, Inc. and its affiliates) and the public data
+sources the site reads, which remain the property of their publishers.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. THE SITE IS AN
+INFORMATION SERVICE AND IS NOT A SUBSTITUTE FOR PROFESSIONAL SECURITY ADVICE.
+
+For permission requests, contact the author through
+https://bcyberaware.co.in
