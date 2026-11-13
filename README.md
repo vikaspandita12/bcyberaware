@@ -17,6 +17,8 @@
 
 ---
 
+> **© 2026 Vikas Pandita. All rights reserved.** This is proprietary software, not open source. The code, design and the BCyberAware name may not be copied, reused or redistributed without written permission. See [LICENSE](LICENSE).
+
 ## About
 
 BCyberAware is an AI-powered Threat Intelligence Dashboard designed to help individuals and organisations stay informed about the latest cybersecurity threats, vulnerabilities, and best practices.

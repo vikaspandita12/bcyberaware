@@ -2665,7 +2665,7 @@ function BCyberAwareDashboard() {
                   <span style={{color:ACCENT,flexShrink:0}}>▸</span>{f}
                 </div>
               ))}
-              <div style={{marginTop:16,fontSize:12,color:"rgba(200,220,240,.25)",fontFamily:"var(--mono)"}}>Open source · MIT Licence · Contributions welcome on GitHub</div>
+              <div style={{marginTop:16,fontSize:12,color:"rgba(200,220,240,.25)",fontFamily:"var(--mono)"}}>© {new Date().getFullYear()} Vikas Pandita · All rights reserved · BCyberAware is free to use; the code and name may not be copied or reused without permission</div>
             </div>
           </div>
         )}
@@ -2689,7 +2689,7 @@ function BCyberAwareDashboard() {
       {/* Footer */}
       <div className="footer-wrap" style={{borderTop:"1px solid rgba(255,255,255,.05)",marginTop:32,padding:"18px 24px",textAlign:"center"}}>
         <div style={{fontSize:12,color:"rgba(200,220,240,.2)",letterSpacing:1,marginBottom:10}}>
-          BCyberAware · Vikas Pandita · {new Date().getFullYear()} · MIT Licence · 30+ live sources · CISA · NVD · ZDI · The Record · Unit 42 · Check Point · Talos · Project Zero · Krebs · +20 more
+          BCyberAware · Vikas Pandita · © {new Date().getFullYear()} · All rights reserved · 55 live sources · CISA · NVD · ZDI · The Record · Unit 42 · Check Point · Talos · Project Zero · Krebs · +20 more
         </div>
       </div>
     </div>

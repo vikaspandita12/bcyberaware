@@ -2,7 +2,7 @@
   "name": "bcyberaware",
   "private": true,
   "scripts": {
-    "build": "esbuild src/app.jsx --minify --format=iife --target=es2020 --legal-comments=none --outfile=app.js",
+    "build": "esbuild src/app.jsx --minify --format=iife --target=es2020 --legal-comments=none --banner:js=\"/*! BCyberAware (c) 2026 Vikas Pandita. All rights reserved. Not open source: copying or reuse without written permission is prohibited. */\" --outfile=app.js",
     "dev": "npm run build && wrangler dev",
     "deploy": "npm run build && wrangler deploy",
     "test": "node --no-warnings --test tests/*.test.mjs"
@@ -10,5 +10,6 @@
   "devDependencies": {
     "esbuild": "^0.25.12",
     "wrangler": "^4.0.0"
-  }
+  },
+  "license": "UNLICENSED"
 }
