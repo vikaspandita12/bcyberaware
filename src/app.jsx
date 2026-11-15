@@ -15,6 +15,15 @@ const SEV_S = {
 };
 const SEV_ORDER = ["CRITICAL","HIGH","MEDIUM","LOW"];
 
+// ── Usage analytics (Google Analytics) ────────────────────────────────────────
+// Records which features are used, never what a visitor types or which CVE they open.
+// Visitors can switch it off from the footer; the choice is kept in their browser.
+const GA_ID = "G-PBVW753RXZ";
+const analyticsOff = () => { try { return localStorage.getItem("bca_analytics") === "off"; } catch { return false; } };
+function track(event, params) {
+  try { if (!analyticsOff() && typeof window.gtag === "function") window.gtag("event", event, params || {}); } catch {}
+}
+
 async function loadFeed(force=false) {
   // index.html starts the first feed request before this script has even downloaded
   if (!force && window.__bcaFeed) {
@@ -825,7 +834,7 @@ function TopPrioritiesPanel({ advisories, exploits, news, onAskAI }) {
                 </div>
 
                 <button
-                  onClick={() => setExpandedId(isExpanded ? null : item.id)}
+                  onClick={() => { if (!isExpanded) track("what_to_do_open", { priority_band: pri.tier, item_category: item.category || "advisory" }); setExpandedId(isExpanded ? null : item.id); }}
                   style={{
                     background: "transparent",
                     border: "none",
@@ -1183,6 +1192,7 @@ function CISOBriefView({ advisories, exploits, news }) {
 // ── GenAI Security View ───────────────────────────────────────────────────────
 function GenAISecurityView({ advisories, exploits, news }) {
   const [aiTab,setAiTab]=useState("overview");
+  useEffect(()=>{ track("genai_tab_view",{tab:aiTab}); },[aiTab]);
   const [owaspList,setOwaspList]=useState("llm");
   const [toolCat,setToolCat]=useState("All");
   const isAI=item=>{
@@ -1617,6 +1627,7 @@ function ThreatAnalystChat({ externalPrompt, onConsumedPrompt, advisories, explo
   useEffect(()=>{ const t=setTimeout(()=>{ if(!open) setUnread(true); },6000); return ()=>clearTimeout(t); },[]);
 
   const send=async(text)=>{
+    track("analyst_chat_message");
     const q=(text??input).trim();
     if(!q||busy) return;
     setInput("");
@@ -2077,6 +2088,7 @@ function BCyberAwareDashboard() {
   }, []);
 
   const toggleWatch = useCallback(item => {
+    track("watchlist_toggle", { item_category: item.category || "advisory" });
     setWatchlist(prev => {
       const exists = prev.some(w => w.id === item.id);
       const next = exists ? prev.filter(w => w.id !== item.id) : [item, ...prev].slice(0, 100);
@@ -2086,6 +2098,7 @@ function BCyberAwareDashboard() {
   }, []);
 
   const askAIAboutItem = useCallback(item => {
+    track("ai_triage_click", { item_category: item.category || "advisory", priority_band: item.priority?.label || "none" });
     const cvePart = item.cve_ids?.length ? ` (${item.cve_ids.join(", ")})` : "";
     const epssPart = item.epss != null ? ` [EPSS: ${item.epss}%]` : "";
     setAiPrompt(`Triage this ${item.severity || ""} item from ${item.source}: "${item.title}"${cvePart}${epssPart}. Explain: 1) What is vulnerable & impact, 2) Detection / IOCs to hunt, 3) Immediate remediation steps for enterprise / GCC SOC teams.`);
@@ -2097,6 +2110,7 @@ function BCyberAwareDashboard() {
   }, []);
 
   const exportIntel = useCallback((items, fmt) => {
+    track("export", { format: fmt, item_count: items.length });
     const stamp = new Date().toISOString().slice(0, 10);
     if (fmt === "stix") {
       const bundle = buildStixBundle(items);
@@ -2150,6 +2164,20 @@ function BCyberAwareDashboard() {
 
   useEffect(()=>{ refreshFeed(); },[]);
 
+  // Feature usage: which sections, feed tabs, sort order and theme people actually use
+  useEffect(()=>{ track("section_view",{section:view}); },[view]);
+  useEffect(()=>{ track("feed_tab_view",{tab:feedTab}); },[feedTab]);
+  const firstSort = React.useRef(true);
+  useEffect(()=>{ if(firstSort.current){ firstSort.current=false; return; } track("sort_change",{sort:sortBy}); },[sortBy]);
+  useEffect(()=>{ track("theme_set",{theme}); },[theme]);
+  const [analyticsOn, setAnalyticsOn] = useState(()=>!analyticsOff());
+  const toggleAnalytics = () => {
+    const next = !analyticsOn;
+    try { localStorage.setItem("bca_analytics", next ? "on" : "off"); } catch {}
+    window["ga-disable-"+GA_ID] = !next;
+    setAnalyticsOn(next);
+  };
+
   // Keep an open tab current: silent refresh every 5 min, and when the tab regains focus
   useEffect(()=>{
     const due = () => document.visibilityState==="visible" && (Date.now()-lastFetchRef.current) >= AUTO_REFRESH_MS-5000;
@@ -2181,6 +2209,7 @@ function BCyberAwareDashboard() {
       }
     } catch {}
     try { localStorage.setItem("bca_alerts", "1"); } catch {}
+    track("alerts_enabled");
     setAlertsOn(true);
     showAlert("🔔 BCyberAware alerts enabled", "You'll be notified about new CRITICAL and exploited-in-the-wild threats while the site is open in a tab. Nothing is stored on any server.", "/");
   }, [alertsOn]);
@@ -2690,6 +2719,10 @@ function BCyberAwareDashboard() {
       <div className="footer-wrap" style={{borderTop:"1px solid rgba(255,255,255,.05)",marginTop:32,padding:"18px 24px",textAlign:"center"}}>
         <div style={{fontSize:12,color:"rgba(200,220,240,.2)",letterSpacing:1,marginBottom:10}}>
           BCyberAware · Vikas Pandita · © {new Date().getFullYear()} · All rights reserved · 55 live sources · CISA · NVD · ZDI · The Record · Unit 42 · Check Point · Talos · Project Zero · Krebs · +20 more
+        </div>
+        <div className="privacy-note" style={{fontSize:12,color:"rgba(200,220,240,.4)",lineHeight:1.7,maxWidth:760,margin:"0 auto 10px"}}>
+          Privacy: no login and no advertising. This site uses Google Analytics to count visits and see which features are used. It does not record what you search for or which advisories you open.{" "}
+          <button type="button" onClick={toggleAnalytics} style={{background:"transparent",border:"none",padding:0,color:ACCENT,cursor:"pointer",fontSize:12,textDecoration:"underline"}}>{analyticsOn?"Turn analytics off":"Analytics is off — turn back on"}</button>
         </div>
       </div>
     </div>

@@ -602,7 +602,7 @@ export async function handleRssRequest(request, env) {
 <title>BCyberAware — Live Threat Intelligence</title>
 <link>https://advisory.bcyberaware.co.in/</link>
 <atom:link href="https://advisory.bcyberaware.co.in/feed.xml" rel="self" type="application/rss+xml"/>
-<description>Live advisories, exploits and breach news aggregated from ${d.sources_total || "45+"} public sources by BCyberAware. No login, no tracking.</description>
+<description>Live advisories, exploits and breach news aggregated from ${d.sources_total || "45+"} public sources by BCyberAware. No login needed.</description>
 <language>en</language>
 <lastBuildDate>${new Date(CACHE.feed.ts).toUTCString()}</lastBuildDate>
 <ttl>30</ttl>
