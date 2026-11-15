@@ -1,0 +1,4 @@
+# BCyberAware is deployed on Cloudflare only.
+# Netlify is not used: skip every build (an ignore command that exits 0 cancels the build).
+[build]
+  ignore = "exit 0"
