@@ -49,8 +49,6 @@
   <!-- Google Analytics -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-PBVW753RXZ"></script>
   <script>
-    // Respect a visitor's choice to switch analytics off (footer link; stored in their browser)
-    try{ if(localStorage.getItem("bca_analytics")==="off") window["ga-disable-G-PBVW753RXZ"]=true; }catch(e){}
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
@@ -66,7 +64,7 @@
   <!-- React is served from this origin: no extra DNS/TLS handshake, no third-party dependency -->
   <script defer src="vendor/react-18.2.0.production.min.js"></script>
   <script defer src="vendor/react-dom-18.2.0.production.min.js"></script>
-  <script defer src="app.js?v=3.3"></script>
+  <script defer src="app.js?v=3.4"></script>
   <style>
     :root{
       --mono:'JetBrains Mono','SFMono-Regular',Menlo,Consolas,monospace;

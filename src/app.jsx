@@ -17,11 +17,8 @@ const SEV_ORDER = ["CRITICAL","HIGH","MEDIUM","LOW"];
 
 // ── Usage analytics (Google Analytics) ────────────────────────────────────────
 // Records which features are used, never what a visitor types or which CVE they open.
-// Visitors can switch it off from the footer; the choice is kept in their browser.
-const GA_ID = "G-PBVW753RXZ";
-const analyticsOff = () => { try { return localStorage.getItem("bca_analytics") === "off"; } catch { return false; } };
 function track(event, params) {
-  try { if (!analyticsOff() && typeof window.gtag === "function") window.gtag("event", event, params || {}); } catch {}
+  try { if (typeof window.gtag === "function") window.gtag("event", event, params || {}); } catch {}
 }
 
 async function loadFeed(force=false) {
@@ -2170,13 +2167,6 @@ function BCyberAwareDashboard() {
   const firstSort = React.useRef(true);
   useEffect(()=>{ if(firstSort.current){ firstSort.current=false; return; } track("sort_change",{sort:sortBy}); },[sortBy]);
   useEffect(()=>{ track("theme_set",{theme}); },[theme]);
-  const [analyticsOn, setAnalyticsOn] = useState(()=>!analyticsOff());
-  const toggleAnalytics = () => {
-    const next = !analyticsOn;
-    try { localStorage.setItem("bca_analytics", next ? "on" : "off"); } catch {}
-    window["ga-disable-"+GA_ID] = !next;
-    setAnalyticsOn(next);
-  };
 
   // Keep an open tab current: silent refresh every 5 min, and when the tab regains focus
   useEffect(()=>{
@@ -2720,9 +2710,8 @@ function BCyberAwareDashboard() {
         <div style={{fontSize:12,color:"rgba(200,220,240,.2)",letterSpacing:1,marginBottom:10}}>
           BCyberAware · Vikas Pandita · © {new Date().getFullYear()} · All rights reserved · 55 live sources · CISA · NVD · ZDI · The Record · Unit 42 · Check Point · Talos · Project Zero · Krebs · +20 more
         </div>
-        <div className="privacy-note" style={{fontSize:12,color:"rgba(200,220,240,.4)",lineHeight:1.7,maxWidth:760,margin:"0 auto 10px"}}>
-          Privacy: no login and no advertising. This site uses Google Analytics to count visits and see which features are used. It does not record what you search for or which advisories you open.{" "}
-          <button type="button" onClick={toggleAnalytics} style={{background:"transparent",border:"none",padding:0,color:ACCENT,cursor:"pointer",fontSize:12,textDecoration:"underline"}}>{analyticsOn?"Turn analytics off":"Analytics is off — turn back on"}</button>
+        <div className="privacy-note" style={{fontSize:11,color:"rgba(200,220,240,.4)",lineHeight:1.6,margin:"0 auto 10px"}}>
+          This site uses Google Analytics to understand how it is used. No login, no advertising.
         </div>
       </div>
     </div>
