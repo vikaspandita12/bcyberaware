@@ -1,5 +1,4 @@
 # Do not publish as static assets (API handled by worker.js)
-api/
 netlify/
 netlify.toml
 vercel.json
