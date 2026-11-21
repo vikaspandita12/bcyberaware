@@ -66,6 +66,17 @@ Built in `functions/_shared/intel-core.js` (pure functions) and applied on every
 npm test           # story merging, scoring and guidance against a trimmed copy of the live feed
 ```
 
+## Telegram channel (automatic alerts)
+
+`functions/_shared/telegram-core.js`, run by the scheduled refresh. It posts every new **ACT NOW** item (priority 70+) as it appears, at most 3 per run, and a **morning brief** with the top 5 at 09:00 IST. Already-posted items are remembered in KV, so nothing is posted twice; on the first run the current alerts are recorded silently instead of flooding the channel.
+
+It stays off until two **secrets** are added in Cloudflare (Workers → bcyberaware → Settings → Variables and Secrets → Add → type *Secret*):
+
+- `TELEGRAM_BOT_TOKEN`: the token @BotFather gives you
+- `TELEGRAM_CHANNEL`: the channel's public username, e.g. `@bcyberaware` (the bot must be an admin of the channel)
+
+Once set, a "Get these alerts on Telegram" banner appears on the site, and `action=status` reports `telegram.configured: true`.
+
 ## How the feed stays fresh (automation)
 
 - A **Cron Trigger** runs every 5 minutes (`triggers.crons` in `wrangler.jsonc`). It refreshes the stalest sources, rebuilds the feed, regenerates the AI summary when due, and stores the result in **Workers KV** (binding `FEED_KV`) — even when nobody is visiting.
