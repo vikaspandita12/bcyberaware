@@ -129,10 +129,32 @@ export async function publishToTelegram(env, payload, store, now, { fetchImpl = 
     }
   }
 
+  // Remember the outcome so the status endpoint can explain a silent channel.
+  // Written only when it changes, to stay well inside the free KV write budget.
+  const last = result.error ? { error: result.error, at: now } : (result.alerts || result.digest) ? { ok: true, at: now } : null;
+  if (last && (state.last?.error || null) !== (last.error || null)) { state.last = last; changed = true; }
+  else if (last?.ok && state.last && !state.last.ok) { state.last = last; changed = true; }
+
   if (changed) {
     state.ids = [...posted].slice(-REMEMBER);
     state.cves = [...postedCves].slice(-REMEMBER);
     try { await store.put(STATE_KEY, JSON.stringify(state)); } catch {}
   }
   return result;
+}
+
+/** For the status endpoint: last Telegram outcome and today's brief. Never throws. */
+export async function telegramStatus(store) {
+  if (!store) return null;
+  try {
+    const st = await store.get(STATE_KEY, { type: "json" });
+    if (!st) return { state: "not run yet" };
+    return {
+      last_error: st.last?.error || null,
+      last_error_at: st.last?.error ? new Date(st.last.at).toISOString() : null,
+      last_success_at: st.last?.ok ? new Date(st.last.at).toISOString() : null,
+      brief_sent_for: st.digest_day || null,
+      alerts_remembered: (st.ids || []).length,
+    };
+  } catch { return null; }
 }

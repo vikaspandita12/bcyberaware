@@ -26,6 +26,8 @@ jobs:
           jq -r '"items: \((.advisories|length)+(.exploits|length)+(.news|length)) · sources live: \(.sources_live)/\(.sources_total) · built: \(.fetched_at_human) · scheduled: \(.scheduled // false) · AI brief: \(.brief.brief != null)"' /tmp/feed.json
           curl -sf --max-time 20 -o /dev/null -w 'home page: HTTP %{http_code} in %{time_total}s\n' "$BASE/"
           # Intelligence layer: what is ranked highest, and a few AI detail lines for review
+          echo "--- telegram"
+          echo "$status" | jq -c '.telegram'
           echo "--- top priorities"
           jq -r '[.advisories[], .exploits[], .news[]] | map(select(.priority != null)) | sort_by(-.priority.score) | .[0:8][] | "\(.priority.score) \(.priority.label) | \(.source) | \(.title[0:90]) | \(.priority.reasons | join("; "))"' /tmp/feed.json
           echo "--- merged stories"
