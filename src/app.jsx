@@ -2412,6 +2412,17 @@ function BCyberAwareDashboard() {
             {feedError&&<div style={{padding:"14px 18px",background:"rgba(200,0,0,.1)",border:"1px solid rgba(200,0,0,.3)",borderRadius:6,marginBottom:16,fontSize:14,color:"#ff6666"}}>⚠ {feedError}{feedMeta?` — showing the last saved copy (updated ${updatedAgo(feedMeta.fetched_at, nowTick)})`:""}</div>}
             <AIBriefCard brief={brief}/>
             <TopPrioritiesPanel advisories={advisories} exploits={exploits} news={news} onAskAI={askAIAboutItem}/>
+            {feedMeta?.telegram_url&&(
+              <a href={feedMeta.telegram_url} target="_blank" rel="noopener noreferrer" className="telegram-cta" onClick={()=>track("telegram_join_click")}
+                style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap",padding:"14px 18px",marginBottom:20,borderRadius:10,background:"rgba(41,182,246,0.08)",border:"1px solid rgba(41,182,246,0.35)",textDecoration:"none"}}>
+                <span style={{fontSize:24}}>📨</span>
+                <span style={{flex:"1 1 260px"}}>
+                  <span style={{display:"block",fontSize:15,fontWeight:700,color:"#eef4ff"}}>Get these alerts on Telegram</span>
+                  <span style={{display:"block",fontSize:13,color:"rgba(200,220,240,0.6)",marginTop:2}}>Every new "Act now" threat the moment it appears, plus a 9 am morning brief. Free.</span>
+                </span>
+                <span style={{fontSize:13,fontWeight:700,color:"#05080f",background:"#29b6f6",padding:"8px 16px",borderRadius:6,fontFamily:"var(--mono)",whiteSpace:"nowrap"}}>Join channel ↗</span>
+              </a>
+            )}
 
             {/* ── Global Command Search + Velocity + Vendor Matrix ── */}
             <div className="search-bar-wrap" style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",marginBottom:14,background:"rgba(255,255,255,0.02)",border:"1px solid rgba(0,200,255,0.18)",borderRadius:8,padding:"10px 14px"}}>

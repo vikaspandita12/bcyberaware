@@ -19,6 +19,7 @@
 
 import { jsonResponse } from "./http.js";
 import { prepareStories, scoreAndAdvise } from "./intel-core.js";
+import { publishToTelegram, channelUrl, telegramConfigured } from "./telegram-core.js";
 
 const CACHE    = { sources: {} };
 const CACHE_MS = 2 * 60 * 1000; // assembled snapshot; individual sources keep longer TTLs below
@@ -273,6 +274,7 @@ export async function handleFeedRequest(request, env) {
     // A live build never has a fresher AI brief than the stored one — carry it forward
     carryAiDetails(payload, CACHE.feed?.data);
     payload.ai_details_visible = aiDetailsVisible(env);
+    payload.telegram_url = channelUrl(env);
     const prevBrief = CACHE.feed?.data?.brief;
     if (!payload.brief && prevBrief && (now - (prevBrief.generated_at || 0)) < 2 * BRIEF_TTL_MS) payload.brief = prevBrief;
     CACHE.feed = { ts: now, data: payload };
@@ -312,6 +314,7 @@ export async function runScheduledRefresh(env) {
   if (prevBrief && (now - (prevBrief.generated_at || 0)) < 6 * 60 * 60 * 1000) payload.brief = prevBrief;
   carryAiDetails(payload, prev);
   payload.ai_details_visible = aiDetailsVisible(env);
+  payload.telegram_url = channelUrl(env);
 
   // Daily history row, refreshed once an hour (one extra KV write per hour)
   const hour = new Date(now).toISOString().slice(0, 13);
@@ -326,6 +329,10 @@ export async function runScheduledRefresh(env) {
     if (stored && recordNow) { try { await recordHistory(store, payload, now); } catch {} }
   }
   await saveSharedFeed(payload);
+
+  // Telegram channel: new ACT NOW alerts + the 09:00 IST morning brief (no-op until configured)
+  let telegram = null;
+  if (stored) telegram = await publishToTelegram(env, payload, store, now).catch(e => ({ error: String(e?.message || e).slice(0, 160) }));
 
   // Optional AI work, strictly time-boxed (sub-hourly Cron Triggers get 30 seconds in total)
   let briefRefreshed = false, detailsAdded = 0;
@@ -347,7 +354,7 @@ export async function runScheduledRefresh(env) {
     }
     if ((briefRefreshed || todo.length) && store) { try { await store.put(KV_SNAPSHOT, JSON.stringify(payload)); } catch {} }
   }
-  return { ok: true, items: payload.advisories.length + payload.exploits.length + payload.news.length, sources_live: payload.sources_live, stored, store_error: storeError, brief_refreshed: briefRefreshed, ai_details_added: detailsAdded, ms: Date.now() - now };
+  return { ok: true, items: payload.advisories.length + payload.exploits.length + payload.news.length, sources_live: payload.sources_live, stored, store_error: storeError, brief_refreshed: briefRefreshed, ai_details_added: detailsAdded, ms: Date.now() - now , telegram };
 }
 
 // ── AI detail for action boxes ────────────────────────────────────────────────
@@ -425,6 +432,7 @@ async function handleStatus(env) {
     sources_live: snap?.sources_live ?? null, sources_total: SOURCES.length,
     brief_age_seconds: snap?.brief?.generated_at ? Math.round((now - snap.brief.generated_at) / 1000) : null,
     intel: snap ? intelStats(snap) : null,
+    telegram: { configured: telegramConfigured(env), channel: channelUrl(env) },
     read_error: readError, checked_at: new Date(now).toISOString(),
   });
 }
