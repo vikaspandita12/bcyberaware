@@ -94,3 +94,17 @@ test("messages stay within Telegram's 4096-character limit", () => {
   for (const a of [...d.advisories, ...d.exploits, ...d.news].filter(a => a.priority?.score >= 50)) assert.ok(formatAlert(a).length <= 4096);
   assert.ok(formatDigest(pickDigest(d), at(10, 0)).length <= 4096);
 });
+
+test("the status reports Telegram's error, then clears it after a success", async () => {
+  const { telegramStatus } = await import("../functions/_shared/telegram-core.js");
+  const kv = new KV();
+  assert.deepEqual(await telegramStatus(kv), { state: "not run yet" });
+  const bad = fakeTelegram(true);
+  await publishToTelegram(env, feed(at(4, 0)), kv, at(4, 0), { fetchImpl: bad.fetchImpl });
+  let st = await telegramStatus(kv);
+  assert.match(st.last_error, /not a member/); assert.equal(st.brief_sent_for, null);
+  const good = fakeTelegram();
+  await publishToTelegram(env, feed(at(4, 5)), kv, at(4, 5), { fetchImpl: good.fetchImpl });
+  st = await telegramStatus(kv);
+  assert.equal(st.last_error, null); assert.ok(st.last_success_at); assert.equal(st.brief_sent_for, "2026-11-21");
+});

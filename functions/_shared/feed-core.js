@@ -19,7 +19,7 @@
 
 import { jsonResponse } from "./http.js";
 import { prepareStories, scoreAndAdvise } from "./intel-core.js";
-import { publishToTelegram, channelUrl, telegramConfigured } from "./telegram-core.js";
+import { publishToTelegram, channelUrl, telegramConfigured, telegramStatus } from "./telegram-core.js";
 
 const CACHE    = { sources: {} };
 const CACHE_MS = 2 * 60 * 1000; // assembled snapshot; individual sources keep longer TTLs below
@@ -432,7 +432,7 @@ async function handleStatus(env) {
     sources_live: snap?.sources_live ?? null, sources_total: SOURCES.length,
     brief_age_seconds: snap?.brief?.generated_at ? Math.round((now - snap.brief.generated_at) / 1000) : null,
     intel: snap ? intelStats(snap) : null,
-    telegram: { configured: telegramConfigured(env), channel: channelUrl(env) },
+    telegram: { configured: telegramConfigured(env), channel: channelUrl(env), ...(telegramConfigured(env) ? await telegramStatus(store) : {}) },
     read_error: readError, checked_at: new Date(now).toISOString(),
   });
 }
