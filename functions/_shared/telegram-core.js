@@ -76,11 +76,11 @@ export function pickDigest(d) {
   return picked;
 }
 
-async function send(env, text, fetchImpl) {
+async function send(env, text, fetchImpl, chatId) {
   const r = await fetchImpl(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ chat_id: env.TELEGRAM_CHANNEL, text, parse_mode: "HTML", disable_web_page_preview: true }),
+    body: JSON.stringify({ chat_id: chatId ?? env.TELEGRAM_CHANNEL, text, parse_mode: "HTML", disable_web_page_preview: true }),
   });
   if (!r.ok) {
     let why = `HTTP ${r.status}`;
@@ -129,6 +129,13 @@ export async function publishToTelegram(env, payload, store, now, { fetchImpl = 
     }
   }
 
+  // Private commands sent to the bot (/test, /start). Polled here, every 5 minutes.
+  try {
+    const cmd = await handleCommands(env, payload, state, now, fetchImpl, timed);
+    if (cmd.changed) changed = true;
+    result.commands = cmd.handled;
+  } catch {}
+
   // Remember the outcome so the status endpoint can explain a silent channel.
   // Written only when it changes, to stay well inside the free KV write budget.
   const last = result.error ? { error: result.error, at: now } : (result.alerts || result.digest) ? { ok: true, at: now } : null;
@@ -141,6 +148,68 @@ export async function publishToTelegram(env, payload, store, now, { fetchImpl = 
     try { await store.put(STATE_KEY, JSON.stringify(state)); } catch {}
   }
   return result;
+}
+
+// ── Bot commands ───────────────────────────────────────────────────────────────
+// The bot has no webhook; the scheduled refresh polls getUpdates instead, so a
+// command is answered within about 5 minutes. Only the channel's owner or an
+// admin may use /test, checked against Telegram's own member list.
+const MAX_COMMANDS_PER_RUN = 3;
+const IST = { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: true };
+
+export function formatTest(payload, now) {
+  const top = pickDigest(payload)[0];
+  const lines = [
+    `✅ <b>Test message from BCyberAware</b>`,
+    `The alert bot is connected and can post here. Sent ${esc(new Date(now).toLocaleString("en-IN", IST))} IST.`,
+    `What arrives automatically:\n• Every new "Act now" threat, within about 5 minutes\n• A morning brief with the top 5 threats at 9:00 am IST`,
+  ];
+  if (top) lines.push(`Top priority right now: <b>[${top.priority.score} ${esc(top.priority.label)}]</b> ${esc(cut(top.title, 150))}`);
+  lines.push(`<a href="${SITE}">advisory.bcyberaware.co.in</a>`);
+  return lines.join("\n\n");
+}
+
+async function api(env, method, params, fetchImpl) {
+  const qs = new URLSearchParams(params || {}).toString();
+  const r = await fetchImpl(`https://api.telegram.org/bot${String(env.TELEGRAM_BOT_TOKEN).trim()}/${method}${qs ? "?" + qs : ""}`);
+  const body = await r.json().catch(() => null);
+  if (!body?.ok) throw new Error(body?.description || `HTTP ${r.status}`);
+  return body.result;
+}
+
+async function handleCommands(env, payload, state, now, fetchImpl, timed) {
+  const out = { handled: 0, changed: false };
+  const offset = state.update_offset || 0;
+  const updates = await timed(api(env, "getUpdates", { offset: String(offset), timeout: "0", limit: "20", allowed_updates: JSON.stringify(["message"]) }, fetchImpl));
+  if (!updates?.length) return out;
+  // Acknowledge everything fetched, even ignored messages, so nothing is re-read
+  state.update_offset = Math.max(...updates.map(u => u.update_id)) + 1;
+  out.changed = true;
+
+  const cmds = updates
+    .map(u => u.message)
+    .filter(m => m?.chat?.type === "private" && typeof m.text === "string" && m.text.startsWith("/"))
+    .slice(-MAX_COMMANDS_PER_RUN);
+  for (const m of cmds) {
+    const cmd = m.text.trim().split(/[\s@]/)[0].toLowerCase();
+    const reply = text => timed(send(env, text, fetchImpl, m.chat.id)).catch(() => {});
+    if (cmd === "/test") {
+      let allowed = false;
+      try {
+        const member = await timed(api(env, "getChatMember", { chat_id: String(env.TELEGRAM_CHANNEL).trim(), user_id: String(m.from.id) }, fetchImpl));
+        allowed = member?.status === "creator" || member?.status === "administrator";
+      } catch {}
+      if (!allowed) { await reply("Sorry, only the owner of the BCyberAware channel can use /test."); continue; }
+      try {
+        await timed(send(env, formatTest(payload, now), fetchImpl));
+        await reply(`✅ Test message posted to ${esc(env.TELEGRAM_CHANNEL)}.`);
+        out.handled++;
+      } catch (e) { await reply(`❌ Could not post to the channel: ${esc(String(e?.message || e).slice(0, 120))}`); }
+    } else if (cmd === "/start" || cmd === "/help") {
+      await reply(`This bot posts BCyberAware threat alerts to ${esc(env.TELEGRAM_CHANNEL)}.\n\nJoin the channel for alerts: ${esc(channelUrl(env) || SITE)}\n\nChannel owner: send /test to post a test message.`);
+    }
+  }
+  return out;
 }
 
 /** For the status endpoint: last Telegram outcome and today's brief. Never throws. */

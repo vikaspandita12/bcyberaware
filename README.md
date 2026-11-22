@@ -75,6 +75,8 @@ It stays off until two **secrets** are added in Cloudflare (Workers → bcyberaw
 - `TELEGRAM_BOT_TOKEN`: the token @BotFather gives you
 - `TELEGRAM_CHANNEL`: the channel's public username, e.g. `@bcyberaware` (the bot must be an admin of the channel)
 
+**Bot commands** (send them to the bot in a private chat; answered within about 5 minutes, since the scheduled refresh polls for them): `/test` posts a test message to the channel, and only the channel's owner or admins may use it; `/start` explains the bot.
+
 Once set, a "Get these alerts on Telegram" banner appears on the site, and `action=status` reports `telegram.configured: true`.
 
 ## How the feed stays fresh (automation)
