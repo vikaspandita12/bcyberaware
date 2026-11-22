@@ -52,7 +52,7 @@ function writeCachedFeed(d) {
 
 // Browser notifications — local only: no login, no email, nothing stored server-side
 async function showAlert(title, body, url) {
-  const opts = { body, icon: "/logo.svg", badge: "/logo.svg", tag: (title + body).slice(0, 60), data: { url } };
+  const opts = { body, icon: "/bcyberaware-icon.png", badge: "/bcyberaware-icon.png", tag: (title + body).slice(0, 60), data: { url } };
   // Prefer the service worker (required on Android); fall back to a page Notification
   try {
     if ("serviceWorker" in navigator) {
@@ -60,7 +60,7 @@ async function showAlert(title, body, url) {
       if (reg && reg.active && reg.showNotification) { await reg.showNotification(title, opts); return; }
     }
   } catch {}
-  try { new Notification(title, { body, icon: "/logo.svg" }); } catch {}
+  try { new Notification(title, { body, icon: "/bcyberaware-icon.png" }); } catch {}
 }
 
 function updatedAgo(ts, now){
@@ -2357,7 +2357,7 @@ function BCyberAwareDashboard() {
       <div className="topbar-wrap" style={{background:theme==="light"?"rgba(255,255,255,0.92)":"rgba(0,0,0,.7)",borderBottom:`1px solid ${theme==="light"?"rgba(0,0,0,0.08)":"rgba(0,200,255,.1)"}`,position:"sticky",top:0,zIndex:50,backdropFilter:"blur(8px)"}}>
         <div className="topbar" style={{maxWidth:1400,margin:"0 auto",padding:"8px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",minHeight:58,gap:10,flexWrap:"wrap"}}>
           <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
-            <img src="logo.svg" alt="BCyberAware Logo" style={{width:36,height:36,objectFit:"contain"}} />
+            <img src="bcyberaware-icon.png" alt="BCyberAware Logo" style={{width:36,height:36,objectFit:"contain",borderRadius:7}} />
             <div>
               <div style={{fontSize:15,fontWeight:900,color:ACCENT,letterSpacing:1.5,lineHeight:1.1,fontFamily:"var(--display)"}}>BCyberAware</div>
               <div className="logo-sub" style={{fontSize:9,color:theme==="light"?"#64748b":"rgba(200,220,240,.4)",letterSpacing:1}}>by Vikas Pandita</div>
@@ -2674,7 +2674,7 @@ function BCyberAwareDashboard() {
         {view==="about"&&(
           <div style={{maxWidth:680,margin:"0 auto",animation:"fadeIn .3s ease"}}>
             <div style={{textAlign:"center",marginBottom:30}}>
-              <img src="logo.svg" alt="BCyberAware Logo" style={{width:90,height:90,objectFit:"contain",margin:"0 auto 16px",display:"block"}} />
+              <img src="bcyberaware-logo-256.png" alt="BCyberAware Logo" style={{width:150,height:150,objectFit:"contain",margin:"0 auto 16px",display:"block"}} />
               <div style={{fontSize:26,fontWeight:900,color:"#ddeeff",letterSpacing:2,marginBottom:7,fontFamily:"var(--display)"}}>BCyberAware</div>
               <div style={{fontSize:13,color:"rgba(200,220,240,.35)",letterSpacing:2}}>SECURITY INTELLIGENCE FOR THE MODERN ENTERPRISE</div>
             </div>
