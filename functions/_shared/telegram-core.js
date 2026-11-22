@@ -158,3 +158,56 @@ export async function telegramStatus(store) {
     };
   } catch { return null; }
 }
+
+// ── Live diagnosis for the status endpoint ─────────────────────────────────────
+// Asks Telegram, right now, whether the configured token works and whether the
+// bot may post in the channel. Reports only yes/no checks on the token's format
+// (never its value or length), which catch the usual paste mistakes.
+let _check = null; // per-isolate memo so a busy status page can't hammer Telegram
+const CHECK_MEMO_MS = 30 * 1000;
+
+export function tokenFormat(token) {
+  const t = String(token ?? "");
+  const m = t.trim().match(/^(\d+):([A-Za-z0-9_-]+)$/);
+  return {
+    looks_like_number_colon_secret: !!m,
+    secret_part_full_length: m ? m[2].length === 35 : false,
+    extra_spaces: t !== t.trim(),
+    has_quotes: /["'`]/.test(t),
+    has_line_break: /[\r\n]/.test(t),
+  };
+}
+
+export async function checkTelegram(env, { fetchImpl = fetch, timeoutMs = 4000, now = Date.now() } = {}) {
+  if (!telegramConfigured(env)) return null;
+  if (_check && now - _check.at < CHECK_MEMO_MS) return _check.value;
+  const token = String(env.TELEGRAM_BOT_TOKEN).trim();
+  const call = async (method, params) => {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const qs = new URLSearchParams(params || {}).toString();
+      const r = await fetchImpl(`https://api.telegram.org/bot${token}/${method}${qs ? "?" + qs : ""}`, { signal: ctrl.signal });
+      let body = null; try { body = await r.json(); } catch {}
+      return { ok: !!body?.ok, status: r.status, description: body?.description || `HTTP ${r.status}`, result: body?.result };
+    } catch (e) { return { ok: false, status: 0, description: "request failed" }; }
+    finally { clearTimeout(t); }
+  };
+  const value = { checked_at: new Date(now).toISOString(), token_format: tokenFormat(env.TELEGRAM_BOT_TOKEN) };
+  const me = await call("getMe");
+  value.token_valid = me.ok;
+  value.telegram_says = me.ok ? "OK" : me.description;
+  if (me.ok) {
+    value.bot_username = me.result?.username || null;
+    const member = await call("getChatMember", { chat_id: String(env.TELEGRAM_CHANNEL).trim(), user_id: String(me.result.id) });
+    value.bot_role_in_channel = member.ok ? member.result?.status : null;
+    value.bot_can_post = member.ok ? (member.result?.status === "creator" || member.result?.can_post_messages === true) : false;
+    if (!member.ok) value.channel_problem = member.description;
+  }
+  value.verdict = !me.ok
+    ? (me.status === 404 ? "Token is malformed: it must be the bot number, a colon, then the secret." : "Telegram rejects this token: it was revoked or mistyped. Get a fresh one from @BotFather and paste the whole thing.")
+    : !value.bot_can_post ? "Token works, but the bot cannot post in the channel: make it an administrator with 'Post Messages' on."
+    : "All good: the bot can post in the channel.";
+  _check = { at: now, value };
+  return value;
+}
