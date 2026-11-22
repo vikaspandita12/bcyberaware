@@ -108,3 +108,25 @@ test("the status reports Telegram's error, then clears it after a success", asyn
   st = await telegramStatus(kv);
   assert.equal(st.last_error, null); assert.ok(st.last_success_at); assert.equal(st.brief_sent_for, "2026-11-21");
 });
+
+test("live check explains what is wrong without exposing the token", async () => {
+  const { checkTelegram, tokenFormat } = await import("../functions/_shared/telegram-core.js");
+  const FAKE = "123456789:" + "X".repeat(35); // obviously fake test token
+  assert.equal(tokenFormat(FAKE).looks_like_number_colon_secret, true);
+  assert.equal(tokenFormat(FAKE).secret_part_full_length, true);
+  assert.equal(tokenFormat("X".repeat(35)).looks_like_number_colon_secret, false);
+  assert.equal(tokenFormat(" " + FAKE + "\n").extra_spaces, true);
+  assert.equal(tokenFormat('"' + FAKE + '"').has_quotes, true);
+  const api = handlers => async url => { const m = url.match(/bot[^/]+\/(\w+)/)[1]; const [status, body] = handlers[m]; return new Response(JSON.stringify(body), { status }); };
+  let t0 = 1e12;
+  const run = (h, tok = FAKE) => checkTelegram({ TELEGRAM_BOT_TOKEN: tok, TELEGRAM_CHANNEL: "@examplechannel" }, { fetchImpl: api(h), now: (t0 += 60000) });
+  let r = await run({ getMe: [401, { ok: false, description: "Unauthorized" }] });
+  assert.equal(r.token_valid, false); assert.match(r.verdict, /revoked or mistyped/);
+  assert.ok(!JSON.stringify(r).includes("XXXX"), "token never echoed");
+  r = await run({ getMe: [404, { ok: false, description: "Not Found" }] }, "X".repeat(35));
+  assert.match(r.verdict, /malformed/);
+  r = await run({ getMe: [200, { ok: true, result: { id: 1, username: "example_bot" } }], getChatMember: [200, { ok: true, result: { status: "left" } }] });
+  assert.equal(r.bot_can_post, false); assert.match(r.verdict, /administrator/);
+  r = await run({ getMe: [200, { ok: true, result: { id: 1, username: "example_bot" } }], getChatMember: [200, { ok: true, result: { status: "administrator", can_post_messages: true } }] });
+  assert.equal(r.bot_can_post, true); assert.match(r.verdict, /All good/);
+});
