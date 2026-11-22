@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/bcyberaware-logo.svg" alt="BCyberAware Logo" width="200"/>
+  <img src="assets/bcyberaware-logo.png" alt="BCyberAware Logo" width="220"/>
 </p>
 
 <h1 align="center">BCyberAware</h1>
