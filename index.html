@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>BCyberAware – Live Threat Intelligence | Vikas Pandita</title>
-  <meta name="description" content="Live cybersecurity threat intelligence. Real advisories from CISA, NVD, NCSC UK, CERT-In, Exploit-DB, The Hacker News and more. Built by Vikas Pandita." />
+  <title>BCyberAware Advisory – Live Cyber Threat Intelligence &amp; Security Advisories | Vikas Pandita</title>
+  <meta name="description" content="BCyberAware Advisory by Vikas Pandita: free live cyber threat intelligence updated every 5 minutes. Prioritised security advisories, exploited CVEs, CERT-In, CISA KEV, NVD, dark web early warning and GenAI security, with clear actions." />
   <meta name="author" content="Vikas Pandita" />
   <meta name="copyright" content="© 2026 Vikas Pandita. All rights reserved." />
   <meta name="theme-color" content="#05080f" />
@@ -34,11 +34,35 @@
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
-    "@type": "WebSite",
-    "name": "BCyberAware",
-    "url": "https://advisory.bcyberaware.co.in/",
-    "description": "AI-powered live cybersecurity threat intelligence dashboard — advisories, exploits, dark web early warning and GenAI security.",
-    "author": { "@type": "Person", "name": "Vikas Pandita" }
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": "https://advisory.bcyberaware.co.in/#website",
+        "name": "BCyberAware Advisory",
+        "alternateName": ["BCyberAware", "B Cyber Aware", "BCyberAware Threat Intelligence"],
+        "url": "https://advisory.bcyberaware.co.in/",
+        "description": "Free live cyber threat intelligence dashboard: prioritised security advisories, exploited vulnerabilities, dark web early warning and GenAI security, refreshed every 5 minutes.",
+        "inLanguage": "en",
+        "publisher": { "@id": "https://bcyberaware.co.in/#org" },
+        "author": { "@id": "https://vikaspanditaportfolio.bcyberaware.co.in/#person" }
+      },
+      {
+        "@type": "Organization",
+        "@id": "https://bcyberaware.co.in/#org",
+        "name": "BCyberAware",
+        "url": "https://bcyberaware.co.in/",
+        "logo": "https://advisory.bcyberaware.co.in/bcyberaware-logo-256.png",
+        "founder": { "@id": "https://vikaspanditaportfolio.bcyberaware.co.in/#person" }
+      },
+      {
+        "@type": "Person",
+        "@id": "https://vikaspanditaportfolio.bcyberaware.co.in/#person",
+        "name": "Vikas Pandita",
+        "url": "https://vikaspanditaportfolio.bcyberaware.co.in/",
+        "jobTitle": "Global Head of Security Architecture",
+        "sameAs": ["https://www.linkedin.com/in/vikas-p-895a5664", "https://github.com/vikaspandita12", "https://bcyberaware.co.in/"]
+      }
+    ]
   }
   </script>
   <!-- Theme Preload Script (prevent flash of wrong theme) -->
@@ -777,6 +801,8 @@
   <div style="height:100vh;display:flex;flex-direction:column;gap:14px;align-items:center;justify-content:center;color:#00c8ff;font-family:monospace;font-size:16px;letter-spacing:3px;text-align:center;padding:0 20px">
     <img src="bcyberaware-icon.png" alt="" width="64" height="64" style="animation:loadPulse 1.6s infinite" />
     <div style="animation:loadPulse 1.6s infinite">LOADING BCYBERAWARE…</div>
+    <h1 style="font-size:15px;letter-spacing:1px;margin:0;color:#8fb3d9;font-weight:600">BCyberAware Advisory – Live Cyber Threat Intelligence by Vikas Pandita</h1>
+    <p style="font-size:12px;letter-spacing:.3px;max-width:520px;line-height:1.7;margin:0;color:#6f88a6;font-family:system-ui,sans-serif">Free, live security advisories refreshed every 5 minutes from CISA KEV, NVD, CERT-In, NCSC UK, GitHub Security Advisories, Exploit-DB and 50+ sources. Prioritised threats, exploited CVEs, dark web early warning and GenAI security, with clear actions for CISOs and security teams.</p>
     <noscript>
       <div style="color:#ff9944;letter-spacing:1px;font-size:14px;max-width:460px;line-height:1.7">
         BCyberAware is a live threat-intelligence dashboard and requires JavaScript.
