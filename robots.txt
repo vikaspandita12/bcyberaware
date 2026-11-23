@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://advisory.bcyberaware.co.in/sitemap.xml
