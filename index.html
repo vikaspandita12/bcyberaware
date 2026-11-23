@@ -69,7 +69,7 @@
   <!-- React is served from this origin: no extra DNS/TLS handshake, no third-party dependency -->
   <script defer src="vendor/react-18.2.0.production.min.js"></script>
   <script defer src="vendor/react-dom-18.2.0.production.min.js"></script>
-  <script defer src="app.js?v=3.8"></script>
+  <script defer src="app.js?v=3.9"></script>
   <style>
     :root{
       --mono:'JetBrains Mono','SFMono-Regular',Menlo,Consolas,monospace;
@@ -98,8 +98,15 @@
     .card:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(0,0,0,.45),0 0 0 1px rgba(0,200,255,.18)}
     .topnav{scrollbar-width:thin}
     html{overflow-x:clip}
-    body{overflow-wrap:anywhere;word-break:normal}
+    body{overflow-wrap:break-word;word-break:normal}
     .ticker-track,.ticker-track *{overflow-wrap:normal}
+    @media(max-width:600px){
+      .stat-card{padding:14px 6px !important}
+      .stat-label{letter-spacing:.4px !important;font-size:10px !important;overflow-wrap:normal;hyphens:auto}
+      .chat-launcher{padding:0 !important;width:52px;height:52px;justify-content:center;right:14px !important;bottom:14px !important;gap:0 !important}
+      .chat-launcher-label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+      .chat-launcher>span:last-child:not(.chat-launcher-label){position:absolute;top:4px;right:4px}
+    }
     img,video,pre,table{max-width:100%}
     pre,code{white-space:pre-wrap}
     @media(max-width:860px){
