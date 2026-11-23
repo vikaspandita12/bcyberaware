@@ -1672,7 +1672,7 @@ function ThreatAnalystChat({ externalPrompt, onConsumedPrompt, advisories, explo
       {/* Floating launcher */}
       {!open&&(
         <button className="chat-launcher" onClick={()=>{setOpen(true);setUnread(false);}} aria-label="Open AI Threat Analyst" style={{position:"fixed",right:20,bottom:20,zIndex:90,display:"flex",alignItems:"center",gap:10,padding:"12px 18px",borderRadius:30,border:`1px solid rgba(0,200,255,.45)`,background:"linear-gradient(135deg,rgba(0,40,70,.95),rgba(40,10,80,.95))",color:"#eef4ff",cursor:"pointer",boxShadow:"0 8px 32px rgba(0,200,255,.25)",fontFamily:"var(--mono)",fontWeight:700,fontSize:13,letterSpacing:.5,backdropFilter:"blur(8px)"}}>
-          <span style={{fontSize:18}}>🛡️</span> Ask Threat Analyst
+          <span style={{fontSize:18}}>🛡️</span><span className="chat-launcher-label">Ask Threat Analyst</span>
           {unread&&<span style={{width:9,height:9,borderRadius:"50%",background:"#00e676",boxShadow:"0 0 8px #00e676",animation:"pulse 1.4s infinite"}}/>}
         </button>
       )}
