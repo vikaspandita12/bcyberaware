@@ -2366,7 +2366,7 @@ function BCyberAwareDashboard() {
           <nav className="topnav" aria-label="Main navigation" style={{display:"flex",gap:4,flex:"1 1 auto",overflowX:"auto",WebkitOverflowScrolling:"touch",padding:"4px 0",justifyContent:"center"}}>
             {[["feed","▦ Live Feed"],["knowledge","🧬 Knowledge"],["heatmap","🌍 Heatmap"],["ciso","📋 CISO Brief"],["genai","🤖 GenAI"],["darkweb","🕵️ Dark Web"],["sources","◎ Sources"],["demo","▶ Demo"],["about","◉ About"]].map(([v,l])=>navBtn(v,l))}
           </nav>
-          <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+          <div className="topbar-actions" style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",minWidth:0,maxWidth:"100%"}}>
             {loading?(
               <span style={{fontSize:11,color:ACCENT,animation:"pulse 1.5s infinite",fontFamily:"var(--mono)",whiteSpace:"nowrap"}}>⟳ Fetching…</span>
             ):(

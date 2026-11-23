@@ -69,7 +69,7 @@
   <!-- React is served from this origin: no extra DNS/TLS handshake, no third-party dependency -->
   <script defer src="vendor/react-18.2.0.production.min.js"></script>
   <script defer src="vendor/react-dom-18.2.0.production.min.js"></script>
-  <script defer src="app.js?v=3.6"></script>
+  <script defer src="app.js?v=3.7"></script>
   <style>
     :root{
       --mono:'JetBrains Mono','SFMono-Regular',Menlo,Consolas,monospace;
@@ -97,8 +97,10 @@
     .card{transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
     .card:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(0,0,0,.45),0 0 0 1px rgba(0,200,255,.18)}
     .topnav{scrollbar-width:thin}
+    html{overflow-x:clip}
     @media(max-width:860px){
       .topbar{justify-content:center}
+      .topbar-actions{width:100%;justify-content:center}
       .topnav{justify-content:flex-start !important;width:100%;order:3}
       .feed-meta{display:none}
     }
