@@ -7,6 +7,7 @@ import { corsPreflightResponse, methodNotAllowed } from "./functions/_shared/htt
 import { handleFeedRequest, handleRssRequest, runScheduledRefresh } from "./functions/_shared/feed-core.js";
 import { handleDarkwebRequest } from "./functions/_shared/darkweb-core.js";
 import { handleChatRequest } from "./functions/_shared/chat-core.js";
+import { handleSitemapRequest, pingIndexNow } from "./functions/_shared/indexnow-core.js";
 
 export default {
   async fetch(request, env) {
@@ -37,6 +38,9 @@ export default {
       return handleDarkwebRequest(request);
     }
 
+    // Sitemap with today's date so search engines see the feed is live
+    if (pathname === "/sitemap.xml") return handleSitemapRequest();
+
     return env.ASSETS.fetch(request);
   },
 
@@ -46,6 +50,8 @@ export default {
     try {
       const r = await runScheduledRefresh(env);
       console.log("scheduled refresh", JSON.stringify(r));
+      // Tell Bing/Yandex (IndexNow) the site changed — at most once a day
+      ctx.waitUntil(pingIndexNow(env).then(x => console.log("indexnow", JSON.stringify(x))));
     } catch (e) {
       console.error("scheduled refresh failed", e?.message || e);
       throw e; // surface the failure in Cloudflare's Cron Trigger history
