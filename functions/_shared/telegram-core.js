@@ -503,7 +503,13 @@ export async function handleUpdate(env, update, ctx) {
       try {
         const d = await ctx.payload();
         await timed(tg.send(env.TELEGRAM_CHANNEL, formatTest(d, now)));
-        await reply(`✅ Test message posted to ${esc(env.TELEGRAM_CHANNEL)}.`);
+        // Also show the current top threat in the full alert format, with its buttons
+        const top = d ? pickDigest(d)[0] : null;
+        if (top) {
+          const me = await timed(tg.call("getMe")).catch(() => null);
+          await timed(tg.send(env.TELEGRAM_CHANNEL, formatAlert(top), alertButtons(top, me?.username))).catch(() => {});
+        }
+        await reply(`✅ Test message posted to ${esc(env.TELEGRAM_CHANNEL)}, with a sample alert in the new format.`);
         out.handled++; out.posted = 1;
       } catch (e) { await reply(`❌ Could not post to the channel: ${esc(String(e?.message || e).slice(0, 120))}`); }
       return out;
