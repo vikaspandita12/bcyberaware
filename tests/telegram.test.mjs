@@ -158,8 +158,9 @@ test("/test from the channel owner posts a test message; anyone else is refused"
   const r = await publishToTelegram(env, d, kv, now + 300000, { fetchImpl });
   assert.equal(r.commands, 1);
   const toChannel = sent.filter(m => m.chat_id === "@bcyberaware");
-  assert.equal(toChannel.length, 1); assert.match(toChannel[0].text, /Test message from BCyberAware/); assert.match(toChannel[0].text, /Top priority right now/);
-  assert.match(sent.find(m => m.chat_id === 111).text, /Test message posted/);
+  assert.equal(toChannel.length, 2); assert.match(toChannel[0].text, /Test message from BCyberAware/); assert.match(toChannel[0].text, /Top priority right now/);
+  assert.match(toChannel[1].text, /Industries:/); assert.ok(toChannel[1].reply_markup.inline_keyboard[0][0].url, "sample alert has buttons");
+  assert.match(sent.find(m => m.chat_id === 111).text, /Test message posted.*sample alert/);
   assert.match(sent.find(m => m.chat_id === 222 && /only the owner/.test(m.text)).text, /only the owner/);
   assert.ok(sent.some(m => m.chat_id === 222 && /Welcome to BCyberAware/.test(m.text) && m.reply_markup?.inline_keyboard), "/start answered with the industry picker");
   sent.length = 0;
