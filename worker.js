@@ -8,6 +8,7 @@ import { handleFeedRequest, handleRssRequest, runScheduledRefresh } from "./func
 import { handleDarkwebRequest } from "./functions/_shared/darkweb-core.js";
 import { handleChatRequest } from "./functions/_shared/chat-core.js";
 import { handleSitemapRequest, pingIndexNow } from "./functions/_shared/indexnow-core.js";
+import { handleTelegramWebhook } from "./functions/_shared/telegram-core.js";
 
 export default {
   async fetch(request, env) {
@@ -30,6 +31,13 @@ export default {
     if (pathname === "/feed.xml" || pathname === "/rss.xml" || pathname === "/feed" || pathname === "/rss") {
       if (request.method !== "GET") return methodNotAllowed();
       return handleRssRequest(request, env);
+    }
+
+    // Telegram bot webhook: instant replies to /start, industry buttons, /brief, /cve
+    if (pathname === "/api/telegram") {
+      return handleTelegramWebhook(request, env, {
+        loadPayload: async () => env.FEED_KV ? await env.FEED_KV.get("feed:snapshot:v1", { type: "json" }) : null,
+      });
     }
 
     if (pathname === "/api/darkweb" || pathname === "/api/darkweb/") {

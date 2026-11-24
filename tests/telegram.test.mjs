@@ -140,11 +140,12 @@ test("/test from the channel owner posts a test message; anyone else is refused"
   const role = { 111: "creator", 222: "left" };
   const fetchImpl = async (url, init) => {
     if (url.includes("/getUpdates")) {
-      const offset = Number(new URL(url).searchParams.get("offset"));
+      const offset = Number(JSON.parse(init.body).offset);
       return new Response(JSON.stringify({ ok: true, result: updates.filter(u => u.update_id >= offset) }));
     }
+    if (url.includes("/getMe")) return new Response(JSON.stringify({ ok: false, description: "polling test" }), { status: 500 });
     if (url.includes("/getChatMember")) {
-      const uid = new URL(url).searchParams.get("user_id");
+      const uid = JSON.parse(init.body).user_id;
       return new Response(JSON.stringify({ ok: true, result: { status: role[uid] || "left" } }));
     }
     sent.push(JSON.parse(init.body));
@@ -160,7 +161,7 @@ test("/test from the channel owner posts a test message; anyone else is refused"
   assert.equal(toChannel.length, 1); assert.match(toChannel[0].text, /Test message from BCyberAware/); assert.match(toChannel[0].text, /Top priority right now/);
   assert.match(sent.find(m => m.chat_id === 111).text, /Test message posted/);
   assert.match(sent.find(m => m.chat_id === 222 && /only the owner/.test(m.text)).text, /only the owner/);
-  assert.ok(sent.some(m => m.chat_id === 222 && /Join the channel/.test(m.text)), "/start answered");
+  assert.ok(sent.some(m => m.chat_id === 222 && /Welcome to BCyberAware/.test(m.text) && m.reply_markup?.inline_keyboard), "/start answered with the industry picker");
   sent.length = 0;
   await publishToTelegram(env, d, kv, now + 600000, { fetchImpl });
   assert.equal(sent.length, 0, "commands are handled once");
