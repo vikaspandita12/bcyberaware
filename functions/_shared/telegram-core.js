@@ -23,6 +23,7 @@
  * direct messages, drained a few per run to stay inside the Worker's request budget.
  */
 import { SECTORS, ALL_CHOICES, byId, sectorsOf, hashtagsOf, matches } from "./sectors.js";
+import { incidentNews, formatNewsAlert, newsButtons, pickRoundup, formatRoundup } from "./news-alerts.js";
 
 const STATE_KEY = "telegram:state:v1";
 const SUBS_KEY = "telegram:subs:v1";
@@ -34,6 +35,10 @@ const MAX_ALERTS_PER_RUN = 3;
 const ALERT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const DIGEST_UTC_MINUTES = 3 * 60 + 30;  // 03:30 UTC = 09:00 IST
 const POLL_UTC_MINUTES = 12 * 60 + 30;   // Friday 12:30 UTC = 18:00 IST
+const ROUNDUP_UTC_MINUTES = 13 * 60;     // 13:00 UTC = 18:30 IST, daily "Today in cyber"
+const NEWS_MAX_PER_DAY = 10;             // breaking breach / attack / zero-day stories per UTC day
+const NEWS_MIN_GAP_MS = 40 * 60 * 1000;  // at most one breaking story every 40 minutes
+const NEWS_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 const REMEMBER = 400;
 const RUN_BUDGET = 16;                   // Telegram requests per scheduled run (Worker limit is 50 in total)
 const WEBHOOK_DM_BUDGET = 20;            // direct messages a webhook call may also deliver
@@ -206,7 +211,7 @@ export function formatTest(payload, now) {
   const lines = [
     `✅ <b>Test message from BCyberAware</b>`,
     `The alert bot is connected and can post here. Sent ${esc(new Date(now).toLocaleString("en-IN", IST))} IST.`,
-    `What arrives automatically:\n• Every new "Act now" threat, within about 5 minutes, tagged by industry\n• A morning brief at 9:00 am IST with an industry watch and patch deadlines\n• A Friday pulse poll at 6:00 pm IST`,
+    `What arrives automatically:\n• Every new "Act now" threat, within about 5 minutes, tagged by industry\n• Breaking news on major breaches, ransomware attacks and zero-days\n• A morning brief at 9:00 am IST and "Today in cyber" at 6:30 pm IST\n• A Friday pulse poll at 6:00 pm IST`,
   ];
   if (top) lines.push(`Top priority right now: <b>[${top.priority.score} ${esc(top.priority.label)}]</b> ${esc(cut(top.title, 150))}`);
   lines.push(`<a href="${SITE}">advisory.bcyberaware.co.in</a>`);
@@ -216,7 +221,7 @@ export function formatTest(payload, now) {
 const WELCOME = `👋 <b>Welcome to BCyberAware alerts</b>
 
 Pick the industries you protect. You'll get:
-• 🚨 Must-act threats for those industries, by direct message
+• 🚨 Must-act threats and major breaches in those industries, by direct message
 • ☀️ A personal brief at 9:00 am IST
 
 Tap to select, then press <b>Done</b>.`;
@@ -340,6 +345,43 @@ export async function publishToTelegram(env, payload, store, now, { fetchImpl = 
   const d = new Date(now);
   const today = d.toISOString().slice(0, 10);
   const minutes = d.getUTCHours() * 60 + d.getUTCMinutes();
+
+  // Breaking incident news: breaches, ransomware, cyberattacks, zero-days under attack.
+  // These score low as vulnerabilities, so they are picked by what the story describes.
+  if (!result.error) {
+    if (state.news_day !== today) { state.news_day = today; state.news_count = 0; changed = true; }
+    const postedNews = new Set(state.news_ids || []);
+    const recentTitles = (state.news_titles || []).filter(x => now - x.at < 2 * DAY);
+    const fresh = incidentNews(payload, now, NEWS_MAX_AGE_MS)
+      .filter(a => !postedNews.has(a.id) && !posted.has(a.id) && !(a.cve_ids || []).some(c => postedCves.has(c)) && !recentTitles.some(x => sameStory(x.t, a.title)));
+    const due = state.news_count < NEWS_MAX_PER_DAY && (now - (state.news_last_at || 0)) >= NEWS_MIN_GAP_MS;
+    const a = fresh.find(x => !postedNews.has(x.id));
+    if (!first && due && a) {
+      try {
+        await timed(tg.send(env.TELEGRAM_CHANNEL, formatNewsAlert(a), newsButtons(a, state.bot_username, SITE)));
+        postedNews.add(a.id); (a.cve_ids || []).forEach(c => postedCves.add(c));
+        recentTitles.push({ t: a.title, at: now });
+        state.news_count++; state.news_last_at = now; result.news = 1;
+        // Direct message to subscribers whose own industries the story is about
+        const s = await loadSubs();
+        for (const [chat, sub] of Object.entries(s)) if (sectorsOf(a).some(id => id !== "cross" && (sub.s || []).includes(id))) await enqueue(chat, formatNewsAlert(a));
+      } catch (e) { result.error = String(e?.message || e).slice(0, 160); }
+    }
+    state.news_ids = [...postedNews].slice(-REMEMBER);
+    state.news_titles = recentTitles.slice(-40);
+    changed = true;
+  }
+
+  // Evening roundup: "Today in cyber", the day's most important stories with links
+  if (!result.error && !first && state.roundup_day !== today && minutes >= ROUNDUP_UTC_MINUTES) {
+    const items = pickRoundup(payload, now, 8);
+    if (items.length >= 3) {
+      try {
+        await timed(tg.send(env.TELEGRAM_CHANNEL, formatRoundup(items, now, SITE)));
+        state.roundup_day = today; changed = true; result.roundup = true;
+      } catch (e) { result.error = String(e?.message || e).slice(0, 160); }
+    }
+  }
   if (!result.error && state.digest_day !== today && minutes >= DIGEST_UTC_MINUTES) {
     const items = pickDigest(payload);
     if (items.length) {
@@ -398,6 +440,15 @@ export async function publishToTelegram(env, payload, store, now, { fetchImpl = 
   if (subsChanged) { try { await store.put(SUBS_KEY, JSON.stringify(subs)); } catch {} }
   if (outboxChanged) { try { await store.put(OUTBOX_KEY, JSON.stringify(outbox)); } catch {} }
   return result;
+}
+
+const STOP = new Set("breach breaches breached data customer customers users hackers hacker attack attacks cyberattack security vulnerability vulnerabilities flaw flaws exposes exposed after with from says said confirms confirmed over more than into their that this have been were about amid following warns exploited exploit actively critical million thousands company affecting wider third party ransomware gang group claims claimed council hits struck stole stolen steals leak leaked leaks records hospital university bank government agency firm giant operator".split(" "));
+const words = t => new Set(String(t || "").toLowerCase().replace(/[^a-z0-9 ]+/g, " ").split(/\s+/).filter(w => w.length >= 4 && !STOP.has(w)));
+/** Two headlines about the same incident from different outlets. */
+export function sameStory(a, b) {
+  const A = words(a), B = words(b); if (!A.size || !B.size) return false;
+  let n = 0; for (const w of A) if (B.has(w)) n++;
+  return n >= 2 && n / Math.min(A.size, B.size) >= 0.3;
 }
 
 function isoWeek(d) {
@@ -587,6 +638,8 @@ export async function telegramStatus(store) {
       bot: st.bot_username ? `@${st.bot_username}` : null,
       instant_replies: !!st.webhook,
       poll_sent_for: st.poll_week || null,
+      news_posted_today: st.news_day ? (st.news_count || 0) : 0,
+      roundup_sent_for: st.roundup_day || null,
       industry_subscribers: Object.keys((await store.get(SUBS_KEY, { type: "json" })) || {}).length,
       direct_messages_queued: ((await store.get(OUTBOX_KEY, { type: "json" })) || []).length,
     };

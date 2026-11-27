@@ -19,7 +19,9 @@ function fakeTelegram(fail) {
   const fetchImpl = async (url, init) => {
     if (url.includes("/getUpdates")) return new Response(JSON.stringify({ ok: true, result: [] }), { status: 200 });
     assert.ok(url.startsWith("https://api.telegram.org/bot123:abc/sendMessage"));
-    const body = JSON.parse(init.body); sent.push(body);
+    const body = JSON.parse(init.body);
+    if (/#News/.test(body.text || "")) return new Response(JSON.stringify({ ok: true }), { status: 200 }); // breaking-news posts are tested in telegram-news.test.mjs
+    sent.push(body);
     if (fail) return new Response(JSON.stringify({ ok: false, description: "Forbidden: bot is not a member of the channel chat" }), { status: 403 });
     return new Response(JSON.stringify({ ok: true }), { status: 200 });
   };
@@ -157,7 +159,7 @@ test("/test from the channel owner posts a test message; anyone else is refused"
   updates = [msg(1, 111, "/test"), msg(2, 222, "/test"), msg(3, 222, "/start")];
   const r = await publishToTelegram(env, d, kv, now + 300000, { fetchImpl });
   assert.equal(r.commands, 1);
-  const toChannel = sent.filter(m => m.chat_id === "@bcyberaware");
+  const toChannel = sent.filter(m => m.chat_id === "@bcyberaware" && !/#News/.test(m.text));
   assert.equal(toChannel.length, 2); assert.match(toChannel[0].text, /Test message from BCyberAware/); assert.match(toChannel[0].text, /Top priority right now/);
   assert.match(toChannel[1].text, /Industries:/); assert.ok(toChannel[1].reply_markup.inline_keyboard[0][0].url, "sample alert has buttons");
   assert.match(sent.find(m => m.chat_id === 111).text, /Test message posted.*sample alert/);

@@ -23,7 +23,7 @@ export const SECTORS = [
   { id: "telecom", name: "Telecom & ISPs", tag: "Telecom", emoji: "📡",
     re: /telecom|telco|carrier|\b5g\b|\blte\b|\bisp\b|mobile network|\bss7\b|diameter|ericsson|nokia|huawei|\bzte\b|\bsim\b swap|cpe\b|broadband|salt typhoon|broadworks|openwave|freeswitch|asterisk|\bvoip\b|\bsip\b|\bims\b|\bsbc\b|session border|ribbon|metaswitch|mitel|avaya|kamailio|\bsms\b gateway|ivr/i },
   { id: "retail", name: "Retail & E-commerce", tag: "Retail", emoji: "🛒",
-    re: /retail|e-?commerce|magento|adobe commerce|woocommerce|shopify|prestashop|point[- ]of[- ]sale|\bpos\b|skimm|loyalty|online store|checkout|supermarket|hospitality|hotel/i },
+    re: /retail|e-?commerce|magento|adobe commerce|woocommerce|shopify|prestashop|point[- ]of[- ]sale|\bpos\b|skimm|loyalty|online store|checkout|supermarket|grocery|hospitality|hotel|restaurant|fast[- ]food|food (chain|delivery|service)|quick[- ]service|mcdonald'?s|starbucks|burger|pizza|coffee chain/i },
   { id: "education", name: "Education", tag: "Education", emoji: "🎓",
     re: /universit(y|ies)|school|education|student|college|campus|moodle|canvas lms|blackboard|powerschool|edtech/i },
   { id: "transport", name: "Transport & Logistics", tag: "Transport", emoji: "🚢",
